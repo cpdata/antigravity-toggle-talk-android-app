@@ -235,7 +235,14 @@ public class MainActivity extends Activity {
     }
 
     private void checkPermissionsAndPreferences() {
-        if (checkSelfPermission("com.termux.permission.RUN_COMMAND") != PackageManager.PERMISSION_GRANTED) {
+        boolean termuxGranted = checkSelfPermission("com.termux.permission.RUN_COMMAND") == PackageManager.PERMISSION_GRANTED;
+        boolean audioGranted = checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
+        
+        if (!audioGranted) {
+            requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO}, 100);
+        }
+        
+        if (!termuxGranted) {
             String warning = "⚠️ WARNING: 'Run commands in Termux' permission is not granted!\n\n" +
                     "To enable it:\n" +
                     "1. Open Android Settings -> Apps -> ToggleTalk\n" +
@@ -244,11 +251,22 @@ public class MainActivity extends Activity {
                     "Also, ensure 'allow-external-apps=true' is uncommented in ~/.termux/termux.properties inside Termux.";
             mTvLog.setText(warning);
             mTvLog.setTextColor(Color.parseColor("#FFCC00"));
+        } else if (!audioGranted) {
+            mTvLog.setText("⚠️ WARNING: Microphone permission is required to use speech features. Please grant microphone access.");
+            mTvLog.setTextColor(Color.parseColor("#FFCC00"));
         } else {
             if ("Press the mic button to start speaking...".equals(mTvLog.getText().toString()) || mTvLog.getText().toString().startsWith("⚠️")) {
                 mTvLog.setText("System ready. Press the mic button to speak.");
                 mTvLog.setTextColor(Color.parseColor("#D1D1D6"));
             }
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 100) {
+            checkPermissionsAndPreferences();
         }
     }
 
