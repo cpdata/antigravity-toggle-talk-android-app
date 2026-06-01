@@ -1,0 +1,317 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Main Content Relative Layout -->
+    <RelativeLayout
+        android:id="@+id/main_content_layout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_gradient"
+        android:padding="24dp">
+
+        <!-- Top header with Hamburger, App name and Status -->
+        <RelativeLayout
+            android:id="@+id/header_layout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp">
+
+            <!-- Hamburger Menu Button -->
+            <ImageButton
+                android:id="@+id/btn_menu"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_menu"
+                android:scaleType="centerInside"
+                android:contentDescription="Open directory menu" />
+
+            <!-- Title and Status centered -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:layout_centerInParent="true">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ToggleTalk"
+                    android:textColor="#E6E6FA"
+                    android:textSize="28sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.05" />
+
+                <TextView
+                    android:id="@+id/tv_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="IDLE"
+                    android:textColor="#8A8A8F"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginTop="8dp"
+                    android:letterSpacing="0.1" />
+            </LinearLayout>
+        </RelativeLayout>
+
+        <!-- Central Button and Animation Area -->
+        <FrameLayout
+            android:id="@+id/button_container"
+            android:layout_width="260dp"
+            android:layout_height="260dp"
+            android:layout_below="@+id/header_layout"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="10dp">
+
+            <!-- Concentric Ring 3 (Outer Ring for Pulsing) -->
+            <View
+                android:id="@+id/ring_outer"
+                android:layout_width="220dp"
+                android:layout_height="220dp"
+                android:layout_gravity="center"
+                android:background="@drawable/bg_mic_btn"
+                android:alpha="0" />
+
+            <!-- Concentric Ring 2 (Middle Ring for Pulsing) -->
+            <View
+                android:id="@+id/ring_middle"
+                android:layout_width="170dp"
+                android:layout_height="170dp"
+                android:layout_gravity="center"
+                android:background="@drawable/bg_mic_btn"
+                android:alpha="0" />
+
+            <!-- Concentric Ring 1 (Inner Ring/Halo) -->
+            <View
+                android:id="@+id/ring_inner"
+                android:layout_width="120dp"
+                android:layout_height="120dp"
+                android:layout_gravity="center"
+                android:background="@drawable/bg_mic_btn"
+                android:alpha="0" />
+
+            <!-- Thinking Spinner Progress Bar -->
+            <ProgressBar
+                android:id="@+id/pb_thinking"
+                android:layout_width="130dp"
+                android:layout_height="130dp"
+                android:layout_gravity="center"
+                android:indeterminate="true"
+                android:visibility="gone"
+                android:indeterminateTintMode="src_atop"
+                android:indeterminateTint="#00F2FE" />
+
+            <!-- Main Mic Action Button -->
+            <ImageButton
+                android:id="@+id/btn_mic"
+                android:layout_width="96dp"
+                android:layout_height="96dp"
+                android:layout_gravity="center"
+                android:background="@drawable/bg_mic_btn"
+                android:src="@drawable/ic_mic"
+                android:padding="20dp"
+                android:scaleType="fitCenter"
+                android:tint="#120E2E"
+                android:contentDescription="Toggle voice record"
+                android:elevation="6dp" />
+        </FrameLayout>
+
+        <!-- Glassmorphic Text Transcript Log Card -->
+        <LinearLayout
+            android:id="@+id/card_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_below="@+id/button_container"
+            android:layout_above="@+id/settings_layout"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="10dp"
+            android:orientation="vertical"
+            android:background="@drawable/card_glass"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="CONVERSATION LOG"
+                android:textColor="#80FFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp"
+                android:letterSpacing="0.05" />
+
+            <ScrollView
+                android:id="@+id/scroll_log"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:fillViewport="true">
+
+                <TextView
+                    android:id="@+id/tv_log"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Press the mic button to start speaking..."
+                    android:textColor="#D1D1D6"
+                    android:textSize="15sp"
+                    android:lineSpacingMultiplier="1.2" />
+            </ScrollView>
+        </LinearLayout>
+
+        <!-- Bottom Settings (Continue session & Setup info) -->
+        <LinearLayout
+            android:id="@+id/settings_layout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:layout_marginBottom="10dp">
+
+            <!-- Styled Context Toggle Checkbox/Switch -->
+            <CheckBox
+                android:id="@+id/cb_continue"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Continue Conversation (Remember Context)"
+                android:textColor="#E6E6FA"
+                android:textSize="14sp"
+                android:buttonTint="#9D50BB"
+                android:checked="false"
+                android:layout_marginBottom="6dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Powered by Antigravity in Termux"
+                android:textColor="#40FFFFFF"
+                android:textSize="11sp"
+                android:letterSpacing="0.05" />
+        </LinearLayout>
+    </RelativeLayout>
+
+    <!-- Slide-out Drawer Overlay Container -->
+    <FrameLayout
+        android:id="@+id/drawer_root"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true">
+
+        <!-- Translucent dim background panel -->
+        <View
+            android:id="@+id/drawer_dim_background"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#A6000000"
+            android:alpha="0" />
+
+        <!-- Drawer Content Card (Glassmorphic) -->
+        <LinearLayout
+            android:id="@+id/drawer_content"
+            android:layout_width="280dp"
+            android:layout_height="match_parent"
+            android:layout_gravity="start"
+            android:orientation="vertical"
+            android:background="#FA0B0518"
+            android:padding="20dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:elevation="16dp">
+
+            <!-- Title Header -->
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:layout_marginBottom="16dp">
+
+                <TextView
+                    android:id="@+id/tv_drawer_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="INITIAL DIRECTORY"
+                    android:textColor="#E6E6FA"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.05" />
+
+                <!-- Refresh Button -->
+                <ImageButton
+                    android:id="@+id/btn_refresh_dirs"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:src="@android:drawable/stat_notify_sync"
+                    android:tint="#E6E6FA"
+                    android:contentDescription="Refresh directories list" />
+            </RelativeLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Select the directory context where the Antigravity CLI will be run:"
+                android:textColor="#A0E6E6FA"
+                android:textSize="12sp"
+                android:layout_marginBottom="20dp"
+                android:lineSpacingMultiplier="1.2" />
+
+            <!-- Loading Spinner container -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <!-- List View of Directories -->
+                <ListView
+                    android:id="@+id/lv_directories"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:divider="@null"
+                    android:dividerHeight="0dp" />
+
+                <!-- Progress Bar during query -->
+                <ProgressBar
+                    android:id="@+id/pb_drawer_loading"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_gravity="center"
+                    android:visibility="gone"
+                    android:indeterminateTint="#00F2FE" />
+
+                <!-- Empty state message -->
+                <TextView
+                    android:id="@+id/tv_empty_dirs"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:text="No directories found in home"
+                    android:textColor="#60FFFFFF"
+                    android:textSize="14sp"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <!-- Bottom Selected Status -->
+            <TextView
+                android:id="@+id/tv_active_dir"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="10dp"
+                android:text="Active: Home"
+                android:textColor="#E6E6FA"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:letterSpacing="0.05" />
+        </LinearLayout>
+    </FrameLayout>
+</FrameLayout>

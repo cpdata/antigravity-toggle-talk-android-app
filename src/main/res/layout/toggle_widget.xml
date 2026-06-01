@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center">
+
+    <!-- Circle button shape container -->
+    <FrameLayout
+        android:id="@+id/widget_button_container"
+        android:layout_width="84dp"
+        android:layout_height="84dp"
+        android:layout_centerInParent="true">
+
+        <!-- Outer Glowing Background Ring -->
+        <ImageView
+            android:id="@+id/widget_ring"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/bg_mic_btn"
+            android:backgroundTint="#40FFFFFF"
+            android:contentDescription="Widget Halo" />
+
+        <!-- Main Button Circle -->
+        <ImageView
+            android:id="@+id/widget_btn_mic"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_mic_btn"
+            android:backgroundTint="#1A0B2E"
+            android:src="@drawable/ic_mic"
+            android:contentDescription="Widget Toggle Button"
+            android:padding="16dp"
+            android:scaleType="fitCenter" />
+    </FrameLayout>
+</RelativeLayout>

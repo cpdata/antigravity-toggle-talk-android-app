@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ToggleTalk</string>
+    <string name="state_idle">IDLE</string>
+    <string name="state_recording">RECORDING...</string>
+    <string name="state_thinking">THINKING...</string>
+    <string name="state_speaking">SPEAKING...</string>
+</resources>

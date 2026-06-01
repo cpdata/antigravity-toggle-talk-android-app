@@ -1,0 +1,32 @@
+plugins {
+    id 'com.android.application' version '8.7.2'
+}
+
+android {
+    namespace 'com.toggletalk.android'
+    compileSdk 33
+    buildToolsVersion "33.0.0"
+
+    defaultConfig {
+        applicationId "com.toggletalk.android"
+        minSdk 26  // Supported minimum for clean ForegroundService
+        targetSdk 33
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    // Keep it minimal and avoid fetching heavy external libraries
+}
