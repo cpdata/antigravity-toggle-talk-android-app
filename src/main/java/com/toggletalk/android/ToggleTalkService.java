@@ -118,12 +118,14 @@ public class ToggleTalkService extends Service {
         runCommandIntent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash");
 
         // Setup arguments
-        String scriptPath = "/data/data/com.termux/files/home/toggle-talk-antigravity/toggle_talk_antigravity.sh";
+        String scriptPath;
+        if (mContinueSession) {
+            scriptPath = "/data/data/com.termux/files/home/ToggleTalkAndroid/toggle_talk_continue.sh";
+        } else {
+            scriptPath = "/data/data/com.termux/files/home/ToggleTalkAndroid/toggle_talk_antigravity.sh";
+        }
         java.util.List<String> argList = new java.util.ArrayList<>();
         argList.add(scriptPath);
-        if (mContinueSession) {
-            argList.add("-c");
-        }
         if (mTargetDirectory != null && !mTargetDirectory.isEmpty() && !"Home".equals(mTargetDirectory) && !"/data/data/com.termux/files/home".equals(mTargetDirectory)) {
             argList.add("-d");
             argList.add(mTargetDirectory);

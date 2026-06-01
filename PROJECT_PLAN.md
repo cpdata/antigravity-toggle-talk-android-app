@@ -33,7 +33,7 @@ Replicate the custom Speech-to-Speech interaction loop inside a native Android a
   - Service: `com.termux/com.termux.app.RunCommandService`
   - Action: `com.termux.RUN_COMMAND`
   - Permission: `com.termux.permission.RUN_COMMAND`
-  - Target script: `~/toggle-talk-antigravity/toggle_talk_antigravity.sh`
+  - Target script: `~/ToggleTalkAndroid/toggle_talk_antigravity.sh`
 
 ---
 

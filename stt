@@ -1,0 +1,64 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# stt - Speech-to-Text wrapper using whisper.cpp in Termux
+
+# Configuration
+export HOME="/data/data/com.termux/files/home"
+export PREFIX="/data/data/com.termux/files/usr"
+export PATH="$PREFIX/bin:$PATH"
+
+WHISPER_PATH="$HOME/whisper.cpp/build/bin/whisper-cli"
+MODEL_PATH="$HOME/whisper.cpp/models/ggml-base.en.bin"
+AUDIO_FILE="$HOME/.stt_recording.m4a"
+WAV_FILE="$HOME/.stt_recording.wav"
+TXT_FILE="$HOME/.stt_recording.wav.txt"
+
+# Ensure clean state function
+cleanup_files() {
+    rm -f "$AUDIO_FILE" "$WAV_FILE" "$TXT_FILE"
+}
+
+# 1. Check if already recording
+STATUS=$(termux-microphone-record -i 2>/dev/null)
+if echo "$STATUS" | grep -q '"isRecording":\s*true'; then
+    # Another instance is recording. Stop it.
+    termux-microphone-record -q >/dev/null 2>&1
+    exit 0
+fi
+
+# 2. Not recording. Start a new recording.
+cleanup_files
+
+# Start recording (300 seconds limit)
+termux-microphone-record -e aac -f "$AUDIO_FILE" -l 300 >/dev/null 2>&1
+
+# Wait a brief moment for the recorder to start and register
+sleep 0.5
+
+# Loop checking status
+while true; do
+    STATUS=$(termux-microphone-record -i 2>/dev/null)
+    if ! echo "$STATUS" | grep -q '"isRecording":\s*true'; then
+        break
+    fi
+    sleep 0.2
+done
+
+# Wait for file cleanup/flush
+sleep 0.5
+
+# 3. Recording stopped. Process audio if file exists and has size.
+if [ -s "$AUDIO_FILE" ]; then
+    # Convert to 16kHz mono WAV for whisper
+    ffmpeg -y -i "$AUDIO_FILE" -ar 16000 -ac 1 -c:a pcm_s16le "$WAV_FILE" >/dev/null 2>&1
+    if [ -s "$WAV_FILE" ]; then
+        # Run transcription
+        $WHISPER_PATH -m "$MODEL_PATH" -f "$WAV_FILE" -otxt -nt -np >/dev/null 2>&1
+        if [ -f "$TXT_FILE" ]; then
+            # Output ONLY the transcribed text
+            cat "$TXT_FILE" | tr -d '\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
+        fi
+    fi
+fi
+
+# Clean up
+cleanup_files
