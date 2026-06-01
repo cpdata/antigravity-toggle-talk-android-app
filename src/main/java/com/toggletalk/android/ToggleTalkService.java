@@ -528,7 +528,8 @@ public class ToggleTalkService extends Service {
             return;
         }
         
-        String modelDir = "/sdcard/ToggleTalkModels";
+        java.io.File externalDir = getExternalFilesDir(null);
+        String modelDir = (externalDir != null ? externalDir.getAbsolutePath() : getFilesDir().getAbsolutePath()) + "/ToggleTalkModels";
         
         java.io.File dir = new java.io.File(modelDir);
         if (!dir.exists()) {
@@ -551,6 +552,7 @@ public class ToggleTalkService extends Service {
                     
                     OfflineModelConfig modelConfig = new OfflineModelConfig();
                     modelConfig.setWhisper(whisperConfig);
+                    modelConfig.setTokens(tokens);
                     modelConfig.setModelType("whisper");
                     modelConfig.setNumThreads(2);
                     modelConfig.setDebug(true);
@@ -564,7 +566,7 @@ public class ToggleTalkService extends Service {
                     config.setModelConfig(modelConfig);
                     config.setFeatConfig(featConfig);
                     
-                    mRecognizer = new OfflineRecognizer(getAssets(), config);
+                    mRecognizer = new OfflineRecognizer(null, config);
                     Log.i(TAG, "Whisper STT engine initialized successfully");
                 } else {
                     Log.w(TAG, "Whisper model files missing in " + modelDir);
@@ -598,7 +600,7 @@ public class ToggleTalkService extends Service {
                     OfflineTtsConfig config = new OfflineTtsConfig();
                     config.setModel(modelConfig);
                     
-                    mTts = new OfflineTts(getAssets(), config);
+                    mTts = new OfflineTts(null, config);
                     Log.i(TAG, "Kokoro TTS engine initialized successfully");
                 } else {
                     Log.w(TAG, "Kokoro model files missing in " + modelDir);

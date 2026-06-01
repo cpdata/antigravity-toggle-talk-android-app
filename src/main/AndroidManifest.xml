@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
 
     <!-- Package visibility for Android 11+ -->
     <queries>
@@ -17,6 +18,7 @@
         android:allowBackup="true"
         android:label="ToggleTalk"
         android:supportsRtl="true"
+        android:requestLegacyExternalStorage="true"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
         <!-- Main Activity -->
@@ -32,7 +34,7 @@
         <!-- Foreground State Machine Service -->
         <service
             android:name=".ToggleTalkService"
-            android:exported="false" />
+            android:exported="true" />
 
         <!-- Quick Settings Tile -->
         <service

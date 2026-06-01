@@ -237,9 +237,18 @@ public class MainActivity extends Activity {
     private void checkPermissionsAndPreferences() {
         boolean termuxGranted = checkSelfPermission("com.termux.permission.RUN_COMMAND") == PackageManager.PERMISSION_GRANTED;
         boolean audioGranted = checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
+        boolean storageGranted = checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
         
+        java.util.List<String> needed = new java.util.ArrayList<>();
         if (!audioGranted) {
-            requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO}, 100);
+            needed.add(android.Manifest.permission.RECORD_AUDIO);
+        }
+        if (!storageGranted) {
+            needed.add(android.Manifest.permission.READ_EXTERNAL_STORAGE);
+        }
+        
+        if (!needed.isEmpty()) {
+            requestPermissions(needed.toArray(new String[0]), 100);
         }
         
         if (!termuxGranted) {
@@ -251,8 +260,8 @@ public class MainActivity extends Activity {
                     "Also, ensure 'allow-external-apps=true' is uncommented in ~/.termux/termux.properties inside Termux.";
             mTvLog.setText(warning);
             mTvLog.setTextColor(Color.parseColor("#FFCC00"));
-        } else if (!audioGranted) {
-            mTvLog.setText("⚠️ WARNING: Microphone permission is required to use speech features. Please grant microphone access.");
+        } else if (!audioGranted || !storageGranted) {
+            mTvLog.setText("⚠️ WARNING: Microphone and Storage permissions are required to use speech features. Please grant access.");
             mTvLog.setTextColor(Color.parseColor("#FFCC00"));
         } else {
             if ("Press the mic button to start speaking...".equals(mTvLog.getText().toString()) || mTvLog.getText().toString().startsWith("⚠️")) {
