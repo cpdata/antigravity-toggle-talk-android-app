@@ -17,7 +17,6 @@ This file outlines the environment details and integration configurations for th
 ## Integrations & Tools
 - **Native Android Speech (Sherpa-ONNX)**: The app runs Whisper (STT) and Kokoro (TTS) natively, utilizing on-device GPU/NPU acceleration. Model assets are loaded from `/sdcard/ToggleTalkModels/`.
 - **Termux Bridge**: The app coordinates the interaction loop and calls Termux asynchronously via the `com.termux.RUN_COMMAND` intent only for invoking the Antigravity agent reasoning CLI (`run_antigravity.sh`).
-- **Legacy Files (Deprecated)**: Old Termux scripts (`stt`, `tts`, `toggle_talk_antigravity.sh`) are kept in the repository for reference but are unused.
 - **Termux Storage**: Configured (`termux-setup-storage` has been run) allowing access to shared device storage at `~/storage/` (Access the SDCard at `/sdcard/` but don't write scripts that write temporary files to the SD card, we want to avoid causing repeated filesystem writes to the SD card).
 - **TTS**: You have access to a custom command `tts <message>` that you can use to speak to the user. (notify the user if you cannot access this command directly, do not review the code for the tts command unless instructed to do so.)
 For voice output, use the custom TTS command `tts 'say something here'` to speak a brief summary of your response.

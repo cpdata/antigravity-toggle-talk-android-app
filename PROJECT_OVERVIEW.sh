@@ -165,8 +165,6 @@ To keep the application small and build times fast in the Termux development env
       --arg st "$SANITIZED_TTS" \
       '{latest_response: $lr, sanitized_tts: $st}'
    ```
-2. **Deprecate Legacy Scripts**:
-   - Remove/deprecate `toggle_talk_antigravity.sh`, `stt`, and `tts` scripts in `/data/data/com.termux/files/home/ToggleTalkAndroid/`.
 
 ---
 
@@ -195,4 +193,3 @@ To keep the application small and build times fast in the Termux development env
 ### Phase 5: Verification & Cleanup
 - Test the end-to-end loop: Tap to listen -> Tap to transcribe -> Reasoning in Termux -> Synthesize response -> Play response.
 - Verify that device GPU is active during transcription and synthesis.
-- Remove legacy script files from the workspace.
