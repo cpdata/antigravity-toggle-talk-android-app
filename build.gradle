@@ -29,4 +29,5 @@ android {
 
 dependencies {
     // Keep it minimal and avoid fetching heavy external libraries
+    implementation fileTree(dir: 'libs', include: ['*.aar', '*.jar'])
 }
