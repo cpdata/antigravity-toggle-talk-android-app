@@ -1,3 +1,5 @@
 build/
 .gradle/
 ignore/
+.task-cli-worktree/
+logs/
