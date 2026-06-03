@@ -24,9 +24,9 @@ PROMPT="${TRANSCRIPT}${PROMPT_SUFFIX}"
 
 # Run Antigravity
 if [ "$CONTINUE_SESSION" = "true" ]; then
-    RESPONSE=$(env -u LD_PRELOAD -u LD_LIBRARY_PATH "$GLIBC_LINKER" --library-path "$GLIBC_LIBS" "$AGY_BIN" --dangerously-skip-permissions -c -p "$PROMPT" < /dev/null 2>>"$ERR_FILE")
+    RESPONSE=$(env -u LD_PRELOAD -u LD_LIBRARY_PATH "$GLIBC_LINKER" --library-path "$GLIBC_LIBS" "$AGY_BIN" --dangerously-skip-permissions -c -p "$PROMPT" --print-timeout 60m < /dev/null 2>>"$ERR_FILE")
 else
-    RESPONSE=$(env -u LD_PRELOAD -u LD_LIBRARY_PATH "$GLIBC_LINKER" --library-path "$GLIBC_LIBS" "$AGY_BIN" --dangerously-skip-permissions -p "$PROMPT" < /dev/null 2>>"$ERR_FILE")
+    RESPONSE=$(env -u LD_PRELOAD -u LD_LIBRARY_PATH "$GLIBC_LINKER" --library-path "$GLIBC_LIBS" "$AGY_BIN" --dangerously-skip-permissions -p "$PROMPT" --print-timeout 60m < /dev/null 2>>"$ERR_FILE")
 fi
 
 # Extract latest and sanitized versions

@@ -21,3 +21,29 @@ This file outlines the environment details and integration configurations for th
 
 ## Git
 - Always git stage and commit your file changes at the end of every turn  Always use the current 'main' branch unless instructed otherwise.
+
+## Agent Task CLI - AI Agent Guide
+
+Use the `task-cli` command to manage tasks for this project.
+
+Pipelines:
+1. Solve: ready -> claim -> [work] -> update --status completed --result '...'
+2. Create: group (optional) -> create --group <id> --depends <ids>
+3. Monitor: stats -> list --status claimed -> heartbeat <id>
+Core Commands (task-cli <cmd>):
+- list/search: [id title status priority assign tags] (filter: -s, -p, -a, -g, -l <tags>)
+- ready: tasks unblocked & for you
+- claim [id]: lock task for work
+- read <id> [-v]: details, metadata, deps
+- update <id>: -s <status>, -r <result>, -t <title>, -d <desc>, -l <tags>, -a <assign>
+- update dep <id>: --add <id>, --remove <id>
+- group: create/list groups (-t, -d, -l <tags>, -p, -a)
+- tags: list all unique tags
+- stats: task/group metrics
+
+
+Context:
+User: main-agent
+Repo: /data/data/com.termux/files/home/ToggleTalkAndroid
+
+Run "task-cli --help" for full command reference.
