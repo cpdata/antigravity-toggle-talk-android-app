@@ -39,11 +39,12 @@
                 android:layout_centerInParent="true">
 
                 <TextView
+                    android:id="@+id/tv_active_dir_top"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="ToggleTalk"
-                    android:textColor="#E6E6FA"
-                    android:textSize="28sp"
+                    android:text="Active: Home"
+                    android:textColor="#00F2FE"
+                    android:textSize="20sp"
                     android:textStyle="bold"
                     android:letterSpacing="0.05" />
 

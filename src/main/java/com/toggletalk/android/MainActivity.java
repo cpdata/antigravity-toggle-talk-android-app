@@ -57,6 +57,7 @@ public class MainActivity extends Activity {
     private ListView mLvDirectories;
     private ProgressBar mPbDrawerLoading;
     private TextView mTvActiveDir;
+    private TextView mTvActiveDirTop;
     private TextView mTvEmptyDirs;
     private ImageButton mBtnMenu;
     private ImageButton mBtnRefreshDirs;
@@ -167,6 +168,7 @@ public class MainActivity extends Activity {
         mLvDirectories = findViewById(R.id.lv_directories);
         mPbDrawerLoading = findViewById(R.id.pb_drawer_loading);
         mTvActiveDir = findViewById(R.id.tv_active_dir);
+        mTvActiveDirTop = findViewById(R.id.tv_active_dir_top);
         mTvEmptyDirs = findViewById(R.id.tv_empty_dirs);
         mBtnMenu = findViewById(R.id.btn_menu);
         mBtnRefreshDirs = findViewById(R.id.btn_refresh_dirs);
@@ -444,6 +446,9 @@ public class MainActivity extends Activity {
 
     private void updateActiveDirLabel() {
         mTvActiveDir.setText("Active: " + mTargetDirectory);
+        if (mTvActiveDirTop != null) {
+            mTvActiveDirTop.setText("Active: " + mTargetDirectory);
+        }
     }
 
     // --- Query Termux Directories list via RUN_COMMAND ---
