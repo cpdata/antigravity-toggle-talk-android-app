@@ -112,67 +112,7 @@
             android:gravity="center_horizontal"
             android:layout_marginBottom="10dp">
 
-            <!-- Central Button and Animation Area -->
-            <FrameLayout
-                android:id="@+id/button_container"
-                android:layout_width="160dp"
-                android:layout_height="160dp"
-                android:layout_marginBottom="10dp">
-
-                <!-- Concentric Ring 3 (Outer Ring for Pulsing) -->
-                <View
-                    android:id="@+id/ring_outer"
-                    android:layout_width="140dp"
-                    android:layout_height="140dp"
-                    android:layout_gravity="center"
-                    android:background="@drawable/bg_mic_btn"
-                    android:alpha="0" />
-
-                <!-- Concentric Ring 2 (Middle Ring for Pulsing) -->
-                <View
-                    android:id="@+id/ring_middle"
-                    android:layout_width="110dp"
-                    android:layout_height="110dp"
-                    android:layout_gravity="center"
-                    android:background="@drawable/bg_mic_btn"
-                    android:alpha="0" />
-
-                <!-- Concentric Ring 1 (Inner Ring/Halo) -->
-                <View
-                    android:id="@+id/ring_inner"
-                    android:layout_width="80dp"
-                    android:layout_height="80dp"
-                    android:layout_gravity="center"
-                    android:background="@drawable/bg_mic_btn"
-                    android:alpha="0" />
-
-                <!-- Thinking Spinner Progress Bar -->
-                <ProgressBar
-                    android:id="@+id/pb_thinking"
-                    android:layout_width="90dp"
-                    android:layout_height="90dp"
-                    android:layout_gravity="center"
-                    android:indeterminate="true"
-                    android:visibility="gone"
-                    android:indeterminateTintMode="src_atop"
-                    android:indeterminateTint="#00F2FE" />
-
-                <!-- Main Mic Action Button -->
-                <ImageButton
-                    android:id="@+id/btn_mic"
-                    android:layout_width="64dp"
-                    android:layout_height="64dp"
-                    android:layout_gravity="center"
-                    android:background="@drawable/bg_mic_btn"
-                    android:src="@drawable/ic_mic"
-                    android:padding="14dp"
-                    android:scaleType="fitCenter"
-                    android:tint="#120E2E"
-                    android:contentDescription="Toggle voice record"
-                    android:elevation="6dp" />
-            </FrameLayout>
-
-            <!-- Styled Context Toggle Checkbox/Switch, moved to the left but still under talk button -->
+            <!-- Styled Context Toggle Checkbox/Switch -->
             <CheckBox
                 android:id="@+id/cb_continue"
                 android:layout_width="wrap_content"
@@ -184,7 +124,107 @@
                 android:checked="false"
                 android:layout_gravity="start"
                 android:layout_marginStart="8dp"
-                android:layout_marginBottom="6dp" />
+                android:layout_marginBottom="8dp" />
+
+            <!-- Input Bar Layout -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="10dp">
+
+                <!-- Sleek glassmorphic text input box -->
+                <EditText
+                    android:id="@+id/et_message"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:minHeight="48dp"
+                    android:hint="Type or speak a message..."
+                    android:textColor="#FFFFFF"
+                    android:textColorHint="#80FFFFFF"
+                    android:background="@drawable/card_glass"
+                    android:padding="12dp"
+                    android:textSize="14sp"
+                    android:layout_marginEnd="6dp"
+                    android:maxLines="4"
+                    android:scrollbars="vertical" />
+
+                <!-- Scaled Down Speak Button & Rings Container -->
+                <FrameLayout
+                    android:id="@+id/button_container"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:layout_marginEnd="6dp">
+
+                    <!-- Concentric Ring 3 (Outer Ring for Pulsing) -->
+                    <View
+                        android:id="@+id/ring_outer"
+                        android:layout_width="50dp"
+                        android:layout_height="50dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_mic_btn"
+                        android:alpha="0" />
+
+                    <!-- Concentric Ring 2 (Middle Ring for Pulsing) -->
+                    <View
+                        android:id="@+id/ring_middle"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_mic_btn"
+                        android:alpha="0" />
+
+                    <!-- Concentric Ring 1 (Inner Ring/Halo) -->
+                    <View
+                        android:id="@+id/ring_inner"
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_mic_btn"
+                        android:alpha="0" />
+
+                    <!-- Thinking Spinner Progress Bar -->
+                    <ProgressBar
+                        android:id="@+id/pb_thinking"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:layout_gravity="center"
+                        android:indeterminate="true"
+                        android:visibility="gone"
+                        android:indeterminateTintMode="src_atop"
+                        android:indeterminateTint="#00F2FE" />
+
+                    <!-- Main Mic Action Button -->
+                    <ImageButton
+                        android:id="@+id/btn_mic"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_mic_btn"
+                        android:src="@drawable/ic_mic"
+                        android:padding="8dp"
+                        android:scaleType="fitCenter"
+                        android:tint="#120E2E"
+                        android:contentDescription="Toggle voice record"
+                        android:elevation="6dp" />
+                </FrameLayout>
+
+                <!-- Send Button -->
+                <ImageButton
+                    android:id="@+id/btn_send"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/card_glass"
+                    android:src="@android:drawable/ic_menu_send"
+                    android:tint="#00F2FE"
+                    android:padding="10dp"
+                    android:scaleType="fitCenter"
+                    android:contentDescription="Send text message"
+                    android:elevation="6dp" />
+
+            </LinearLayout>
 
             <TextView
                 android:layout_width="wrap_content"

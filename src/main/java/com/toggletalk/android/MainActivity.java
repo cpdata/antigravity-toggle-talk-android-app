@@ -45,6 +45,8 @@ public class MainActivity extends Activity {
     private CheckBox mCbContinue;
     private ImageButton mBtnMic;
     private ProgressBar mPbThinking;
+    private android.widget.EditText mEtMessage;
+    private ImageButton mBtnSend;
 
     private View mRingInner;
     private View mRingMiddle;
@@ -129,6 +131,19 @@ public class MainActivity extends Activity {
         }
     };
 
+    // Broadcast Receiver for Speech Transcription Results
+    private final BroadcastReceiver mTranscriptionReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if ("com.toggletalk.android.ACTION_TRANSCRIPTION_RESULT".equals(intent.getAction())) {
+                String transcript = intent.getStringExtra("transcript");
+                if (transcript != null && !transcript.trim().isEmpty()) {
+                    appendTranscription(transcript);
+                }
+            }
+        }
+    };
+
     private static class ViewAnimation {
         final View view;
         final Animation animation;
@@ -156,6 +171,16 @@ public class MainActivity extends Activity {
         mCbContinue = findViewById(R.id.cb_continue);
         mBtnMic = findViewById(R.id.btn_mic);
         mPbThinking = findViewById(R.id.pb_thinking);
+        mEtMessage = findViewById(R.id.et_message);
+        mBtnSend = findViewById(R.id.btn_send);
+        mBtnSend.setOnClickListener(v -> sendMessage());
+        mEtMessage.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEND) {
+                sendMessage();
+                return true;
+            }
+            return false;
+        });
 
         mRingInner = findViewById(R.id.ring_inner);
         mRingMiddle = findViewById(R.id.ring_middle);
@@ -214,6 +239,9 @@ public class MainActivity extends Activity {
         // Register Directories Broadcast Callback
         registerReceiver(mDirectoriesReceiver, new IntentFilter(ACTION_DIRECTORIES_LIST));
 
+        // Register Transcription Receiver
+        registerReceiver(mTranscriptionReceiver, new IntentFilter("com.toggletalk.android.ACTION_TRANSCRIPTION_RESULT"));
+
         // Check Permissions
         checkPermissionsAndPreferences();
 
@@ -231,8 +259,9 @@ public class MainActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
-        unregisterReceiver(mStateReceiver);
-        unregisterReceiver(mDirectoriesReceiver);
+        try { unregisterReceiver(mStateReceiver); } catch (Exception ignored) {}
+        try { unregisterReceiver(mDirectoriesReceiver); } catch (Exception ignored) {}
+        try { unregisterReceiver(mTranscriptionReceiver); } catch (Exception ignored) {}
         clearAllAnimations();
     }
 
@@ -442,6 +471,48 @@ public class MainActivity extends Activity {
         
         // Close drawer smoothly
         mDrawerContent.postDelayed(this::closeDrawer, 150);
+    }
+
+    private void sendMessage() {
+        if (mEtMessage == null) return;
+        String message = mEtMessage.getText().toString().trim();
+        if (message.isEmpty()) return;
+
+        mEtMessage.setText("");
+
+        // Check if continue checkbox status
+        Intent intent = new Intent(this, ToggleTalkService.class);
+        intent.setAction("com.toggletalk.android.ACTION_SEND_PROMPT");
+        intent.putExtra("prompt", message);
+        intent.putExtra("continue_session", mContinueSession);
+        startService(intent);
+    }
+
+    private void appendTranscription(String text) {
+        if (mEtMessage == null) return;
+        int start = mEtMessage.getSelectionStart();
+        int end = mEtMessage.getSelectionEnd();
+        String currentText = mEtMessage.getText().toString();
+        
+        if (start >= 0 && end >= 0) {
+            StringBuilder sb = new StringBuilder(currentText);
+            sb.replace(start, end, text);
+            mEtMessage.setText(sb.toString());
+            mEtMessage.setSelection(start + text.length());
+        } else {
+            if (!currentText.isEmpty() && !currentText.endsWith(" ")) {
+                mEtMessage.setText(currentText + " " + text);
+            } else {
+                mEtMessage.setText(currentText + text);
+            }
+            mEtMessage.setSelection(mEtMessage.getText().length());
+        }
+        
+        mEtMessage.requestFocus();
+        android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.showSoftInput(mEtMessage, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+        }
     }
 
     private void updateActiveDirLabel() {

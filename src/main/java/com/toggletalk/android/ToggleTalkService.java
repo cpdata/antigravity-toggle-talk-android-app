@@ -140,6 +140,17 @@ public class ToggleTalkService extends Service {
             if (ACTION_TOGGLE.equals(action)) {
                 mContinueSession = intent.getBooleanExtra("continue_session", false);
                 handleToggle();
+            } else if ("com.toggletalk.android.ACTION_SEND_PROMPT".equals(action)) {
+                String prompt = intent.getStringExtra("prompt");
+                mContinueSession = intent.getBooleanExtra("continue_session", false);
+                if (prompt != null && !prompt.trim().isEmpty()) {
+                    updateState("THINKING", prompt);
+                    if (prompt.toLowerCase().startsWith("mock:") || prompt.toLowerCase().startsWith("/mock")) {
+                        runMockReasoning(prompt);
+                    } else {
+                        new Thread(() -> runAntigravityReasoning(prompt)).start();
+                    }
+                }
             } else if ("com.toggletalk.android.ACTION_SET_CONTINUE".equals(action)) {
                 mContinueSession = intent.getBooleanExtra("continue_session", false);
             } else if (ACTION_SET_DIRECTORY.equals(action)) {
@@ -297,14 +308,67 @@ public class ToggleTalkService extends Service {
                         return;
                     }
                     
-                    // Show transcript in UI and move to THINKING
-                    updateState("THINKING", text);
-                    
-                    // Proceed to invoke Antigravity reasoning
-                    runAntigravityReasoning(text);
+                    // Broadcast transcript back to activity
+                    Intent intent = new Intent("com.toggletalk.android.ACTION_TRANSCRIPTION_RESULT");
+                    intent.putExtra("transcript", text);
+                    sendBroadcast(intent);
+
+                    // Reset state to IDLE
+                    updateState("IDLE", "");
                 } catch (Exception e) {
                     Log.e(TAG, "ASR transcription failed", e);
                     updateState("IDLE", "Transcription failed: " + e.getMessage());
+                }
+            }
+        }).start();
+    }
+
+    private void runMockReasoning(final String prompt) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(1500); // Simulate thinking delay
+                } catch (InterruptedException ignored) {}
+
+                String queryText = prompt;
+                if (prompt.toLowerCase().startsWith("mock:")) {
+                    queryText = prompt.substring(5).trim();
+                } else if (prompt.toLowerCase().startsWith("/mock")) {
+                    queryText = prompt.substring(5).trim();
+                }
+
+                String responseText;
+                if (queryText.equalsIgnoreCase("list")) {
+                    responseText = "### Target Directory Contents\nHere is a list of mock files inside your current directory:\n\n" +
+                        "| File Name | Size | Type |\n" +
+                        "|---|---|---|\n" +
+                        "| `README.md` | 2.4 KB | Markdown |\n" +
+                        "| `MainActivity.java` | 31 KB | Java Source |\n" +
+                        "| `build.gradle` | 908 B | Gradle Configuration |\n\n" +
+                        "<tts>I found three files in the directory: README.md, MainActivity.java, and build.gradle.</tts>";
+                } else if (queryText.equalsIgnoreCase("help")) {
+                    responseText = "### ToggleTalk Help\nToggleTalk is a voice and text assistant interface.\n\n" +
+                        "- **Speech Input**: Click the mic button to start recording speech.\n" +
+                        "- **Text Input**: Type message in the input box.\n" +
+                        "- **Sessions**: Swipe from the right edge to view recent sessions.\n\n" +
+                        "<tts>This is Toggle Talk help. You can speak by tapping the microphone or type in the input box.</tts>";
+                } else {
+                    responseText = "### Echo Mode\nReceived prompt: **" + queryText + "**\n\nThis is a mocked response simulating Antigravity.\n\n" +
+                        "<tts>Echoing your prompt. You said: " + queryText + "</tts>";
+                }
+
+                try {
+                    org.json.JSONObject obj = new org.json.JSONObject();
+                    obj.put("latest_response", responseText);
+                    obj.put("sanitized_tts", responseText);
+                    final String jsonStr = obj.toString();
+                    
+                    android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+                    handler.post(() -> handleAntigravityResponse(jsonStr));
+                } catch (Exception e) {
+                    Log.e(TAG, "Mock JSON creation failed", e);
+                    updateState("IDLE", "Mock failed: " + e.getMessage());
                 }
             }
         }).start();
