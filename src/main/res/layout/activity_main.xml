@@ -123,19 +123,38 @@
             android:gravity="center_horizontal"
             android:layout_marginBottom="10dp">
 
-            <!-- Styled Context Toggle Checkbox/Switch -->
-            <CheckBox
-                android:id="@+id/cb_continue"
-                android:layout_width="wrap_content"
+            <!-- Checkbox Layout -->
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Continue Conversation (Remember Context)"
-                android:textColor="#E6E6FA"
-                android:textSize="14sp"
-                android:buttonTint="#9D50BB"
-                android:checked="false"
+                android:orientation="vertical"
                 android:layout_gravity="start"
                 android:layout_marginStart="8dp"
-                android:layout_marginBottom="8dp" />
+                android:layout_marginBottom="8dp">
+
+                <!-- Styled Context Toggle Checkbox/Switch -->
+                <CheckBox
+                    android:id="@+id/cb_continue"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Continue Conversation (Remember Context)"
+                    android:textColor="#E6E6FA"
+                    android:textSize="14sp"
+                    android:buttonTint="#9D50BB"
+                    android:checked="false"
+                    android:layout_marginBottom="4dp" />
+
+                <!-- Styled Mock Mode Checkbox -->
+                <CheckBox
+                    android:id="@+id/cb_mock_mode"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Bypass Antigravity (Mock Responses)"
+                    android:textColor="#E6E6FA"
+                    android:textSize="14sp"
+                    android:buttonTint="#9D50BB"
+                    android:checked="false" />
+            </LinearLayout>
 
             <!-- Input Bar Layout -->
             <LinearLayout

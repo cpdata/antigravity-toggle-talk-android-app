@@ -52,7 +52,9 @@ public class ToggleTalkService extends Service {
     private String mCurrentState = "IDLE";
     private String mCurrentText = "";
     private boolean mContinueSession = false;
+    private boolean mBypassAntigravity = false;
     private String mTargetDirectory = "Home";
+    private String mSelectedSessionId = "";
 
     // Speech engines
     private OfflineRecognizer mRecognizer = null;
@@ -111,8 +113,10 @@ public class ToggleTalkService extends Service {
         Log.d(TAG, "Service onCreate");
         createNotificationChannel();
         
-        // Load target directory path from preferences
+        // Load target directory path and active session ID from preferences
         mTargetDirectory = getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).getString("target_directory", "Home");
+        mSelectedSessionId = getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).getString("selected_session_id", "");
+        mBypassAntigravity = getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).getBoolean("bypass_antigravity", false);
         
         startForeground(NOTIFICATION_ID, buildNotification("IDLE", ""));
 
@@ -143,9 +147,10 @@ public class ToggleTalkService extends Service {
             } else if ("com.toggletalk.android.ACTION_SEND_PROMPT".equals(action)) {
                 String prompt = intent.getStringExtra("prompt");
                 mContinueSession = intent.getBooleanExtra("continue_session", false);
+                boolean bypass = intent.getBooleanExtra("bypass_antigravity", mBypassAntigravity);
                 if (prompt != null && !prompt.trim().isEmpty()) {
                     updateState("THINKING", prompt);
-                    if (prompt.toLowerCase().startsWith("mock:") || prompt.toLowerCase().startsWith("/mock")) {
+                    if (bypass || prompt.toLowerCase().startsWith("mock:") || prompt.toLowerCase().startsWith("/mock")) {
                         runMockReasoning(prompt);
                     } else {
                         new Thread(() -> runAntigravityReasoning(prompt)).start();
@@ -153,12 +158,24 @@ public class ToggleTalkService extends Service {
                 }
             } else if ("com.toggletalk.android.ACTION_SET_CONTINUE".equals(action)) {
                 mContinueSession = intent.getBooleanExtra("continue_session", false);
+            } else if ("com.toggletalk.android.ACTION_SET_BYPASS_ANTIGRAVITY".equals(action)) {
+                mBypassAntigravity = intent.getBooleanExtra("bypass_antigravity", false);
+                getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putBoolean("bypass_antigravity", mBypassAntigravity).apply();
+                Log.d(TAG, "Bypass Antigravity (Mock Mode) set to: " + mBypassAntigravity);
             } else if (ACTION_SET_DIRECTORY.equals(action)) {
                 String dir = intent.getStringExtra(EXTRA_DIRECTORY);
                 if (dir != null) {
                     mTargetDirectory = dir;
                     getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putString("target_directory", dir).apply();
                     Log.d(TAG, "Directory updated to: " + dir);
+                }
+            } else if ("com.toggletalk.android.ACTION_SET_SESSION_ID".equals(action)) {
+                String sessionId = intent.getStringExtra("session_id");
+                mContinueSession = intent.getBooleanExtra("continue_session", mContinueSession);
+                if (sessionId != null) {
+                    mSelectedSessionId = sessionId;
+                    getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putString("selected_session_id", sessionId).apply();
+                    Log.d(TAG, "Session ID updated to: " + sessionId);
                 }
             } else if ("com.toggletalk.android.ACTION_GET_STATE".equals(action)) {
                 broadcastStateToApp();
@@ -397,6 +414,11 @@ public class ToggleTalkService extends Service {
         }
         
         argList.add(String.valueOf(mContinueSession));
+        if (mContinueSession && mSelectedSessionId != null && !mSelectedSessionId.isEmpty()) {
+            argList.add(mSelectedSessionId);
+        } else {
+            argList.add("");
+        }
         
         String[] arguments = argList.toArray(new String[0]);
         runCommandIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arguments);
@@ -460,6 +482,50 @@ public class ToggleTalkService extends Service {
         }
     }
 
+    private java.util.List<String> splitIntoTtsChunks(String text) {
+        java.util.List<String> chunks = new java.util.ArrayList<>();
+        if (text == null || text.trim().isEmpty()) {
+            return chunks;
+        }
+        String[] parts = text.split("(?<=[.!?;:])\\s+");
+        for (String part : parts) {
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty()) {
+                chunks.add(trimmed);
+            }
+        }
+        return chunks;
+    }
+
+    private String sanitizeInApp(String text) {
+        if (text == null) return "";
+        text = text.replaceAll("(?m)^#+\\s+", "");
+        text = text.replaceAll("\\*\\*([^*]+)\\*\\*|__([^_]+)__", "$1$2");
+        text = text.replaceAll("\\*([^*]+)\\*", "$1");
+        text = text.replaceAll("_([^_]+)_", "$1");
+        text = text.replaceAll("\\[([^\\]]+)\\]\\([^)]+\\)", "$1");
+        text = text.replaceAll("`([^`]+)`", "$1");
+        text = text.replaceAll("```[a-zA-Z0-9_-]*\\s*", "");
+        text = text.replaceAll("/", " slash ");
+        text = text.replaceAll("\\\\", " backslash ");
+        text = text.replaceAll("(?<=\\w)\\.(?=\\w)", " dot ");
+        text = text.replaceAll("(^|\\s)\\.([a-zA-Z0-9_-]+)", "$1dot $2");
+        text = text.replaceAll("\\$(\\d+(?:\\.\\d+)?)", "$1 dollars");
+        text = text.replaceAll("\\$", " dollars ");
+        text = text.replaceAll("&", " and ");
+        text = text.replaceAll("@", " at ");
+        text = text.replaceAll("%", " percent");
+        text = text.replaceAll("\\+", " plus ");
+        text = text.replaceAll("=", " equals ");
+        text = text.replaceAll("#", " number ");
+        text = text.replaceAll("~", " tilde ");
+        text = text.replaceAll("_", " ");
+        text = text.replaceAll("[^\\w\\s.,!?;:\\-'\"()¿¡]", "");
+        text = text.replaceAll("[ \\t]+", " ");
+        text = text.replaceAll("\\n+", " ");
+        return text.trim();
+    }
+
     private void processTTSOutput(final String latestResponse, final String sanitizedTts) {
         updateState("SPEAKING", latestResponse);
         
@@ -473,102 +539,126 @@ public class ToggleTalkService extends Service {
                     return;
                 }
                 
-                Log.d(TAG, "Starting Kokoro TTS synthesis on: " + sanitizedTts);
+                // Parse <tts>...</tts> tags in latestResponse
+                java.util.List<String> ttsSegments = new java.util.ArrayList<>();
+                java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("<tts>(.*?)</tts>", java.util.regex.Pattern.DOTALL);
+                java.util.regex.Matcher matcher = pattern.matcher(latestResponse);
+                while (matcher.find()) {
+                    ttsSegments.add(matcher.group(1));
+                }
+                
+                String textToSpeak;
+                if (!ttsSegments.isEmpty()) {
+                    StringBuilder sb = new StringBuilder();
+                    for (String seg : ttsSegments) {
+                        sb.append(seg).append(" ");
+                    }
+                    textToSpeak = sanitizeInApp(sb.toString().trim());
+                } else {
+                    textToSpeak = sanitizedTts;
+                }
+                
+                if (textToSpeak == null || textToSpeak.trim().isEmpty()) {
+                    Log.w(TAG, "No TTS text to speak");
+                    updateState("IDLE", "");
+                    return;
+                }
+                
+                java.util.List<String> chunks = splitIntoTtsChunks(textToSpeak);
+                if (chunks.isEmpty()) {
+                    updateState("IDLE", "");
+                    return;
+                }
+                
+                Log.d(TAG, "Starting Kokoro TTS streaming synthesis on " + chunks.size() + " chunks");
+                
+                mIsPlayingAudio = true;
+                android.media.AudioTrack track = null;
+                
                 try {
-                    // Generate audio floats. Default speakerId = 0, speed = 1.0f.
-                    GeneratedAudio audio = mTts.generate(sanitizedTts, 0, 1.0f);
-                    float[] samples = audio.getSamples();
-                    int sampleRate = audio.getSampleRate();
-                    
-                    if (samples == null || samples.length == 0) {
-                        Log.w(TAG, "TTS generated 0 audio samples");
-                        updateState("IDLE", "");
-                        return;
+                    for (int i = 0; i < chunks.size(); i++) {
+                        if (!mIsPlayingAudio) {
+                            break;
+                        }
+                        
+                        String chunk = chunks.get(i);
+                        Log.d(TAG, "Generating TTS chunk " + i + ": " + chunk);
+                        GeneratedAudio audio = mTts.generate(chunk, 0, 1.0f);
+                        float[] samples = audio.getSamples();
+                        int sampleRate = audio.getSampleRate();
+                        
+                        if (samples == null || samples.length == 0) {
+                            continue;
+                        }
+                        
+                        if (track == null) {
+                            int bufferSize = android.media.AudioTrack.getMinBufferSize(
+                                sampleRate,
+                                android.media.AudioFormat.CHANNEL_OUT_MONO,
+                                android.media.AudioFormat.ENCODING_PCM_FLOAT
+                            );
+                            if (bufferSize == android.media.AudioTrack.ERROR || bufferSize == android.media.AudioTrack.ERROR_BAD_VALUE) {
+                                bufferSize = samples.length * 4;
+                            }
+                            
+                            track = new android.media.AudioTrack(
+                                new android.media.AudioAttributes.Builder()
+                                    .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
+                                    .build(),
+                                new android.media.AudioFormat.Builder()
+                                    .setChannelMask(android.media.AudioFormat.CHANNEL_OUT_MONO)
+                                    .setEncoding(android.media.AudioFormat.ENCODING_PCM_FLOAT)
+                                    .setSampleRate(sampleRate)
+                                    .build(),
+                                bufferSize,
+                                android.media.AudioTrack.MODE_STREAM,
+                                android.media.AudioManager.AUDIO_SESSION_ID_GENERATE
+                            );
+                            
+                            if (track.getState() != android.media.AudioTrack.STATE_INITIALIZED) {
+                                Log.e(TAG, "AudioTrack initialization failed");
+                                break;
+                            }
+                            mAudioTrack = track;
+                            track.play();
+                        }
+                        
+                        int offset = 0;
+                        int writeChunkSize = 4096;
+                        while (mIsPlayingAudio && offset < samples.length) {
+                            int writeSize = Math.min(writeChunkSize, samples.length - offset);
+                            int written = track.write(samples, offset, writeSize, android.media.AudioTrack.WRITE_BLOCKING);
+                            if (written > 0) {
+                                offset += written;
+                            } else if (written < 0) {
+                                Log.e(TAG, "AudioTrack write error: " + written);
+                                break;
+                            }
+                        }
                     }
                     
-                    Log.d(TAG, "Synthesized " + samples.length + " floats at " + sampleRate + "Hz. Starting native playback.");
-                    playPcmAudio(samples, sampleRate);
+                    // Wait for playback to finish
+                    if (mIsPlayingAudio && track != null) {
+                        try {
+                            Thread.sleep(100);
+                        } catch (InterruptedException ignored) {}
+                        while (mIsPlayingAudio && track.getPlayState() == android.media.AudioTrack.PLAYSTATE_PLAYING) {
+                            try {
+                                Thread.sleep(50);
+                            } catch (InterruptedException ignored) {}
+                        }
+                    }
+                    
                 } catch (Exception e) {
-                    Log.e(TAG, "TTS synthesis failed", e);
-                    updateState("IDLE", "Speech synthesis failed: " + e.getMessage());
+                    Log.e(TAG, "TTS synthesis/playback failed", e);
+                } finally {
+                    cleanupAudioTrack();
+                    mIsPlayingAudio = false;
+                    updateState("IDLE", "");
                 }
             }
         }).start();
-    }
-
-    private void playPcmAudio(float[] samples, int sampleRate) {
-        if (mIsPlayingAudio) {
-            stopAudioPlayback();
-        }
-        
-        mIsPlayingAudio = true;
-        
-        int bufferSize = android.media.AudioTrack.getMinBufferSize(
-            sampleRate,
-            android.media.AudioFormat.CHANNEL_OUT_MONO,
-            android.media.AudioFormat.ENCODING_PCM_FLOAT
-        );
-        
-        if (bufferSize == android.media.AudioTrack.ERROR || bufferSize == android.media.AudioTrack.ERROR_BAD_VALUE) {
-            bufferSize = samples.length * 4;
-        }
-        
-        try {
-            mAudioTrack = new android.media.AudioTrack(
-                new android.media.AudioAttributes.Builder()
-                    .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
-                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
-                    .build(),
-                new android.media.AudioFormat.Builder()
-                    .setChannelMask(android.media.AudioFormat.CHANNEL_OUT_MONO)
-                    .setEncoding(android.media.AudioFormat.ENCODING_PCM_FLOAT)
-                    .setSampleRate(sampleRate)
-                    .build(),
-                bufferSize,
-                android.media.AudioTrack.MODE_STREAM,
-                android.media.AudioManager.AUDIO_SESSION_ID_GENERATE
-            );
-            
-            if (mAudioTrack.getState() != android.media.AudioTrack.STATE_INITIALIZED) {
-                Log.e(TAG, "AudioTrack initialization failed");
-                mIsPlayingAudio = false;
-                updateState("IDLE", "Audio output initialization failed");
-                return;
-            }
-            
-            mAudioTrack.play();
-            
-            int offset = 0;
-            int chunkSize = 4096;
-            while (mIsPlayingAudio && offset < samples.length) {
-                int writeSize = Math.min(chunkSize, samples.length - offset);
-                int written = mAudioTrack.write(samples, offset, writeSize, android.media.AudioTrack.WRITE_BLOCKING);
-                if (written > 0) {
-                    offset += written;
-                } else if (written < 0) {
-                    Log.e(TAG, "AudioTrack write error: " + written);
-                    break;
-                }
-            }
-            
-            if (mIsPlayingAudio) {
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException ignored) {}
-                while (mIsPlayingAudio && mAudioTrack.getPlayState() == android.media.AudioTrack.PLAYSTATE_PLAYING) {
-                    try {
-                        Thread.sleep(50);
-                    } catch (InterruptedException ignored) {}
-                }
-            }
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Error playing PCM audio", e);
-        } finally {
-            cleanupAudioTrack();
-            mIsPlayingAudio = false;
-            updateState("IDLE", "");
-        }
     }
 
     private void stopAudioPlayback() {
@@ -707,6 +797,7 @@ public class ToggleTalkService extends Service {
         intent.putExtra(EXTRA_STATE, mCurrentState);
         intent.putExtra(EXTRA_TEXT, mCurrentText);
         intent.putExtra("continue_session", mContinueSession);
+        intent.putExtra("bypass_antigravity", mBypassAntigravity);
         intent.putExtra(EXTRA_DIRECTORY, mTargetDirectory);
         sendBroadcast(intent);
     }

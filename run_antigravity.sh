@@ -4,6 +4,7 @@
 TRANSCRIPT="$1"
 TARGET_DIR="${2:-$HOME}"
 CONTINUE_SESSION="${3:-false}"
+SESSION_ID="$4"
 
 LOG_FILE="$HOME/.toggle_talk_antigravity.log"
 ERR_FILE="$HOME/.toggle_talk_antigravity.err"
@@ -21,18 +22,24 @@ PROMPT_SUFFIX="
 
 [Context: Your active working directory for this session is '$(basename "$TARGET_DIR")'.
 Format your response in standard Markdown to display inside of a markdown renderer.
-Do not enclose your response in triple backticks."
+Do not enclose your response in triple backticks.
+CRITICAL: You MUST wrap any text that should be spoken out loud by the Text-to-Speech (TTS) system inside <tts>...</tts> tags. ONLY the content inside these tags will be spoken. Place all thoughts, intermediate reasoning, tool calls, and verbose explanations outside the <tts>...</tts> tags so they are only displayed visually, keeping the spoken response concise and natural.]"
 PROMPT="${TRANSCRIPT}${PROMPT_SUFFIX}"
 
 # Run Antigravity
 if [ "$CONTINUE_SESSION" = "true" ]; then
+    if [ -n "$SESSION_ID" ]; then
+        CONV_ARG="--conversation $SESSION_ID"
+    else
+        CONV_ARG="-c"
+    fi
     RESPONSE=$(env -u LD_PRELOAD -u LD_LIBRARY_PATH "$PROOT_BIN" --kill-on-exit \
       -b /data/data/com.termux/files/usr/etc/resolv.conf:/etc/resolv.conf \
       -b /data/data/com.termux/files/usr/bin/env:/usr/bin/env \
       -b /data/data/com.termux/files/usr/bin/sh:/bin/sh \
       -b /data/data/com.termux/files/usr/bin/bash:/bin/bash \
       "$GLIBC_LINKER" --library-path "$GLIBC_LIBS" "$AGY_BIN" \
-      --dangerously-skip-permissions -c -p "$PROMPT" --print-timeout 60m < /dev/null 2>>"$ERR_FILE")
+      --dangerously-skip-permissions $CONV_ARG -p "$PROMPT" --print-timeout 60m < /dev/null 2>>"$ERR_FILE")
 else
     RESPONSE=$(env -u LD_PRELOAD -u LD_LIBRARY_PATH "$PROOT_BIN" --kill-on-exit \
       -b /data/data/com.termux/files/usr/etc/resolv.conf:/etc/resolv.conf \

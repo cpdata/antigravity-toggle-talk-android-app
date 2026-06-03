@@ -44,6 +44,8 @@ public class MainActivity extends Activity {
     private android.widget.LinearLayout mChatContainer;
     private TextView mActiveAgentTextView;
     private CheckBox mCbContinue;
+    private CheckBox mCbMockMode;
+    private boolean mBypassAntigravity = false;
     private ImageButton mBtnMic;
     private ProgressBar mPbThinking;
     private android.widget.EditText mEtMessage;
@@ -111,6 +113,10 @@ public class MainActivity extends Activity {
                 String state = intent.getStringExtra(ToggleTalkService.EXTRA_STATE);
                 String text = intent.getStringExtra(ToggleTalkService.EXTRA_TEXT);
                 mContinueSession = intent.getBooleanExtra("continue_session", false);
+                mBypassAntigravity = intent.getBooleanExtra("bypass_antigravity", false);
+                if (mCbMockMode != null) {
+                    mCbMockMode.setChecked(mBypassAntigravity);
+                }
                 
                 String dir = intent.getStringExtra(ToggleTalkService.EXTRA_DIRECTORY);
                 if (dir != null) {
@@ -217,6 +223,7 @@ public class MainActivity extends Activity {
         mChatContainer = findViewById(R.id.layout_chat_container);
         mScrollLog = findViewById(R.id.scroll_log);
         mCbContinue = findViewById(R.id.cb_continue);
+        mCbMockMode = findViewById(R.id.cb_mock_mode);
         mBtnMic = findViewById(R.id.btn_mic);
         mPbThinking = findViewById(R.id.pb_thinking);
         mEtMessage = findViewById(R.id.et_message);
@@ -293,6 +300,18 @@ public class MainActivity extends Activity {
             Intent intent = new Intent(MainActivity.this, ToggleTalkService.class);
             intent.setAction("com.toggletalk.android.ACTION_SET_CONTINUE");
             intent.putExtra("continue_session", isChecked);
+            startService(intent);
+        });
+
+        // Load and setup mock mode settings
+        mBypassAntigravity = getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).getBoolean("bypass_antigravity", false);
+        mCbMockMode.setChecked(mBypassAntigravity);
+        mCbMockMode.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            mBypassAntigravity = isChecked;
+            getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putBoolean("bypass_antigravity", isChecked).apply();
+            Intent intent = new Intent(MainActivity.this, ToggleTalkService.class);
+            intent.setAction("com.toggletalk.android.ACTION_SET_BYPASS_ANTIGRAVITY");
+            intent.putExtra("bypass_antigravity", isChecked);
             startService(intent);
         });
 
@@ -608,6 +627,7 @@ public class MainActivity extends Activity {
         intent.setAction("com.toggletalk.android.ACTION_SEND_PROMPT");
         intent.putExtra("prompt", message);
         intent.putExtra("continue_session", mContinueSession);
+        intent.putExtra("bypass_antigravity", mBypassAntigravity);
         startService(intent);
     }
 
@@ -1138,6 +1158,9 @@ public class MainActivity extends Activity {
     private void onStateChanged(String state, String text) {
         mCurrentState = state;
         mCbContinue.setChecked(mContinueSession);
+        if (mCbMockMode != null) {
+            mCbMockMode.setChecked(mBypassAntigravity);
+        }
 
         clearAllAnimations();
 
