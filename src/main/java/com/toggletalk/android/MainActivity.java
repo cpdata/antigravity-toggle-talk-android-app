@@ -927,10 +927,15 @@ public class MainActivity extends Activity {
         tv.setTextSize(14);
         tv.setPadding((int)(12 * density), (int)(8 * density), (int)(12 * density), (int)(8 * density));
         
+        // Extract the last 6 hex digits (RGB) for the stroke color - handles both #RRGGBB and #AARRGGBB
+        String rgbHex = colorHex.replaceAll("^#[0-9A-Fa-f]{2}([0-9A-Fa-f]{6})$", "#$1");
+        if (!rgbHex.startsWith("#") || rgbHex.length() != 7) {
+            rgbHex = colorHex.length() >= 7 ? "#" + colorHex.substring(colorHex.length() - 6) : "#FFFFFF";
+        }
         android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
         gd.setColor(Color.parseColor("#1AFFFFFF"));
         gd.setCornerRadius(density * 8);
-        gd.setStroke((int)density, Color.parseColor("#1A" + colorHex.substring(1)));
+        gd.setStroke((int)density, Color.parseColor("#1A" + rgbHex.substring(1)));
         tv.setBackground(gd);
         
         android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
