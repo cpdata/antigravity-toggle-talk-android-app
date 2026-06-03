@@ -661,7 +661,9 @@ public class ToggleTalkService extends Service {
                 } finally {
                     cleanupAudioTrack();
                     mIsPlayingAudio = false;
-                    updateState("IDLE", "");
+                    if ("SPEAKING".equals(mCurrentState)) {
+                        updateState("IDLE", "");
+                    }
                 }
             }
         }).start();
