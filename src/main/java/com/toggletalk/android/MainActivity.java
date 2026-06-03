@@ -821,9 +821,15 @@ public class MainActivity extends Activity {
 
         // Read transcript from filesystem in background thread
         new Thread(() -> {
+            // Prefer transcript_full.jsonl as it contains non-truncated content fields
+            String transcriptFullPath = "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain/"
+                    + sessionId + "/.system_generated/logs/transcript_full.jsonl";
             String transcriptPath = "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain/"
                     + sessionId + "/.system_generated/logs/transcript.jsonl";
-            java.io.File file = new java.io.File(transcriptPath);
+            java.io.File file = new java.io.File(transcriptFullPath);
+            if (!file.exists()) {
+                file = new java.io.File(transcriptPath);
+            }
             if (!file.exists()) {
                 runOnUiThread(() -> {
                     if (mChatContainer != null) mChatContainer.removeAllViews();
@@ -874,8 +880,8 @@ public class MainActivity extends Activity {
                     addSystemMessage("No messages found in this session.", "#80FFFFFF");
                     return;
                 }
-                // Show up to last 30 messages to avoid overloading the view
-                int start = Math.max(0, messages.size() - 30);
+                // Show up to last 50 messages to avoid overloading the view
+                int start = Math.max(0, messages.size() - 50);
                 if (start > 0) {
                     addSystemMessage("... (" + start + " earlier messages omitted) ...", "#60FFFFFF");
                 }
