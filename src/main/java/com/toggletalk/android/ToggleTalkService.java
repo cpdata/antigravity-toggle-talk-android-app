@@ -199,9 +199,10 @@ public class ToggleTalkService extends Service {
             float[] samples = stopNativeRecording();
             runNativeTranscription(samples);
         } else if ("THINKING".equals(mCurrentState) || "SPEAKING".equals(mCurrentState)) {
-            stopNativeRecording();
             stopAudioPlayback();
-            updateState("IDLE", "");
+            stopNativeRecording();
+            updateState("RECORDING", "Listening...");
+            startNativeRecording();
         }
     }
 
@@ -640,6 +641,11 @@ public class ToggleTalkService extends Service {
                     
                     // Wait for playback to finish
                     if (mIsPlayingAudio && track != null) {
+                        try {
+                            track.stop();
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error stopping track", e);
+                        }
                         try {
                             Thread.sleep(100);
                         } catch (InterruptedException ignored) {}
