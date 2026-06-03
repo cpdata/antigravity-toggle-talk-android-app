@@ -68,6 +68,10 @@ public class ToggleTalkService extends Service {
     private android.media.AudioTrack mAudioTrack = null;
     private boolean mIsPlayingAudio = false;
 
+    // Wake and Wifi Locks to prevent device from sleeping while waiting for agent response
+    private android.os.PowerManager.WakeLock mWakeLock = null;
+    private android.net.wifi.WifiManager.WifiLock mWifiLock = null;
+
     private BroadcastReceiver mTermuxReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -616,6 +620,12 @@ public class ToggleTalkService extends Service {
         mCurrentState = state;
         mCurrentText = text;
 
+        if ("IDLE".equals(state)) {
+            releaseWakeLocks();
+        } else {
+            acquireWakeLocks();
+        }
+
         // Update foreground notification
         NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (notificationManager != null) {
@@ -679,6 +689,53 @@ public class ToggleTalkService extends Service {
         }
     }
 
+    private synchronized void acquireWakeLocks() {
+        try {
+            if (mWakeLock == null) {
+                android.os.PowerManager pm = (android.os.PowerManager) getSystemService(Context.POWER_SERVICE);
+                if (pm != null) {
+                    mWakeLock = pm.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "ToggleTalk::WakeLock");
+                }
+            }
+            if (mWakeLock != null && !mWakeLock.isHeld()) {
+                mWakeLock.acquire(60 * 60 * 1000L); // 1 hour max timeout
+                Log.d(TAG, "WakeLock acquired");
+            }
+            
+            if (mWifiLock == null) {
+                android.net.wifi.WifiManager wm = (android.net.wifi.WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                if (wm != null) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        mWifiLock = wm.createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL_LOW_LATENCY, "ToggleTalk::WifiLock");
+                    } else {
+                        mWifiLock = wm.createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL, "ToggleTalk::WifiLock");
+                    }
+                }
+            }
+            if (mWifiLock != null && !mWifiLock.isHeld()) {
+                mWifiLock.acquire();
+                Log.d(TAG, "WifiLock acquired");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error acquiring wake/wifi locks", e);
+        }
+    }
+
+    private synchronized void releaseWakeLocks() {
+        try {
+            if (mWakeLock != null && mWakeLock.isHeld()) {
+                mWakeLock.release();
+                Log.d(TAG, "WakeLock released");
+            }
+            if (mWifiLock != null && mWifiLock.isHeld()) {
+                mWifiLock.release();
+                Log.d(TAG, "WifiLock released");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error releasing wake/wifi locks", e);
+        }
+    }
+
     @Override
     public void onDestroy() {
         Log.d(TAG, "Service onDestroy");
@@ -702,6 +759,7 @@ public class ToggleTalkService extends Service {
         }
         
         unregisterReceiver(mTermuxReceiver);
+        releaseWakeLocks();
         super.onDestroy();
     }
 
