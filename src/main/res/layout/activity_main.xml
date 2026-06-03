@@ -179,7 +179,8 @@
                     android:textSize="14sp"
                     android:layout_marginEnd="6dp"
                     android:maxLines="4"
-                    android:scrollbars="vertical" />
+                    android:scrollbars="vertical"
+                    android:textCursorDrawable="@drawable/cursor_color" />
 
                 <!-- Scaled Down Speak Button & Rings Container -->
                 <FrameLayout
