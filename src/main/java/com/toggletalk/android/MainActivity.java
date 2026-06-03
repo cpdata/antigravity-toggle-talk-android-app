@@ -73,6 +73,26 @@ public class MainActivity extends Activity {
     private DirectoryAdapter mDirectoryAdapter;
     private boolean mIsDrawerOpen = false;
 
+    // Right Drawer Views
+    private View mRightDrawerRoot;
+    private View mRightDrawerContent;
+    private View mRightDrawerDimBackground;
+    private ListView mLvSessions;
+    private ProgressBar mPbRightDrawerLoading;
+    private TextView mTvActiveSession;
+    private TextView mTvEmptySessions;
+    private ImageButton mBtnRightMenu;
+    private ImageButton mBtnRefreshSessions;
+
+    private boolean mIsRightDrawerOpen = false;
+    private boolean mIsDraggingRightDrawer = false;
+    private float mInitialRightTranslationX = 0f;
+    private String mSelectedSessionId = "";
+    private final List<String> mSessionsList = new ArrayList<>();
+    private ArrayAdapter<String> mSessionsAdapter;
+
+    private static final String ACTION_SESSIONS_LIST = "com.toggletalk.android.ACTION_SESSIONS_LIST";
+
     // Gesture tracking variables for drawer edge swipe
     private float mTouchStartX = 0f;
     private float mTouchStartY = 0f;
@@ -144,6 +164,33 @@ public class MainActivity extends Activity {
         }
     };
 
+    // Broadcast Receiver for Termux Command Output (Sessions List)
+    private final BroadcastReceiver mSessionsReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (ACTION_SESSIONS_LIST.equals(intent.getAction())) {
+                Log.d(TAG, "Received sessions list callback from Termux");
+                mPbRightDrawerLoading.setVisibility(View.GONE);
+                
+                Bundle resultBundle = intent.getBundleExtra("result");
+                if (resultBundle != null) {
+                    String stdout = resultBundle.getString("stdout");
+                    String errmsg = resultBundle.getString("errmsg");
+                    
+                    if (stdout != null && !stdout.trim().isEmpty()) {
+                        parseAndPopulateSessions(stdout);
+                    } else {
+                        Log.w(TAG, "Stdout empty. Errmsg: " + errmsg);
+                        showEmptySessionsState();
+                    }
+                } else {
+                    Log.w(TAG, "Result bundle was null");
+                    showEmptySessionsState();
+                }
+            }
+        }
+    };
+
     private static class ViewAnimation {
         final View view;
         final Animation animation;
@@ -198,9 +245,23 @@ public class MainActivity extends Activity {
         mBtnMenu = findViewById(R.id.btn_menu);
         mBtnRefreshDirs = findViewById(R.id.btn_refresh_dirs);
 
+        // Bind Right Drawer UIs
+        mRightDrawerRoot = findViewById(R.id.right_drawer_root);
+        mRightDrawerContent = findViewById(R.id.right_drawer_content);
+        mRightDrawerDimBackground = findViewById(R.id.right_drawer_dim_background);
+        mLvSessions = findViewById(R.id.lv_sessions);
+        mPbRightDrawerLoading = findViewById(R.id.pb_right_drawer_loading);
+        mTvActiveSession = findViewById(R.id.tv_active_session);
+        mTvEmptySessions = findViewById(R.id.tv_empty_sessions);
+        mBtnRightMenu = findViewById(R.id.btn_right_menu);
+        mBtnRefreshSessions = findViewById(R.id.btn_refresh_sessions);
+
         // Setup ListView Adapter
         mDirectoryAdapter = new DirectoryAdapter(this, mDirectoriesList);
         mLvDirectories.setAdapter(mDirectoryAdapter);
+
+        mSessionsAdapter = new SessionAdapter(this, mSessionsList);
+        mLvSessions.setAdapter(mSessionsAdapter);
 
         // Setup Listeners
         mBtnMic.setOnClickListener(v -> toggleTalkSession());
@@ -208,10 +269,23 @@ public class MainActivity extends Activity {
         mDrawerDimBackground.setOnClickListener(v -> closeDrawer());
         mBtnRefreshDirs.setOnClickListener(v -> queryTermuxDirectories());
 
+        mBtnRightMenu.setOnClickListener(v -> openRightDrawer());
+        mRightDrawerDimBackground.setOnClickListener(v -> closeRightDrawer());
+        mBtnRefreshSessions.setOnClickListener(v -> queryTermuxSessions());
+
         mLvDirectories.setOnItemClickListener((parent, view, position, id) -> {
             String selectedDir = mDirectoriesList.get(position);
             selectDirectory(selectedDir);
         });
+
+        mLvSessions.setOnItemClickListener((parent, view, position, id) -> {
+            String selectedSession = mSessionsList.get(position);
+            selectSession(selectedSession);
+        });
+
+        // Load active session from preferences
+        mSelectedSessionId = getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).getString("selected_session_id", "");
+        updateActiveSessionLabel();
 
         mCbContinue.setOnCheckedChangeListener((buttonView, isChecked) -> {
             mContinueSession = isChecked;
@@ -242,6 +316,9 @@ public class MainActivity extends Activity {
         // Register Transcription Receiver
         registerReceiver(mTranscriptionReceiver, new IntentFilter("com.toggletalk.android.ACTION_TRANSCRIPTION_RESULT"));
 
+        // Register Sessions Broadcast Callback
+        registerReceiver(mSessionsReceiver, new IntentFilter(ACTION_SESSIONS_LIST));
+
         // Check Permissions
         checkPermissionsAndPreferences();
 
@@ -262,6 +339,7 @@ public class MainActivity extends Activity {
         try { unregisterReceiver(mStateReceiver); } catch (Exception ignored) {}
         try { unregisterReceiver(mDirectoriesReceiver); } catch (Exception ignored) {}
         try { unregisterReceiver(mTranscriptionReceiver); } catch (Exception ignored) {}
+        try { unregisterReceiver(mSessionsReceiver); } catch (Exception ignored) {}
         clearAllAnimations();
     }
 
@@ -381,16 +459,26 @@ public class MainActivity extends Activity {
     public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
         float density = getResources().getDisplayMetrics().density;
         int drawerWidth = getDrawerWidth();
+        int rightDrawerWidth = getRightDrawerWidth();
+        int screenWidth = getResources().getDisplayMetrics().widthPixels;
 
         switch (ev.getAction()) {
             case android.view.MotionEvent.ACTION_DOWN:
                 mTouchStartX = ev.getX();
                 mTouchStartY = ev.getY();
                 mIsDraggingDrawer = false;
+                mIsDraggingRightDrawer = false;
+                
                 if (mIsDrawerOpen) {
                     mInitialTranslationX = mDrawerContent.getTranslationX();
                 } else {
                     mInitialTranslationX = -drawerWidth;
+                }
+                
+                if (mIsRightDrawerOpen) {
+                    mInitialRightTranslationX = mRightDrawerContent.getTranslationX();
+                } else {
+                    mInitialRightTranslationX = rightDrawerWidth;
                 }
                 break;
 
@@ -398,20 +486,39 @@ public class MainActivity extends Activity {
                 float dx = ev.getX() - mTouchStartX;
                 float dy = ev.getY() - mTouchStartY;
 
-                if (!mIsDraggingDrawer) {
-                    // Check if we should start dragging
+                // Handle Left Drawer Gestures
+                if (!mIsDraggingDrawer && !mIsDraggingRightDrawer && !mIsRightDrawerOpen) {
                     if (!mIsDrawerOpen) {
-                        // Closed: touch must start near the left edge (within 50dp), and move right
+                        // Closed: touch starts near left edge (within 50dp), moves right
                         if (mTouchStartX < 50 * density && dx > 15 * density && Math.abs(dx) > Math.abs(dy) * 1.5) {
                             mIsDraggingDrawer = true;
                             mDrawerRoot.setVisibility(View.VISIBLE);
-                            queryTermuxDirectories(); // Start loading directories
+                            queryTermuxDirectories();
                             cancelChildTouches(ev);
                         }
                     } else {
-                        // Open: touch can start anywhere, and move left (closing gesture)
+                        // Open: touch moves left to close
                         if (dx < -15 * density && Math.abs(dx) > Math.abs(dy) * 1.5) {
                             mIsDraggingDrawer = true;
+                            cancelChildTouches(ev);
+                        }
+                    }
+                }
+
+                // Handle Right Drawer Gestures
+                if (!mIsDraggingDrawer && !mIsDraggingRightDrawer && !mIsDrawerOpen) {
+                    if (!mIsRightDrawerOpen) {
+                        // Closed: touch starts near right edge (within 50dp), moves left
+                        if (mTouchStartX > screenWidth - 50 * density && dx < -15 * density && Math.abs(dx) > Math.abs(dy) * 1.5) {
+                            mIsDraggingRightDrawer = true;
+                            mRightDrawerRoot.setVisibility(View.VISIBLE);
+                            queryTermuxSessions();
+                            cancelChildTouches(ev);
+                        }
+                    } else {
+                        // Open: touch moves right to close
+                        if (dx > 15 * density && Math.abs(dx) > Math.abs(dy) * 1.5) {
+                            mIsDraggingRightDrawer = true;
                             cancelChildTouches(ev);
                         }
                     }
@@ -424,10 +531,21 @@ public class MainActivity extends Activity {
 
                     mDrawerContent.setTranslationX(newTranslationX);
                     
-                    // Alpha of dim background from 0 to 1
                     float progress = (drawerWidth + newTranslationX) / drawerWidth;
                     mDrawerDimBackground.setAlpha(progress);
-                    return true; // Consume event during drag
+                    return true;
+                }
+
+                if (mIsDraggingRightDrawer) {
+                    float newTranslationX = mInitialRightTranslationX + dx;
+                    if (newTranslationX < 0f) newTranslationX = 0f;
+                    if (newTranslationX > rightDrawerWidth) newTranslationX = rightDrawerWidth;
+
+                    mRightDrawerContent.setTranslationX(newTranslationX);
+                    
+                    float progress = (rightDrawerWidth - newTranslationX) / rightDrawerWidth;
+                    mRightDrawerDimBackground.setAlpha(progress);
+                    return true;
                 }
                 break;
 
@@ -437,19 +555,27 @@ public class MainActivity extends Activity {
                     mIsDraggingDrawer = false;
                     float currentTranslationX = mDrawerContent.getTranslationX();
                     if (currentTranslationX > -drawerWidth * 0.5f) {
-                        // Open drawer
                         animateDrawer(currentTranslationX, 0f, 1.0f, true);
                     } else {
-                        // Close drawer
                         animateDrawer(currentTranslationX, -drawerWidth, 0f, false);
                     }
-                    return true; // Consume event
+                    return true;
+                }
+
+                if (mIsDraggingRightDrawer) {
+                    mIsDraggingRightDrawer = false;
+                    float currentTranslationX = mRightDrawerContent.getTranslationX();
+                    if (currentTranslationX < rightDrawerWidth * 0.5f) {
+                        animateRightDrawer(currentTranslationX, 0f, 1.0f, true);
+                    } else {
+                        animateRightDrawer(currentTranslationX, rightDrawerWidth, 0f, false);
+                    }
+                    return true;
                 }
                 break;
         }
 
-        // If dragging, intercept
-        if (mIsDraggingDrawer) {
+        if (mIsDraggingDrawer || mIsDraggingRightDrawer) {
             return true;
         }
 
@@ -519,6 +645,231 @@ public class MainActivity extends Activity {
         mTvActiveDir.setText("Active: " + mTargetDirectory);
         if (mTvActiveDirTop != null) {
             mTvActiveDirTop.setText("Active: " + mTargetDirectory);
+        }
+    }
+
+    // --- Right Drawer (Sessions) Slide Animation Actions ---
+
+    private int getRightDrawerWidth() {
+        int width = mRightDrawerContent.getWidth();
+        if (width == 0) {
+            width = (int) (280 * getResources().getDisplayMetrics().density);
+        }
+        return width;
+    }
+
+    private void openRightDrawer() {
+        if (mIsRightDrawerOpen) return;
+        mRightDrawerRoot.setVisibility(View.VISIBLE);
+        int width = getRightDrawerWidth();
+        mRightDrawerContent.setTranslationX(width);
+        mRightDrawerDimBackground.setAlpha(0f);
+        animateRightDrawer(width, 0f, 1.0f, true);
+    }
+
+    private void closeRightDrawer() {
+        if (!mIsRightDrawerOpen) return;
+        int width = getRightDrawerWidth();
+        animateRightDrawer(mRightDrawerContent.getTranslationX(), width, 0f, false);
+    }
+
+    private void animateRightDrawer(float fromTranslationX, float toTranslationX, float toAlpha, final boolean open) {
+        mIsRightDrawerOpen = open;
+
+        // Slide card animation
+        ObjectAnimator slideAnim = ObjectAnimator.ofFloat(mRightDrawerContent, "translationX", toTranslationX);
+        slideAnim.setDuration(200);
+        slideAnim.setInterpolator(new DecelerateInterpolator());
+
+        // Fade dim background animation
+        ObjectAnimator fadeAnim = ObjectAnimator.ofFloat(mRightDrawerDimBackground, "alpha", toAlpha);
+        fadeAnim.setDuration(200);
+
+        slideAnim.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                if (open) {
+                    mRightDrawerRoot.setVisibility(View.VISIBLE);
+                    queryTermuxSessions();
+                } else {
+                    mRightDrawerRoot.setVisibility(View.GONE);
+                }
+            }
+        });
+
+        slideAnim.start();
+        fadeAnim.start();
+    }
+
+    private void selectSession(String sessionId) {
+        mSelectedSessionId = sessionId;
+        updateActiveSessionLabel();
+        mSessionsAdapter.notifyDataSetChanged();
+
+        // Enable continue conversation checkbox automatically
+        mContinueSession = true;
+        mCbContinue.setChecked(true);
+
+        // Update the ToggleTalkService with the new active session ID
+        Intent intent = new Intent(this, ToggleTalkService.class);
+        intent.setAction("com.toggletalk.android.ACTION_SET_SESSION_ID");
+        intent.putExtra("session_id", sessionId);
+        intent.putExtra("continue_session", true);
+        startService(intent);
+
+        Toast.makeText(this, "Active session set: " + (sessionId.length() > 8 ? sessionId.substring(0, 8) + "..." : sessionId), Toast.LENGTH_SHORT).show();
+        
+        // Close right drawer smoothly
+        mRightDrawerContent.postDelayed(this::closeRightDrawer, 150);
+    }
+
+    private void updateActiveSessionLabel() {
+        if (mTvActiveSession == null) return;
+        if (mSelectedSessionId == null || mSelectedSessionId.isEmpty()) {
+            mTvActiveSession.setText("Active: None");
+        } else {
+            String shortId = mSelectedSessionId;
+            if (mSelectedSessionId.length() > 10) {
+                shortId = mSelectedSessionId.substring(0, 8) + "...";
+            }
+            mTvActiveSession.setText("Active: " + shortId);
+        }
+    }
+
+    // --- Query Termux Antigravity Sessions list via RUN_COMMAND ---
+
+    private void queryTermuxSessions() {
+        mPbRightDrawerLoading.setVisibility(View.VISIBLE);
+        mTvEmptySessions.setVisibility(View.GONE);
+
+        // Create PendingIntent for command result callback
+        Intent callbackIntent = new Intent(ACTION_SESSIONS_LIST);
+        
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            flags |= PendingIntent.FLAG_MUTABLE;
+        }
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 888, callbackIntent, flags);
+
+        // Build the command Intent targeting Termux's RunCommandService
+        Intent runCommandIntent = new Intent();
+        runCommandIntent.setClassName("com.termux", "com.termux.app.RunCommandService");
+        runCommandIntent.setAction("com.termux.RUN_COMMAND");
+
+        // Executable path: find utility
+        runCommandIntent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/find");
+
+        // Arguments: list directories in .gemini/antigravity-cli/brain/
+        String[] arguments = new String[]{
+                "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain",
+                "-maxdepth", "1",
+                "-type", "d",
+                "-not", "-path", "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain"
+        };
+        runCommandIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arguments);
+        runCommandIntent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
+        runCommandIntent.putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home");
+        
+        // Set PendingIntent extra
+        runCommandIntent.putExtra("com.termux.RUN_COMMAND_PENDING_INTENT", pendingIntent);
+
+        Log.d(TAG, "Querying Termux sessions...");
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(runCommandIntent);
+            } else {
+                startService(runCommandIntent);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to launch sessions query command", e);
+            mPbRightDrawerLoading.setVisibility(View.GONE);
+            Toast.makeText(this, "Failed to query Termux environment", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void parseAndPopulateSessions(String stdout) {
+        String[] lines = stdout.split("\n");
+        List<String> list = new ArrayList<>();
+        
+        String brainPath = "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain";
+
+        for (String line : lines) {
+            line = line.trim();
+            if (line.isEmpty() || line.equals(brainPath)) {
+                continue;
+            }
+            
+            // Extract folder name relative to brain dir
+            if (line.startsWith(brainPath + "/")) {
+                String relativeName = line.substring(brainPath.length() + 1);
+                if (!relativeName.isEmpty() && !list.contains(relativeName)) {
+                    list.add(relativeName);
+                }
+            }
+        }
+
+        // Sort items (sessions)
+        Collections.sort(list);
+
+        mSessionsList.clear();
+        mSessionsList.addAll(list);
+        mSessionsAdapter.notifyDataSetChanged();
+        
+        if (mSessionsList.isEmpty()) {
+            mTvEmptySessions.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void showEmptySessionsState() {
+        mSessionsList.clear();
+        mSessionsAdapter.notifyDataSetChanged();
+        mTvEmptySessions.setVisibility(View.VISIBLE);
+    }
+
+    // --- Session adapter sub-class ---
+
+    private class SessionAdapter extends ArrayAdapter<String> {
+        public SessionAdapter(Context context, List<String> sessions) {
+            super(context, R.layout.item_directory, sessions);
+        }
+        
+        @Override
+        public View getView(int position, View convertView, ViewGroup parent) {
+            if (convertView == null) {
+                convertView = getLayoutInflater().inflate(R.layout.item_directory, parent, false);
+            }
+            String sessionId = getItem(position);
+            TextView tvDirName = convertView.findViewById(R.id.tv_dir_name);
+            View viewIndicator = convertView.findViewById(R.id.view_indicator);
+            ImageView imgFolder = convertView.findViewById(R.id.img_folder);
+            
+            // Shorten display name
+            String displayName = sessionId;
+            if (sessionId.length() > 16) {
+                displayName = sessionId.substring(0, 14) + "...";
+            }
+            tvDirName.setText(displayName);
+            
+            boolean isSelected = sessionId.equals(mSelectedSessionId);
+            if (isSelected) {
+                convertView.setBackgroundColor(Color.parseColor("#3300F2FE")); // Glassy Cyan Tint
+                viewIndicator.setVisibility(View.VISIBLE);
+                tvDirName.setTextColor(Color.parseColor("#00F2FE"));
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    imgFolder.setImageResource(android.R.drawable.ic_menu_recent_history);
+                    imgFolder.setImageTintList(ColorStateList.valueOf(Color.parseColor("#00F2FE")));
+                }
+            } else {
+                convertView.setBackgroundColor(Color.TRANSPARENT);
+                viewIndicator.setVisibility(View.GONE);
+                tvDirName.setTextColor(Color.parseColor("#FFFFFF"));
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    imgFolder.setImageResource(android.R.drawable.ic_menu_recent_history);
+                    imgFolder.setImageTintList(ColorStateList.valueOf(Color.parseColor("#E6E6FA")));
+                }
+            }
+            
+            return convertView;
         }
     }
 

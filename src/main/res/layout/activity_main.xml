@@ -59,6 +59,19 @@
                     android:layout_marginTop="8dp"
                     android:letterSpacing="0.1" />
             </LinearLayout>
+
+            <!-- Right Drawer Menu Button -->
+            <ImageButton
+                android:id="@+id/btn_right_menu"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_menu_recent_history"
+                android:scaleType="centerInside"
+                android:tint="#E6E6FA"
+                android:contentDescription="Open sessions menu" />
         </RelativeLayout>
 
         <!-- Glassmorphic Text Transcript Log Card -->
@@ -349,6 +362,126 @@
                 android:layout_marginTop="16dp"
                 android:layout_marginBottom="10dp"
                 android:text="Active: Home"
+                android:textColor="#E6E6FA"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:letterSpacing="0.05" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- Slide-out Right Drawer Overlay Container -->
+    <FrameLayout
+        android:id="@+id/right_drawer_root"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true">
+
+        <!-- Translucent dim background panel -->
+        <View
+            android:id="@+id/right_drawer_dim_background"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#A6000000"
+            android:alpha="0" />
+
+        <!-- Drawer Content Card (Glassmorphic) -->
+        <LinearLayout
+            android:id="@+id/right_drawer_content"
+            android:layout_width="280dp"
+            android:layout_height="match_parent"
+            android:layout_gravity="end"
+            android:orientation="vertical"
+            android:background="#FA0B0518"
+            android:padding="20dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:elevation="16dp">
+
+            <!-- Title Header -->
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:layout_marginBottom="16dp">
+
+                <TextView
+                    android:id="@+id/tv_right_drawer_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ANTIGRAVITY SESSIONS"
+                    android:textColor="#E6E6FA"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.05" />
+
+                <!-- Refresh Button -->
+                <ImageButton
+                    android:id="@+id/btn_refresh_sessions"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:src="@android:drawable/stat_notify_sync"
+                    android:tint="#E6E6FA"
+                    android:contentDescription="Refresh sessions list" />
+            </RelativeLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Select a session context to continue the conversation:"
+                android:textColor="#A0E6E6FA"
+                android:textSize="12sp"
+                android:layout_marginBottom="20dp"
+                android:lineSpacingMultiplier="1.2" />
+
+            <!-- Loading Spinner container -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <!-- List View of Sessions -->
+                <ListView
+                    android:id="@+id/lv_sessions"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:divider="@null"
+                    android:dividerHeight="0dp" />
+
+                <!-- Progress Bar during query -->
+                <ProgressBar
+                    android:id="@+id/pb_right_drawer_loading"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_gravity="center"
+                    android:visibility="gone"
+                    android:indeterminateTint="#00F2FE" />
+
+                <!-- Empty state message -->
+                <TextView
+                    android:id="@+id/tv_empty_sessions"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:text="No sessions found"
+                    android:textColor="#60FFFFFF"
+                    android:textSize="14sp"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <!-- Bottom Selected Status -->
+            <TextView
+                android:id="@+id/tv_active_session"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="10dp"
+                android:text="Active: None"
                 android:textColor="#E6E6FA"
                 android:textSize="13sp"
                 android:textStyle="bold"
