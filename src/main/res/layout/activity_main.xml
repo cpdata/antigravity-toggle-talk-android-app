@@ -9,20 +9,20 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@drawable/bg_gradient"
-        android:padding="24dp">
+        android:padding="10dp">
 
         <!-- Top header with Hamburger, App name and Status -->
         <RelativeLayout
             android:id="@+id/header_layout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp">
+            android:layout_marginTop="4dp">
 
             <!-- Hamburger Menu Button -->
             <ImageButton
                 android:id="@+id/btn_menu"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:layout_alignParentStart="true"
                 android:layout_centerVertical="true"
                 android:background="?android:attr/selectableItemBackgroundBorderless"
@@ -44,9 +44,20 @@
                     android:layout_height="wrap_content"
                     android:text="Active: Home"
                     android:textColor="#00F2FE"
-                    android:textSize="20sp"
+                    android:textSize="15sp"
                     android:textStyle="bold"
                     android:letterSpacing="0.05" />
+
+                <TextView
+                    android:id="@+id/tv_active_session_top"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textColor="#80E6E6FA"
+                    android:textSize="10sp"
+                    android:singleLine="true"
+                    android:ellipsize="end"
+                    android:maxWidth="160dp" />
 
                 <TextView
                     android:id="@+id/tv_status"
@@ -54,17 +65,17 @@
                     android:layout_height="wrap_content"
                     android:text="IDLE"
                     android:textColor="#8A8A8F"
-                    android:textSize="16sp"
+                    android:textSize="12sp"
                     android:textStyle="bold"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="2dp"
                     android:letterSpacing="0.1" />
             </LinearLayout>
 
             <!-- Right Drawer Menu Button -->
             <ImageButton
                 android:id="@+id/btn_right_menu"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:layout_alignParentEnd="true"
                 android:layout_centerVertical="true"
                 android:background="?android:attr/selectableItemBackgroundBorderless"
@@ -81,21 +92,11 @@
             android:layout_height="match_parent"
             android:layout_below="@+id/header_layout"
             android:layout_above="@+id/settings_layout"
-            android:layout_marginTop="10dp"
-            android:layout_marginBottom="10dp"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="6dp"
             android:orientation="vertical"
             android:background="@drawable/card_glass"
-            android:padding="16dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="CONVERSATION LOG"
-                android:textColor="#80FFFFFF"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:layout_marginBottom="8dp"
-                android:letterSpacing="0.05" />
+            android:padding="8dp">
 
             <ScrollView
                 android:id="@+id/scroll_log"
@@ -109,7 +110,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="4dp" />
+                    android:padding="2dp" />
             </ScrollView>
         </LinearLayout>
 
@@ -121,7 +122,7 @@
             android:layout_alignParentBottom="true"
             android:orientation="vertical"
             android:gravity="center_horizontal"
-            android:layout_marginBottom="10dp">
+            android:layout_marginBottom="4dp">
 
             <!-- Top Controls Row: New Chat + Mock Mode -->
             <LinearLayout
@@ -129,8 +130,8 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginStart="8dp"
-                android:layout_marginBottom="8dp">
+                android:layout_marginStart="4dp"
+                android:layout_marginBottom="4dp">
 
                 <!-- New Chat Button -->
                 <TextView
@@ -139,13 +140,13 @@
                     android:layout_height="wrap_content"
                     android:text="✦ New Chat"
                     android:textColor="#00F2FE"
-                    android:textSize="13sp"
+                    android:textSize="12sp"
                     android:textStyle="bold"
                     android:background="@drawable/card_glass"
-                    android:padding="8dp"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="12dp"
-                    android:layout_marginEnd="12dp"
+                    android:padding="6dp"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:layout_marginEnd="10dp"
                     android:clickable="true"
                     android:focusable="true"
                     android:contentDescription="Start a new chat session" />
@@ -157,7 +158,7 @@
                     android:layout_height="wrap_content"
                     android:text="Mock Mode"
                     android:textColor="#E6E6FA"
-                    android:textSize="13sp"
+                    android:textSize="12sp"
                     android:buttonTint="#9D50BB"
                     android:checked="false" />
             </LinearLayout>
@@ -168,7 +169,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginBottom="10dp">
+                android:layout_marginBottom="6dp">
 
                 <!-- Sleek glassmorphic text input box -->
                 <EditText
@@ -176,14 +177,14 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:minHeight="48dp"
+                    android:minHeight="42dp"
                     android:hint="Type or speak a message..."
                     android:textColor="#FFFFFF"
                     android:textColorHint="#80FFFFFF"
                     android:background="@drawable/card_glass"
-                    android:padding="12dp"
-                    android:textSize="14sp"
-                    android:layout_marginEnd="6dp"
+                    android:padding="10dp"
+                    android:textSize="13sp"
+                    android:layout_marginEnd="5dp"
                     android:maxLines="4"
                     android:scrollbars="vertical"
                     android:textCursorDrawable="@drawable/cursor_color" />
@@ -191,15 +192,15 @@
                 <!-- Scaled Down Speak Button & Rings Container -->
                 <FrameLayout
                     android:id="@+id/button_container"
-                    android:layout_width="56dp"
-                    android:layout_height="56dp"
-                    android:layout_marginEnd="6dp">
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginEnd="5dp">
 
                     <!-- Concentric Ring 3 (Outer Ring for Pulsing) -->
                     <View
                         android:id="@+id/ring_outer"
-                        android:layout_width="50dp"
-                        android:layout_height="50dp"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
                         android:layout_gravity="center"
                         android:background="@drawable/bg_mic_btn"
                         android:alpha="0" />
@@ -207,8 +208,8 @@
                     <!-- Concentric Ring 2 (Middle Ring for Pulsing) -->
                     <View
                         android:id="@+id/ring_middle"
-                        android:layout_width="44dp"
-                        android:layout_height="44dp"
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
                         android:layout_gravity="center"
                         android:background="@drawable/bg_mic_btn"
                         android:alpha="0" />
@@ -216,8 +217,8 @@
                     <!-- Concentric Ring 1 (Inner Ring/Halo) -->
                     <View
                         android:id="@+id/ring_inner"
-                        android:layout_width="38dp"
-                        android:layout_height="38dp"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
                         android:layout_gravity="center"
                         android:background="@drawable/bg_mic_btn"
                         android:alpha="0" />
@@ -225,8 +226,8 @@
                     <!-- Thinking Spinner Progress Bar -->
                     <ProgressBar
                         android:id="@+id/pb_thinking"
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
                         android:layout_gravity="center"
                         android:indeterminate="true"
                         android:visibility="gone"
@@ -236,12 +237,12 @@
                     <!-- Main Mic Action Button -->
                     <ImageButton
                         android:id="@+id/btn_mic"
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
                         android:layout_gravity="center"
                         android:background="@drawable/bg_mic_btn"
                         android:src="@drawable/ic_mic"
-                        android:padding="8dp"
+                        android:padding="6dp"
                         android:scaleType="fitCenter"
                         android:tint="#120E2E"
                         android:contentDescription="Toggle voice record"
@@ -251,12 +252,12 @@
                 <!-- Send Button -->
                 <ImageButton
                     android:id="@+id/btn_send"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
+                    android:layout_width="42dp"
+                    android:layout_height="42dp"
                     android:background="@drawable/card_glass"
                     android:src="@android:drawable/ic_menu_send"
                     android:tint="#00F2FE"
-                    android:padding="10dp"
+                    android:padding="8dp"
                     android:scaleType="fitCenter"
                     android:contentDescription="Send text message"
                     android:elevation="6dp" />
@@ -268,7 +269,7 @@
                 android:layout_height="wrap_content"
                 android:text="Powered by Antigravity in Termux"
                 android:textColor="#40FFFFFF"
-                android:textSize="11sp"
+                android:textSize="9sp"
                 android:layout_gravity="center_horizontal"
                 android:letterSpacing="0.05" />
         </LinearLayout>
@@ -294,12 +295,12 @@
         <!-- Drawer Content Card (Glassmorphic) -->
         <LinearLayout
             android:id="@+id/drawer_content"
-            android:layout_width="280dp"
+            android:layout_width="260dp"
             android:layout_height="match_parent"
             android:layout_gravity="start"
             android:orientation="vertical"
             android:background="#FA0B0518"
-            android:padding="20dp"
+            android:padding="14dp"
             android:clickable="true"
             android:focusable="true"
             android:elevation="16dp">
@@ -308,8 +309,8 @@
             <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:layout_marginBottom="16dp">
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="10dp">
 
                 <TextView
                     android:id="@+id/tv_drawer_title"
@@ -317,15 +318,15 @@
                     android:layout_height="wrap_content"
                     android:text="INITIAL DIRECTORY"
                     android:textColor="#E6E6FA"
-                    android:textSize="16sp"
+                    android:textSize="13sp"
                     android:textStyle="bold"
                     android:letterSpacing="0.05" />
 
                 <!-- Refresh Button -->
                 <ImageButton
                     android:id="@+id/btn_refresh_dirs"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
                     android:layout_alignParentEnd="true"
                     android:layout_centerVertical="true"
                     android:background="?android:attr/selectableItemBackgroundBorderless"
@@ -339,8 +340,8 @@
                 android:layout_height="wrap_content"
                 android:text="Select the directory context where the Antigravity CLI will be run:"
                 android:textColor="#A0E6E6FA"
-                android:textSize="12sp"
-                android:layout_marginBottom="20dp"
+                android:textSize="11sp"
+                android:layout_marginBottom="12dp"
                 android:lineSpacingMultiplier="1.2" />
 
             <!-- Loading Spinner container -->
@@ -374,7 +375,7 @@
                     android:layout_gravity="center"
                     android:text="No directories found in home"
                     android:textColor="#60FFFFFF"
-                    android:textSize="14sp"
+                    android:textSize="12sp"
                     android:visibility="gone" />
             </FrameLayout>
 
@@ -383,11 +384,11 @@
                 android:id="@+id/tv_active_dir"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:layout_marginBottom="10dp"
+                android:layout_marginTop="10dp"
+                android:layout_marginBottom="6dp"
                 android:text="Active: Home"
                 android:textColor="#E6E6FA"
-                android:textSize="13sp"
+                android:textSize="11sp"
                 android:textStyle="bold"
                 android:gravity="center"
                 android:letterSpacing="0.05" />
@@ -414,12 +415,12 @@
         <!-- Drawer Content Card (Glassmorphic) -->
         <LinearLayout
             android:id="@+id/right_drawer_content"
-            android:layout_width="280dp"
+            android:layout_width="260dp"
             android:layout_height="match_parent"
             android:layout_gravity="end"
             android:orientation="vertical"
             android:background="#FA0B0518"
-            android:padding="20dp"
+            android:padding="14dp"
             android:clickable="true"
             android:focusable="true"
             android:elevation="16dp">
@@ -428,8 +429,8 @@
             <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:layout_marginBottom="16dp">
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="10dp">
 
                 <TextView
                     android:id="@+id/tv_right_drawer_title"
@@ -437,15 +438,15 @@
                     android:layout_height="wrap_content"
                     android:text="ANTIGRAVITY SESSIONS"
                     android:textColor="#E6E6FA"
-                    android:textSize="16sp"
+                    android:textSize="13sp"
                     android:textStyle="bold"
                     android:letterSpacing="0.05" />
 
                 <!-- Refresh Button -->
                 <ImageButton
                     android:id="@+id/btn_refresh_sessions"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
                     android:layout_alignParentEnd="true"
                     android:layout_centerVertical="true"
                     android:background="?android:attr/selectableItemBackgroundBorderless"
@@ -454,14 +455,32 @@
                     android:contentDescription="Refresh sessions list" />
             </RelativeLayout>
 
+            <!-- New Chat Button (same height as a session item) -->
             <TextView
+                android:id="@+id/btn_new_chat_drawer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Select a session context to continue the conversation:"
-                android:textColor="#A0E6E6FA"
-                android:textSize="12sp"
-                android:layout_marginBottom="20dp"
-                android:lineSpacingMultiplier="1.2" />
+                android:text="✦  New Chat"
+                android:textColor="#00F2FE"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:gravity="center_vertical"
+                android:padding="10dp"
+                android:paddingStart="12dp"
+                android:layout_marginHorizontal="8dp"
+                android:layout_marginVertical="4dp"
+                android:background="@drawable/card_glass"
+                android:clickable="true"
+                android:focusable="true"
+                android:contentDescription="Start a new chat session" />
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#20FFFFFF"
+                android:layout_marginTop="6dp"
+                android:layout_marginBottom="2dp" />
 
             <!-- Loading Spinner container -->
             <FrameLayout
@@ -494,7 +513,7 @@
                     android:layout_gravity="center"
                     android:text="No sessions found"
                     android:textColor="#60FFFFFF"
-                    android:textSize="14sp"
+                    android:textSize="12sp"
                     android:visibility="gone" />
             </FrameLayout>
 
@@ -503,11 +522,11 @@
                 android:id="@+id/tv_active_session"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:layout_marginBottom="10dp"
+                android:layout_marginTop="10dp"
+                android:layout_marginBottom="6dp"
                 android:text="Active: None"
                 android:textColor="#E6E6FA"
-                android:textSize="13sp"
+                android:textSize="11sp"
                 android:textStyle="bold"
                 android:gravity="center"
                 android:letterSpacing="0.05" />

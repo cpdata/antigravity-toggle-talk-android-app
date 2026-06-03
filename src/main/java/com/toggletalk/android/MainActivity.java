@@ -44,6 +44,8 @@ public class MainActivity extends Activity {
     private android.widget.LinearLayout mChatContainer;
     private TextView mActiveAgentTextView;
     private TextView mBtnNewChat;
+    private TextView mBtnNewChatDrawer;
+    private TextView mTvActiveSessionTop;
     private CheckBox mCbMockMode;
     private boolean mBypassAntigravity = false;
     private ImageButton mBtnMic;
@@ -259,6 +261,8 @@ public class MainActivity extends Activity {
         mChatContainer = findViewById(R.id.layout_chat_container);
         mScrollLog = findViewById(R.id.scroll_log);
         mBtnNewChat = findViewById(R.id.btn_new_chat);
+        mBtnNewChatDrawer = findViewById(R.id.btn_new_chat_drawer);
+        mTvActiveSessionTop = findViewById(R.id.tv_active_session_top);
         mCbMockMode = findViewById(R.id.cb_mock_mode);
         mBtnMic = findViewById(R.id.btn_mic);
         mPbThinking = findViewById(R.id.pb_thinking);
@@ -333,8 +337,14 @@ public class MainActivity extends Activity {
             selectSession(selectedSession.id);
         });
 
-        // New Chat button
+        // New Chat buttons (bottom bar and drawer)
         mBtnNewChat.setOnClickListener(v -> startNewChat());
+        if (mBtnNewChatDrawer != null) {
+            mBtnNewChatDrawer.setOnClickListener(v -> {
+                startNewChat();
+                closeRightDrawer();
+            });
+        }
 
         // Load active session from preferences
         mSelectedSessionId = getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).getString("selected_session_id", "");
@@ -355,6 +365,11 @@ public class MainActivity extends Activity {
 
         // Initialize state visually
         onStateChanged("IDLE", "");
+
+        // Load previously selected session history on startup
+        if (mSelectedSessionId != null && !mSelectedSessionId.isEmpty()) {
+            loadSessionHistory(mSelectedSessionId);
+        }
     }
 
     @Override
@@ -933,27 +948,25 @@ public class MainActivity extends Activity {
     }
 
     private void updateActiveSessionLabel() {
-        if (mTvActiveSession == null) return;
+        String displayTitle = null;
         if (mSelectedSessionId == null || mSelectedSessionId.isEmpty()) {
-            mTvActiveSession.setText("Active: None");
-        } else {
-            String title = null;
-            for (SessionItem item : mSessionsList) {
-                if (item.id.equals(mSelectedSessionId)) {
-                    title = item.title;
-                    break;
-                }
-            }
-            if (title != null) {
-                mTvActiveSession.setText("Active: " + title);
-            } else {
-                String shortId = mSelectedSessionId;
-                if (mSelectedSessionId.length() > 10) {
-                    shortId = mSelectedSessionId.substring(0, 8) + "...";
-                }
-                mTvActiveSession.setText("Active: " + shortId);
+            if (mTvActiveSession != null) mTvActiveSession.setText("Active: None");
+            if (mTvActiveSessionTop != null) mTvActiveSessionTop.setText("");
+            return;
+        }
+        for (SessionItem item : mSessionsList) {
+            if (item.id.equals(mSelectedSessionId)) {
+                displayTitle = item.title;
+                break;
             }
         }
+        if (displayTitle == null) {
+            displayTitle = mSelectedSessionId.length() > 10
+                    ? mSelectedSessionId.substring(0, 8) + "..."
+                    : mSelectedSessionId;
+        }
+        if (mTvActiveSession != null) mTvActiveSession.setText("Active: " + displayTitle);
+        if (mTvActiveSessionTop != null) mTvActiveSessionTop.setText(displayTitle);
     }
 
     private void addSystemMessage(String text, String colorHex) {
@@ -963,8 +976,8 @@ public class MainActivity extends Activity {
         TextView tv = new TextView(this);
         tv.setText(text);
         tv.setTextColor(Color.parseColor(colorHex));
-        tv.setTextSize(14);
-        tv.setPadding((int)(12 * density), (int)(8 * density), (int)(12 * density), (int)(8 * density));
+        tv.setTextSize(12);
+        tv.setPadding((int)(8 * density), (int)(5 * density), (int)(8 * density), (int)(5 * density));
         
         // Extract the last 6 hex digits (RGB) for the stroke color - handles both #RRGGBB and #AARRGGBB
         String rgbHex = colorHex.replaceAll("^#[0-9A-Fa-f]{2}([0-9A-Fa-f]{6})$", "#$1");
@@ -973,13 +986,13 @@ public class MainActivity extends Activity {
         }
         android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
         gd.setColor(Color.parseColor("#1AFFFFFF"));
-        gd.setCornerRadius(density * 8);
+        gd.setCornerRadius(density * 6);
         gd.setStroke((int)density, Color.parseColor("#1A" + rgbHex.substring(1)));
         tv.setBackground(gd);
         
         android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(0, (int)(6 * density), 0, (int)(6 * density));
+        lp.setMargins(0, (int)(4 * density), 0, (int)(4 * density));
         tv.setLayoutParams(lp);
         
         mChatContainer.addView(tv);
@@ -995,25 +1008,25 @@ public class MainActivity extends Activity {
         bubbleLayout.setOrientation(android.widget.LinearLayout.HORIZONTAL);
         android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(0, (int)(8 * density), 0, (int)(8 * density));
+        lp.setMargins(0, (int)(5 * density), 0, (int)(5 * density));
         bubbleLayout.setLayoutParams(lp);
         bubbleLayout.setGravity(android.view.Gravity.END);
         
         TextView tv = new TextView(this);
         tv.setText(message);
         tv.setTextColor(Color.WHITE);
-        tv.setTextSize(15);
-        tv.setPadding((int)(14 * density), (int)(10 * density), (int)(14 * density), (int)(10 * density));
+        tv.setTextSize(13);
+        tv.setPadding((int)(10 * density), (int)(7 * density), (int)(10 * density), (int)(7 * density));
         
         android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
         gd.setColor(Color.parseColor("#4D9D50BB"));
-        gd.setCornerRadius(density * 12);
+        gd.setCornerRadius(density * 10);
         gd.setStroke((int)density, Color.parseColor("#669D50BB"));
         tv.setBackground(gd);
         
         android.widget.LinearLayout.LayoutParams tvLp = new android.widget.LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        tvLp.setMarginStart((int)(40 * density));
+        tvLp.setMarginStart((int)(30 * density));
         tv.setLayoutParams(tvLp);
         
         bubbleLayout.addView(tv);
@@ -1030,25 +1043,25 @@ public class MainActivity extends Activity {
         bubbleLayout.setOrientation(android.widget.LinearLayout.HORIZONTAL);
         android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(0, (int)(8 * density), 0, (int)(8 * density));
+        lp.setMargins(0, (int)(5 * density), 0, (int)(5 * density));
         bubbleLayout.setLayoutParams(lp);
         bubbleLayout.setGravity(android.view.Gravity.START);
         
         TextView tv = new TextView(this);
         tv.setText(renderMarkdown(initialText));
         tv.setTextColor(Color.WHITE);
-        tv.setTextSize(15);
-        tv.setPadding((int)(14 * density), (int)(10 * density), (int)(14 * density), (int)(10 * density));
+        tv.setTextSize(13);
+        tv.setPadding((int)(10 * density), (int)(7 * density), (int)(10 * density), (int)(7 * density));
         
         android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
         gd.setColor(Color.parseColor("#2600F2FE"));
-        gd.setCornerRadius(density * 12);
+        gd.setCornerRadius(density * 10);
         gd.setStroke((int)density, Color.parseColor("#4D00F2FE"));
         tv.setBackground(gd);
         
         android.widget.LinearLayout.LayoutParams tvLp = new android.widget.LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        tvLp.setMarginEnd((int)(40 * density));
+        tvLp.setMarginEnd((int)(30 * density));
         tv.setLayoutParams(tvLp);
         
         bubbleLayout.addView(tv);
