@@ -40,8 +40,9 @@ public class MainActivity extends Activity {
     private static final String ACTION_DIRECTORIES_LIST = "com.toggletalk.android.ACTION_DIRECTORIES_LIST";
 
     private TextView mTvStatus;
-    private TextView mTvLog;
     private ScrollView mScrollLog;
+    private android.widget.LinearLayout mChatContainer;
+    private TextView mActiveAgentTextView;
     private CheckBox mCbContinue;
     private ImageButton mBtnMic;
     private ProgressBar mPbThinking;
@@ -213,7 +214,7 @@ public class MainActivity extends Activity {
 
         // Bind main UIs
         mTvStatus = findViewById(R.id.tv_status);
-        mTvLog = findViewById(R.id.tv_log);
+        mChatContainer = findViewById(R.id.layout_chat_container);
         mScrollLog = findViewById(R.id.scroll_log);
         mCbContinue = findViewById(R.id.cb_continue);
         mBtnMic = findViewById(R.id.btn_mic);
@@ -363,19 +364,15 @@ public class MainActivity extends Activity {
         if (!termuxGranted) {
             String warning = "⚠️ WARNING: 'Run commands in Termux' permission is not granted!\n\n" +
                     "To enable it:\n" +
-                    "1. Open Android Settings -> Apps -> ToggleTalk\n" +
+                    "1. Open Settings -> Apps -> ToggleTalk\n" +
                     "2. Go to Permissions -> Additional permissions\n" +
-                    "3. Select 'Run commands in Termux environment' and set to Allow.\n\n" +
-                    "Also, ensure 'allow-external-apps=true' is uncommented in ~/.termux/termux.properties inside Termux.";
-            mTvLog.setText(warning);
-            mTvLog.setTextColor(Color.parseColor("#FFCC00"));
+                    "3. Select 'Run commands in Termux environment' and set to Allow.";
+            addSystemMessage(warning, "#FFCC00");
         } else if (!audioGranted || !storageGranted) {
-            mTvLog.setText("⚠️ WARNING: Microphone and Storage permissions are required to use speech features. Please grant access.");
-            mTvLog.setTextColor(Color.parseColor("#FFCC00"));
+            addSystemMessage("⚠️ WARNING: Microphone and Storage permissions are required to use speech features. Please grant access.", "#FFCC00");
         } else {
-            if ("Press the mic button to start speaking...".equals(mTvLog.getText().toString()) || mTvLog.getText().toString().startsWith("⚠️")) {
-                mTvLog.setText("System ready. Press the mic button to speak.");
-                mTvLog.setTextColor(Color.parseColor("#D1D1D6"));
+            if (mChatContainer != null && mChatContainer.getChildCount() == 0) {
+                addSystemMessage("System ready. Press the mic button or type a message to start.", "#E6E6FA");
             }
         }
     }
@@ -736,6 +733,172 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void addSystemMessage(String text, String colorHex) {
+        if (mChatContainer == null) return;
+        float density = getResources().getDisplayMetrics().density;
+        
+        TextView tv = new TextView(this);
+        tv.setText(text);
+        tv.setTextColor(Color.parseColor(colorHex));
+        tv.setTextSize(14);
+        tv.setPadding((int)(12 * density), (int)(8 * density), (int)(12 * density), (int)(8 * density));
+        
+        android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
+        gd.setColor(Color.parseColor("#1AFFFFFF"));
+        gd.setCornerRadius(density * 8);
+        gd.setStroke((int)density, Color.parseColor("#1A" + colorHex.substring(1)));
+        tv.setBackground(gd);
+        
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(0, (int)(6 * density), 0, (int)(6 * density));
+        tv.setLayoutParams(lp);
+        
+        mChatContainer.addView(tv);
+        mScrollLog.post(() -> mScrollLog.fullScroll(View.FOCUS_DOWN));
+    }
+
+    private void addUserBubble(String message) {
+        if (mChatContainer == null || message == null || message.trim().isEmpty()) return;
+        
+        float density = getResources().getDisplayMetrics().density;
+        
+        android.widget.LinearLayout bubbleLayout = new android.widget.LinearLayout(this);
+        bubbleLayout.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(0, (int)(8 * density), 0, (int)(8 * density));
+        bubbleLayout.setLayoutParams(lp);
+        bubbleLayout.setGravity(android.view.Gravity.END);
+        
+        TextView tv = new TextView(this);
+        tv.setText(message);
+        tv.setTextColor(Color.WHITE);
+        tv.setTextSize(15);
+        tv.setPadding((int)(14 * density), (int)(10 * density), (int)(14 * density), (int)(10 * density));
+        
+        android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
+        gd.setColor(Color.parseColor("#4D9D50BB"));
+        gd.setCornerRadius(density * 12);
+        gd.setStroke((int)density, Color.parseColor("#669D50BB"));
+        tv.setBackground(gd);
+        
+        android.widget.LinearLayout.LayoutParams tvLp = new android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        tvLp.setMarginStart((int)(40 * density));
+        tv.setLayoutParams(tvLp);
+        
+        bubbleLayout.addView(tv);
+        mChatContainer.addView(bubbleLayout);
+        mScrollLog.post(() -> mScrollLog.fullScroll(View.FOCUS_DOWN));
+    }
+
+    private void addAgentBubble(String initialText) {
+        if (mChatContainer == null) return;
+        
+        float density = getResources().getDisplayMetrics().density;
+        
+        android.widget.LinearLayout bubbleLayout = new android.widget.LinearLayout(this);
+        bubbleLayout.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(0, (int)(8 * density), 0, (int)(8 * density));
+        bubbleLayout.setLayoutParams(lp);
+        bubbleLayout.setGravity(android.view.Gravity.START);
+        
+        TextView tv = new TextView(this);
+        tv.setText(renderMarkdown(initialText));
+        tv.setTextColor(Color.WHITE);
+        tv.setTextSize(15);
+        tv.setPadding((int)(14 * density), (int)(10 * density), (int)(14 * density), (int)(10 * density));
+        
+        android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
+        gd.setColor(Color.parseColor("#2600F2FE"));
+        gd.setCornerRadius(density * 12);
+        gd.setStroke((int)density, Color.parseColor("#4D00F2FE"));
+        tv.setBackground(gd);
+        
+        android.widget.LinearLayout.LayoutParams tvLp = new android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        tvLp.setMarginEnd((int)(40 * density));
+        tv.setLayoutParams(tvLp);
+        
+        bubbleLayout.addView(tv);
+        mChatContainer.addView(bubbleLayout);
+        mActiveAgentTextView = tv;
+        mScrollLog.post(() -> mScrollLog.fullScroll(View.FOCUS_DOWN));
+    }
+
+    private android.os.Handler mTypeHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private Runnable mTypeRunnable;
+    
+    private void streamAgentResponse(final String fullText) {
+        if (mActiveAgentTextView == null) {
+            addAgentBubble("");
+        }
+        
+        if (mTypeRunnable != null) {
+            mTypeHandler.removeCallbacks(mTypeRunnable);
+        }
+        
+        final int[] index = {0};
+        mTypeRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (index[0] <= fullText.length()) {
+                    String part = fullText.substring(0, index[0]);
+                    mActiveAgentTextView.setText(renderMarkdown(part));
+                    mScrollLog.post(() -> mScrollLog.fullScroll(View.FOCUS_DOWN));
+                    index[0] += 2;
+                    mTypeHandler.postDelayed(this, 15);
+                } else {
+                    mActiveAgentTextView.setText(renderMarkdown(fullText));
+                    mScrollLog.post(() -> mScrollLog.fullScroll(View.FOCUS_DOWN));
+                }
+            }
+        };
+        mTypeHandler.post(mTypeRunnable);
+    }
+
+    private static android.text.Spanned renderMarkdown(String markdown) {
+        if (markdown == null) return new android.text.SpannableString("");
+        
+        // Headers
+        String html = markdown.replaceAll("(?m)^###\\s+(.*)$", "<br/><font color=\"#00F2FE\"><b>$1</b></font><br/>");
+        html = html.replaceAll("(?m)^##\\s+(.*)$", "<br/><font color=\"#00F2FE\"><b><big>$1</big></b></font><br/>");
+        html = html.replaceAll("(?m)^#\\s+(.*)$", "<br/><font color=\"#00F2FE\"><b><big><big>$1</big></big></b></font><br/>");
+
+        // Bold
+        html = html.replaceAll("\\*\\*([^*]+)\\*\\*", "<b>$1</b>");
+        html = html.replaceAll("__([^_]+)__", "<b>$1</b>");
+
+        // Italic
+        html = html.replaceAll("\\*([^*]+)\\*", "<i>$1</i>");
+        html = html.replaceAll("_([^_]+)_", "<i>$1</i>");
+
+        // Bullets
+        html = html.replaceAll("(?m)^[\\-*]\\s+(.*)$", "&#8226; $1<br/>");
+
+        // Code blocks
+        html = html.replaceAll("(?s)```[a-zA-Z0-9_-]*\\n(.*?)\\n```", "<br/><font face=\"monospace\" color=\"#00F2FE\"><tt>$1</tt></font><br/>");
+
+        // Inline code
+        html = html.replaceAll("`([^`]+)`", "<font face=\"monospace\" color=\"#E6E6FA\"><tt>$1</tt></font>");
+
+        // Strip <tts> tags
+        html = html.replaceAll("(?s)<tts>.*?</tts>", "");
+
+        // Convert newlines
+        html = html.replaceAll("\\n", "<br/>");
+        html = html.replaceAll("(<br/>\\s*){2,}", "<br/><br/>");
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            return android.text.Html.fromHtml(html, android.text.Html.FROM_HTML_MODE_LEGACY);
+        } else {
+            return android.text.Html.fromHtml(html);
+        }
+    }
+
     // --- Query Termux Antigravity Sessions list via RUN_COMMAND ---
 
     private void queryTermuxSessions() {
@@ -986,9 +1149,6 @@ public class MainActivity extends Activity {
                 mBtnMic.setImageTintList(ColorStateList.valueOf(Color.parseColor("#FFFFFF")));
                 mPbThinking.setVisibility(View.GONE);
 
-                mTvLog.setText("Listening...");
-                mTvLog.setTextColor(Color.parseColor("#FF2D55"));
-
                 startPulseAnimation(mRingInner, 1200, 0);
                 startPulseAnimation(mRingMiddle, 1200, 400);
                 startPulseAnimation(mRingOuter, 1200, 800);
@@ -1001,12 +1161,15 @@ public class MainActivity extends Activity {
                 mBtnMic.setImageTintList(ColorStateList.valueOf(Color.parseColor("#00F2FE")));
                 mPbThinking.setVisibility(View.VISIBLE);
 
-                if (!text.isEmpty()) {
+                if (!text.isEmpty() && !text.equals(mUserPrompt)) {
                     mUserPrompt = text;
+                    addUserBubble(mUserPrompt);
+                    addAgentBubble("...");
+                } else if (mUserPrompt.isEmpty()) {
+                    mUserPrompt = text.isEmpty() ? "Voice Command" : text;
+                    addUserBubble(mUserPrompt);
+                    addAgentBubble("...");
                 }
-                String thinkText = "User: \"" + mUserPrompt + "\"\n\nAntigravity is thinking...";
-                mTvLog.setText(thinkText);
-                mTvLog.setTextColor(Color.parseColor("#00F2FE"));
                 
                 mRingInner.setScaleX(1.15f);
                 mRingInner.setScaleY(1.15f);
@@ -1021,9 +1184,7 @@ public class MainActivity extends Activity {
                 mBtnMic.setImageTintList(ColorStateList.valueOf(Color.parseColor("#FFFFFF")));
                 mPbThinking.setVisibility(View.GONE);
 
-                String speakText = "User: \"" + mUserPrompt + "\"\n\nAntigravity: " + text;
-                mTvLog.setText(speakText);
-                mTvLog.setTextColor(Color.parseColor("#FFFFFF"));
+                streamAgentResponse(text);
 
                 mRingInner.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#4CD964")));
                 mRingMiddle.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#4CD964")));
@@ -1043,10 +1204,12 @@ public class MainActivity extends Activity {
                 mRingMiddle.setAlpha(0f);
                 mRingOuter.setAlpha(0f);
                 
-                if (mTvLog.getText().toString().equals("Listening...") || mTvLog.getText().toString().contains("thinking...")) {
-                    mTvLog.setText("System ready. Press the mic button to speak.");
-                    mTvLog.setTextColor(Color.parseColor("#D1D1D6"));
+                if (mActiveAgentTextView != null && "...".equals(mActiveAgentTextView.getText().toString())) {
+                    mActiveAgentTextView.setText("No response received.");
                 }
+                
+                // Clear user prompt cache so same text can be sent again
+                mUserPrompt = "";
                 break;
         }
 

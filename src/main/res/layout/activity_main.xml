@@ -104,14 +104,12 @@
                 android:layout_weight="1"
                 android:fillViewport="true">
 
-                <TextView
-                    android:id="@+id/tv_log"
+                <LinearLayout
+                    android:id="@+id/layout_chat_container"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Press the mic button to start speaking..."
-                    android:textColor="#D1D1D6"
-                    android:textSize="15sp"
-                    android:lineSpacingMultiplier="1.2" />
+                    android:orientation="vertical"
+                    android:padding="4dp" />
             </ScrollView>
         </LinearLayout>
 
