@@ -19,7 +19,9 @@ cd "$TARGET_DIR" 2>/dev/null
 
 PROMPT_SUFFIX="
 
-[Context: Your active working directory for this session is '$(basename "$TARGET_DIR")'. Format your response in standard Markdown to display inside the app. For voice output, use the custom 'tts' command to speak a brief summary of your response.]"
+[Context: Your active working directory for this session is '$(basename "$TARGET_DIR")'.
+Format your response in standard Markdown to display inside of a markdown renderer.
+Do not enclose your response in triple backticks."
 PROMPT="${TRANSCRIPT}${PROMPT_SUFFIX}"
 
 # Run Antigravity
