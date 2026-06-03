@@ -41,6 +41,7 @@ public class ToggleTalkService extends Service {
     public static final String ACTION_STATE_UPDATE_FROM_TERMUX = "com.toggletalk.android.STATE_UPDATE";
     public static final String ACTION_SET_DIRECTORY = "com.toggletalk.android.ACTION_SET_DIRECTORY";
     public static final String ACTION_ANTIGRAVITY_RESPONSE = "com.toggletalk.android.ACTION_ANTIGRAVITY_RESPONSE";
+    public static final String ACTION_STOP = "com.toggletalk.android.ACTION_STOP";
 
     public static final String EXTRA_STATE = "state";
     public static final String EXTRA_TEXT = "text";
@@ -55,6 +56,7 @@ public class ToggleTalkService extends Service {
     private boolean mBypassAntigravity = false;
     private String mTargetDirectory = "Home";
     private String mSelectedSessionId = "";
+    private volatile boolean mStopRequested = false;
 
     // Speech engines
     private OfflineRecognizer mRecognizer = null;
@@ -86,6 +88,12 @@ public class ToggleTalkService extends Service {
                 }
             } else if (ACTION_ANTIGRAVITY_RESPONSE.equals(action)) {
                 Log.d(TAG, "Received Antigravity response callback from Termux");
+                // If stop was requested, discard the result
+                if (mStopRequested) {
+                    Log.d(TAG, "Stop requested: discarding Antigravity response");
+                    mStopRequested = false;
+                    return;
+                }
                 Bundle resultBundle = intent.getBundleExtra("result");
                 if (resultBundle != null) {
                     String stdout = resultBundle.getString("stdout");
@@ -144,11 +152,14 @@ public class ToggleTalkService extends Service {
             if (ACTION_TOGGLE.equals(action)) {
                 mContinueSession = intent.getBooleanExtra("continue_session", false);
                 handleToggle();
+            } else if (ACTION_STOP.equals(action)) {
+                handleStop();
             } else if ("com.toggletalk.android.ACTION_SEND_PROMPT".equals(action)) {
                 String prompt = intent.getStringExtra("prompt");
                 mContinueSession = intent.getBooleanExtra("continue_session", false);
                 boolean bypass = intent.getBooleanExtra("bypass_antigravity", mBypassAntigravity);
                 if (prompt != null && !prompt.trim().isEmpty()) {
+                    mStopRequested = false; // reset stop flag for new request
                     updateState("THINKING", prompt);
                     if (bypass || prompt.toLowerCase().startsWith("mock:") || prompt.toLowerCase().startsWith("/mock")) {
                         runMockReasoning(prompt);
@@ -203,6 +214,16 @@ public class ToggleTalkService extends Service {
             stopNativeRecording();
             updateState("RECORDING", "Listening...");
             startNativeRecording();
+        }
+    }
+
+    private void handleStop() {
+        Log.d(TAG, "handleStop: stopping agent and TTS");
+        mStopRequested = true;
+        stopAudioPlayback();
+        stopNativeRecording();
+        if (!"IDLE".equals(mCurrentState)) {
+            updateState("IDLE", "");
         }
     }
 

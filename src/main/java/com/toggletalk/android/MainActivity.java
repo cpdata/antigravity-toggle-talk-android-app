@@ -43,13 +43,14 @@ public class MainActivity extends Activity {
     private ScrollView mScrollLog;
     private android.widget.LinearLayout mChatContainer;
     private TextView mActiveAgentTextView;
-    private CheckBox mCbContinue;
+    private TextView mBtnNewChat;
     private CheckBox mCbMockMode;
     private boolean mBypassAntigravity = false;
     private ImageButton mBtnMic;
     private ProgressBar mPbThinking;
     private android.widget.EditText mEtMessage;
     private ImageButton mBtnSend;
+    private boolean mIsAgentActive = false; // true when THINKING or SPEAKING
 
     private View mRingInner;
     private View mRingMiddle;
@@ -124,7 +125,10 @@ public class MainActivity extends Activity {
             if (ToggleTalkService.ACTION_STATE_CHANGED.equals(intent.getAction())) {
                 String state = intent.getStringExtra(ToggleTalkService.EXTRA_STATE);
                 String text = intent.getStringExtra(ToggleTalkService.EXTRA_TEXT);
-                mContinueSession = intent.getBooleanExtra("continue_session", false);
+                // Only accept continue_session from service if no session is selected locally
+                if (mSelectedSessionId == null || mSelectedSessionId.isEmpty()) {
+                    mContinueSession = intent.getBooleanExtra("continue_session", false);
+                }
                 mBypassAntigravity = intent.getBooleanExtra("bypass_antigravity", false);
                 if (mCbMockMode != null) {
                     mCbMockMode.setChecked(mBypassAntigravity);
@@ -234,16 +238,22 @@ public class MainActivity extends Activity {
         mTvStatus = findViewById(R.id.tv_status);
         mChatContainer = findViewById(R.id.layout_chat_container);
         mScrollLog = findViewById(R.id.scroll_log);
-        mCbContinue = findViewById(R.id.cb_continue);
+        mBtnNewChat = findViewById(R.id.btn_new_chat);
         mCbMockMode = findViewById(R.id.cb_mock_mode);
         mBtnMic = findViewById(R.id.btn_mic);
         mPbThinking = findViewById(R.id.pb_thinking);
         mEtMessage = findViewById(R.id.et_message);
         mBtnSend = findViewById(R.id.btn_send);
-        mBtnSend.setOnClickListener(v -> sendMessage());
+        mBtnSend.setOnClickListener(v -> {
+            if (mIsAgentActive) {
+                stopAgent();
+            } else {
+                sendMessage();
+            }
+        });
         mEtMessage.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEND) {
-                sendMessage();
+                if (!mIsAgentActive) sendMessage();
                 return true;
             }
             return false;
@@ -303,17 +313,13 @@ public class MainActivity extends Activity {
             selectSession(selectedSession.id);
         });
 
+        // New Chat button
+        mBtnNewChat.setOnClickListener(v -> startNewChat());
+
         // Load active session from preferences
         mSelectedSessionId = getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).getString("selected_session_id", "");
+        mContinueSession = (mSelectedSessionId != null && !mSelectedSessionId.isEmpty());
         updateActiveSessionLabel();
-
-        mCbContinue.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            mContinueSession = isChecked;
-            Intent intent = new Intent(MainActivity.this, ToggleTalkService.class);
-            intent.setAction("com.toggletalk.android.ACTION_SET_CONTINUE");
-            intent.putExtra("continue_session", isChecked);
-            startService(intent);
-        });
 
         // Load and setup mock mode settings
         mBypassAntigravity = getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).getBoolean("bypass_antigravity", false);
@@ -422,6 +428,56 @@ public class MainActivity extends Activity {
         intent.setAction(ToggleTalkService.ACTION_TOGGLE);
         intent.putExtra("continue_session", mContinueSession);
         startService(intent);
+    }
+
+    private void stopAgent() {
+        // Send stop intent to service (kills TTS + signals stop)
+        Intent intent = new Intent(this, ToggleTalkService.class);
+        intent.setAction("com.toggletalk.android.ACTION_STOP");
+        startService(intent);
+        // Immediately update UI
+        mIsAgentActive = false;
+        updateSendButtonState();
+        addSystemMessage("⛔ Stopped by user.", "#FF6B6B");
+    }
+
+    private void startNewChat() {
+        // Clear session selection
+        mSelectedSessionId = "";
+        mContinueSession = false;
+        getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putString("selected_session_id", "").apply();
+        updateActiveSessionLabel();
+
+        // Notify service
+        Intent intent = new Intent(this, ToggleTalkService.class);
+        intent.setAction("com.toggletalk.android.ACTION_SET_SESSION_ID");
+        intent.putExtra("session_id", "");
+        intent.putExtra("continue_session", false);
+        startService(intent);
+
+        // Clear chat log
+        if (mChatContainer != null) mChatContainer.removeAllViews();
+        mActiveAgentTextView = null;
+        mUserPrompt = "";
+        mSessionsAdapter.notifyDataSetChanged();
+
+        addSystemMessage("✦ New chat started. Type or speak your message.", "#00F2FE");
+        Toast.makeText(this, "New chat started", Toast.LENGTH_SHORT).show();
+    }
+
+    private void updateSendButtonState() {
+        if (mBtnSend == null) return;
+        if (mIsAgentActive) {
+            // Show red stop button
+            mBtnSend.setImageResource(android.R.drawable.ic_delete);
+            mBtnSend.setImageTintList(ColorStateList.valueOf(Color.parseColor("#FF3B30")));
+            mBtnSend.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#33FF3B30")));
+        } else {
+            // Restore send button
+            mBtnSend.setImageResource(android.R.drawable.ic_menu_send);
+            mBtnSend.setImageTintList(ColorStateList.valueOf(Color.parseColor("#00F2FE")));
+            mBtnSend.setBackgroundTintList(null);
+        }
     }
 
     // --- Drawer Slide Animation Actions ---
@@ -635,7 +691,6 @@ public class MainActivity extends Activity {
 
         mEtMessage.setText("");
 
-        // Check if continue checkbox status
         Intent intent = new Intent(this, ToggleTalkService.class);
         intent.setAction("com.toggletalk.android.ACTION_SEND_PROMPT");
         intent.putExtra("prompt", message);
@@ -733,12 +788,12 @@ public class MainActivity extends Activity {
 
     private void selectSession(String sessionId) {
         mSelectedSessionId = sessionId;
+        mContinueSession = true;
         updateActiveSessionLabel();
         mSessionsAdapter.notifyDataSetChanged();
 
-        // Enable continue conversation checkbox automatically
-        mContinueSession = true;
-        mCbContinue.setChecked(true);
+        // Save to preferences
+        getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putString("selected_session_id", sessionId).apply();
 
         // Update the ToggleTalkService with the new active session ID
         Intent intent = new Intent(this, ToggleTalkService.class);
@@ -747,10 +802,95 @@ public class MainActivity extends Activity {
         intent.putExtra("continue_session", true);
         startService(intent);
 
-        Toast.makeText(this, "Active session set: " + (sessionId.length() > 8 ? sessionId.substring(0, 8) + "..." : sessionId), Toast.LENGTH_SHORT).show();
-        
+        Toast.makeText(this, "Session loaded: " + (sessionId.length() > 8 ? sessionId.substring(0, 8) + "..." : sessionId), Toast.LENGTH_SHORT).show();
+
+        // Load session history into chat log
+        loadSessionHistory(sessionId);
+
         // Close right drawer smoothly
         mRightDrawerContent.postDelayed(this::closeRightDrawer, 150);
+    }
+
+    private void loadSessionHistory(String sessionId) {
+        // Clear current chat log
+        if (mChatContainer != null) mChatContainer.removeAllViews();
+        mActiveAgentTextView = null;
+        mUserPrompt = "";
+
+        addSystemMessage("Loading session history...", "#80FFFFFF");
+
+        // Read transcript from filesystem in background thread
+        new Thread(() -> {
+            String transcriptPath = "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain/"
+                    + sessionId + "/.system_generated/logs/transcript.jsonl";
+            java.io.File file = new java.io.File(transcriptPath);
+            if (!file.exists()) {
+                runOnUiThread(() -> {
+                    if (mChatContainer != null) mChatContainer.removeAllViews();
+                    addSystemMessage("No conversation history found for this session.", "#80FFFFFF");
+                });
+                return;
+            }
+
+            final java.util.List<String[]> messages = new java.util.ArrayList<>();
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(new java.io.FileInputStream(file), "UTF-8"))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (line.trim().isEmpty()) continue;
+                    try {
+                        org.json.JSONObject obj = new org.json.JSONObject(line);
+                        String type = obj.optString("type", "");
+                        String source = obj.optString("source", "");
+                        String content = obj.optString("content", "");
+
+                        if ("USER_INPUT".equals(type) && content != null && !content.trim().isEmpty()) {
+                            // Extract from <USER_REQUEST>...</USER_REQUEST> if present
+                            java.util.regex.Matcher m = java.util.regex.Pattern
+                                    .compile("<USER_REQUEST>(.*?)</USER_REQUEST>", java.util.regex.Pattern.DOTALL)
+                                    .matcher(content);
+                            String userText = m.find() ? m.group(1).trim() : content.trim();
+                            if (!userText.isEmpty()) {
+                                messages.add(new String[]{"user", userText});
+                            }
+                        } else if ("PLANNER_RESPONSE".equals(type) && "MODEL".equals(source)
+                                && content != null && !content.trim().isEmpty()) {
+                            // Only include non-empty model text responses
+                            String trimmed = content.trim();
+                            if (!trimmed.isEmpty()) {
+                                messages.add(new String[]{"agent", trimmed});
+                            }
+                        }
+                    } catch (Exception ignored) {}
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error reading transcript", e);
+            }
+
+            runOnUiThread(() -> {
+                if (mChatContainer != null) mChatContainer.removeAllViews();
+                mActiveAgentTextView = null;
+                if (messages.isEmpty()) {
+                    addSystemMessage("No messages found in this session.", "#80FFFFFF");
+                    return;
+                }
+                // Show up to last 30 messages to avoid overloading the view
+                int start = Math.max(0, messages.size() - 30);
+                if (start > 0) {
+                    addSystemMessage("... (" + start + " earlier messages omitted) ...", "#60FFFFFF");
+                }
+                for (int i = start; i < messages.size(); i++) {
+                    String[] msg = messages.get(i);
+                    if ("user".equals(msg[0])) {
+                        addUserBubble(msg[1]);
+                    } else {
+                        addAgentBubble(msg[1]);
+                        mActiveAgentTextView = null; // don't stream-overwrite history bubbles
+                    }
+                }
+                addSystemMessage("✓ Session loaded. Continue the conversation below.", "#4CD964");
+            });
+        }).start();
     }
 
     private void updateActiveSessionLabel() {
@@ -1164,7 +1304,6 @@ public class MainActivity extends Activity {
 
     private void onStateChanged(String state, String text) {
         mCurrentState = state;
-        mCbContinue.setChecked(mContinueSession);
         if (mCbMockMode != null) {
             mCbMockMode.setChecked(mBypassAntigravity);
         }
@@ -1174,6 +1313,7 @@ public class MainActivity extends Activity {
         switch (state) {
             case "RECORDING":
                 mIsResuming = false;
+                mIsAgentActive = false;
                 mTvStatus.setText("LISTENING...");
                 mTvStatus.setTextColor(Color.parseColor("#FF2D55"));
                 mBtnMic.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#FF2D55")));
@@ -1187,12 +1327,14 @@ public class MainActivity extends Activity {
 
             case "THINKING":
                 mIsResuming = false;
+                mIsAgentActive = true;
                 mTvStatus.setText("THINKING...");
                 mTvStatus.setTextColor(Color.parseColor("#00F2FE"));
                 mBtnMic.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#0D1A2E")));
                 mBtnMic.setImageTintList(ColorStateList.valueOf(Color.parseColor("#00F2FE")));
                 mPbThinking.setVisibility(View.VISIBLE);
 
+                // After loading a session, mActiveAgentTextView is null so new bubbles are fresh
                 if (!text.isEmpty() && !text.equals(mUserPrompt)) {
                     mUserPrompt = text;
                     addUserBubble(mUserPrompt);
@@ -1202,7 +1344,7 @@ public class MainActivity extends Activity {
                     addUserBubble(mUserPrompt);
                     addAgentBubble("...");
                 }
-                
+
                 mRingInner.setScaleX(1.15f);
                 mRingInner.setScaleY(1.15f);
                 mRingInner.setAlpha(0.15f);
@@ -1210,6 +1352,7 @@ public class MainActivity extends Activity {
                 break;
 
             case "SPEAKING":
+                mIsAgentActive = true;
                 mTvStatus.setText("SPEAKING...");
                 mTvStatus.setTextColor(Color.parseColor("#4CD964"));
                 mBtnMic.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#4CD964")));
@@ -1236,6 +1379,7 @@ public class MainActivity extends Activity {
             case "IDLE":
             default:
                 mIsResuming = false;
+                mIsAgentActive = false;
                 mTvStatus.setText("IDLE");
                 mTvStatus.setTextColor(Color.parseColor("#8A8A8F"));
                 mBtnMic.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#2D1F54")));
@@ -1245,16 +1389,20 @@ public class MainActivity extends Activity {
                 mRingInner.setAlpha(0f);
                 mRingMiddle.setAlpha(0f);
                 mRingOuter.setAlpha(0f);
-                
+
                 if (mActiveAgentTextView != null && "...".equals(mActiveAgentTextView.getText().toString())) {
                     mActiveAgentTextView.setText("No response received.");
                 }
-                
+
+                // Auto-continue: if a session is selected, always continue
+                mContinueSession = (mSelectedSessionId != null && !mSelectedSessionId.isEmpty());
+
                 // Clear user prompt cache so same text can be sent again
                 mUserPrompt = "";
                 break;
         }
 
+        updateSendButtonState();
         mScrollLog.post(() -> mScrollLog.fullScroll(View.FOCUS_DOWN));
     }
 
