@@ -108,6 +108,7 @@ public class MainActivity extends Activity {
     private ArrayAdapter<SessionItem> mSessionsAdapter;
 
     private static final String ACTION_SESSIONS_LIST = "com.toggletalk.android.ACTION_SESSIONS_LIST";
+    private static final String ACTION_SESSION_HISTORY = "com.toggletalk.android.ACTION_SESSION_HISTORY";
 
     // Gesture tracking variables for drawer edge swipe
     private float mTouchStartX = 0f;
@@ -210,6 +211,25 @@ public class MainActivity extends Activity {
                     Log.w(TAG, "Result bundle was null");
                     showEmptySessionsState();
                 }
+            }
+        }
+    };
+
+    // Broadcast Receiver for Termux Command Output (Session History)
+    private final BroadcastReceiver mSessionHistoryReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (ACTION_SESSION_HISTORY.equals(intent.getAction())) {
+                Log.d(TAG, "Received session history callback from Termux");
+                Bundle resultBundle = intent.getBundleExtra("result");
+                String stdout = null;
+                String errmsg = null;
+                if (resultBundle != null) {
+                    stdout = resultBundle.getString("stdout");
+                    errmsg = resultBundle.getString("errmsg");
+                }
+                Log.d(TAG, "Session history stdout len=" + (stdout == null ? "null" : stdout.length()) + " errmsg=" + errmsg);
+                receiveSessionHistory(stdout, errmsg);
             }
         }
     };
@@ -358,6 +378,9 @@ public class MainActivity extends Activity {
         // Register Sessions Broadcast Callback
         registerReceiver(mSessionsReceiver, new IntentFilter(ACTION_SESSIONS_LIST));
 
+        // Register Session History Broadcast Callback
+        registerReceiver(mSessionHistoryReceiver, new IntentFilter(ACTION_SESSION_HISTORY));
+
         // Check Permissions
         checkPermissionsAndPreferences();
 
@@ -379,6 +402,7 @@ public class MainActivity extends Activity {
         try { unregisterReceiver(mDirectoriesReceiver); } catch (Exception ignored) {}
         try { unregisterReceiver(mTranscriptionReceiver); } catch (Exception ignored) {}
         try { unregisterReceiver(mSessionsReceiver); } catch (Exception ignored) {}
+        try { unregisterReceiver(mSessionHistoryReceiver); } catch (Exception ignored) {}
         clearAllAnimations();
     }
 
@@ -819,84 +843,93 @@ public class MainActivity extends Activity {
 
         addSystemMessage("Loading session history...", "#80FFFFFF");
 
-        // Read transcript from filesystem in background thread
-        new Thread(() -> {
-            // Prefer transcript_full.jsonl as it contains non-truncated content fields
-            String transcriptFullPath = "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain/"
-                    + sessionId + "/.system_generated/logs/transcript_full.jsonl";
-            String transcriptPath = "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain/"
-                    + sessionId + "/.system_generated/logs/transcript.jsonl";
-            java.io.File file = new java.io.File(transcriptFullPath);
-            if (!file.exists()) {
-                file = new java.io.File(transcriptPath);
+        // The transcript files live in Termux's private data dir which this app
+        // cannot read directly (different UIDs). Delegate to Termux via RUN_COMMAND.
+        Intent callbackIntent = new Intent(ACTION_SESSION_HISTORY);
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            flags |= PendingIntent.FLAG_MUTABLE;
+        }
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 999, callbackIntent, flags);
+
+        Intent runCommandIntent = new Intent();
+        runCommandIntent.setClassName("com.termux", "com.termux.app.RunCommandService");
+        runCommandIntent.setAction("com.termux.RUN_COMMAND");
+        runCommandIntent.putExtra("com.termux.RUN_COMMAND_PATH",
+                "/data/data/com.termux/files/usr/bin/python");
+        runCommandIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{
+                "/data/data/com.termux/files/home/ToggleTalkAndroid/load_session_history.py",
+                sessionId
+        });
+        runCommandIntent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
+        runCommandIntent.putExtra("com.termux.RUN_COMMAND_WORKDIR",
+                "/data/data/com.termux/files/home");
+        runCommandIntent.putExtra("com.termux.RUN_COMMAND_PENDING_INTENT", pendingIntent);
+
+        Log.d(TAG, "Requesting session history for: " + sessionId);
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(runCommandIntent);
+            } else {
+                startService(runCommandIntent);
             }
-            if (!file.exists()) {
-                runOnUiThread(() -> {
-                    if (mChatContainer != null) mChatContainer.removeAllViews();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to launch session history command", e);
+            if (mChatContainer != null) mChatContainer.removeAllViews();
+            addSystemMessage("Failed to load session history.", "#FF6B6B");
+        }
+    }
+
+    private void receiveSessionHistory(String stdout, String errmsg) {
+        if (mChatContainer != null) mChatContainer.removeAllViews();
+        mActiveAgentTextView = null;
+
+        if (stdout == null || stdout.trim().isEmpty()) {
+            Log.w(TAG, "Session history stdout empty. errmsg=" + errmsg);
+            addSystemMessage("No conversation history found for this session.", "#80FFFFFF");
+            return;
+        }
+
+        try {
+            // Check for error object
+            String trimmed = stdout.trim();
+            if (trimmed.startsWith("{")) {
+                org.json.JSONObject errObj = new org.json.JSONObject(trimmed);
+                String err = errObj.optString("error", "");
+                if (!err.isEmpty()) {
                     addSystemMessage("No conversation history found for this session.", "#80FFFFFF");
-                });
+                    return;
+                }
+            }
+
+            org.json.JSONArray array = new org.json.JSONArray(trimmed);
+            if (array.length() == 0) {
+                addSystemMessage("No messages found in this session.", "#80FFFFFF");
                 return;
             }
 
-            final java.util.List<String[]> messages = new java.util.ArrayList<>();
-            try (java.io.BufferedReader reader = new java.io.BufferedReader(
-                    new java.io.InputStreamReader(new java.io.FileInputStream(file), "UTF-8"))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    if (line.trim().isEmpty()) continue;
-                    try {
-                        org.json.JSONObject obj = new org.json.JSONObject(line);
-                        String type = obj.optString("type", "");
-                        String source = obj.optString("source", "");
-                        String content = obj.optString("content", "");
-
-                        if ("USER_INPUT".equals(type) && content != null && !content.trim().isEmpty()) {
-                            // Extract from <USER_REQUEST>...</USER_REQUEST> if present
-                            java.util.regex.Matcher m = java.util.regex.Pattern
-                                    .compile("<USER_REQUEST>(.*?)</USER_REQUEST>", java.util.regex.Pattern.DOTALL)
-                                    .matcher(content);
-                            String userText = m.find() ? m.group(1).trim() : content.trim();
-                            if (!userText.isEmpty()) {
-                                messages.add(new String[]{"user", userText});
-                            }
-                        } else if ("PLANNER_RESPONSE".equals(type) && "MODEL".equals(source)
-                                && content != null && !content.trim().isEmpty()) {
-                            // Only include non-empty model text responses
-                            String trimmed = content.trim();
-                            if (!trimmed.isEmpty()) {
-                                messages.add(new String[]{"agent", trimmed});
-                            }
-                        }
-                    } catch (Exception ignored) {}
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error reading transcript", e);
+            // Show up to last 50 messages
+            int start = Math.max(0, array.length() - 50);
+            if (start > 0) {
+                addSystemMessage("... (" + start + " earlier messages omitted) ...", "#60FFFFFF");
             }
-
-            runOnUiThread(() -> {
-                if (mChatContainer != null) mChatContainer.removeAllViews();
-                mActiveAgentTextView = null;
-                if (messages.isEmpty()) {
-                    addSystemMessage("No messages found in this session.", "#80FFFFFF");
-                    return;
+            for (int i = start; i < array.length(); i++) {
+                org.json.JSONObject msg = array.getJSONObject(i);
+                String role = msg.optString("role", "");
+                String text = msg.optString("text", "");
+                if (text.isEmpty()) continue;
+                if ("user".equals(role)) {
+                    addUserBubble(text);
+                } else if ("agent".equals(role)) {
+                    addAgentBubble(text);
+                    mActiveAgentTextView = null; // don't stream-overwrite history bubbles
                 }
-                // Show up to last 50 messages to avoid overloading the view
-                int start = Math.max(0, messages.size() - 50);
-                if (start > 0) {
-                    addSystemMessage("... (" + start + " earlier messages omitted) ...", "#60FFFFFF");
-                }
-                for (int i = start; i < messages.size(); i++) {
-                    String[] msg = messages.get(i);
-                    if ("user".equals(msg[0])) {
-                        addUserBubble(msg[1]);
-                    } else {
-                        addAgentBubble(msg[1]);
-                        mActiveAgentTextView = null; // don't stream-overwrite history bubbles
-                    }
-                }
-                addSystemMessage("✓ Session loaded. Continue the conversation below.", "#4CD964");
-            });
-        }).start();
+            }
+            addSystemMessage("✓ Session loaded. Continue the conversation below.", "#4CD964");
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing session history JSON", e);
+            addSystemMessage("Error loading session history.", "#FF6B6B");
+        }
     }
 
     private void updateActiveSessionLabel() {
