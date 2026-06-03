@@ -71,6 +71,7 @@ public class MainActivity extends Activity {
     private String mUserPrompt = "";
     private boolean mContinueSession = false;
     private String mTargetDirectory = "Home";
+    private boolean mIsResuming = false;
     
     private final List<String> mDirectoriesList = new ArrayList<>();
     private DirectoryAdapter mDirectoryAdapter;
@@ -91,8 +92,19 @@ public class MainActivity extends Activity {
     private boolean mIsDraggingRightDrawer = false;
     private float mInitialRightTranslationX = 0f;
     private String mSelectedSessionId = "";
-    private final List<String> mSessionsList = new ArrayList<>();
-    private ArrayAdapter<String> mSessionsAdapter;
+    
+    private static class SessionItem {
+        final String id;
+        final String title;
+        
+        SessionItem(String id, String title) {
+            this.id = id;
+            this.title = title;
+        }
+    }
+    
+    private final List<SessionItem> mSessionsList = new ArrayList<>();
+    private ArrayAdapter<SessionItem> mSessionsAdapter;
 
     private static final String ACTION_SESSIONS_LIST = "com.toggletalk.android.ACTION_SESSIONS_LIST";
 
@@ -287,8 +299,8 @@ public class MainActivity extends Activity {
         });
 
         mLvSessions.setOnItemClickListener((parent, view, position, id) -> {
-            String selectedSession = mSessionsList.get(position);
-            selectSession(selectedSession);
+            SessionItem selectedSession = mSessionsList.get(position);
+            selectSession(selectedSession.id);
         });
 
         // Load active session from preferences
@@ -322,6 +334,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        mIsResuming = true;
         
         // Start Foreground Service
         Intent serviceIntent = new Intent(this, ToggleTalkService.class);
@@ -745,11 +758,22 @@ public class MainActivity extends Activity {
         if (mSelectedSessionId == null || mSelectedSessionId.isEmpty()) {
             mTvActiveSession.setText("Active: None");
         } else {
-            String shortId = mSelectedSessionId;
-            if (mSelectedSessionId.length() > 10) {
-                shortId = mSelectedSessionId.substring(0, 8) + "...";
+            String title = null;
+            for (SessionItem item : mSessionsList) {
+                if (item.id.equals(mSelectedSessionId)) {
+                    title = item.title;
+                    break;
+                }
             }
-            mTvActiveSession.setText("Active: " + shortId);
+            if (title != null) {
+                mTvActiveSession.setText("Active: " + title);
+            } else {
+                String shortId = mSelectedSessionId;
+                if (mSelectedSessionId.length() > 10) {
+                    shortId = mSelectedSessionId.substring(0, 8) + "...";
+                }
+                mTvActiveSession.setText("Active: " + shortId);
+            }
         }
     }
 
@@ -939,15 +963,12 @@ public class MainActivity extends Activity {
         runCommandIntent.setClassName("com.termux", "com.termux.app.RunCommandService");
         runCommandIntent.setAction("com.termux.RUN_COMMAND");
 
-        // Executable path: find utility
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/find");
+        // Executable path: python utility
+        runCommandIntent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/python");
 
-        // Arguments: list directories in .gemini/antigravity-cli/brain/
+        // Arguments: run the list_sessions.py script
         String[] arguments = new String[]{
-                "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain",
-                "-maxdepth", "1",
-                "-type", "d",
-                "-not", "-path", "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain"
+                "/data/data/com.termux/files/home/ToggleTalkAndroid/list_sessions.py"
         };
         runCommandIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arguments);
         runCommandIntent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
@@ -971,32 +992,23 @@ public class MainActivity extends Activity {
     }
 
     private void parseAndPopulateSessions(String stdout) {
-        String[] lines = stdout.split("\n");
-        List<String> list = new ArrayList<>();
-        
-        String brainPath = "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain";
-
-        for (String line : lines) {
-            line = line.trim();
-            if (line.isEmpty() || line.equals(brainPath)) {
-                continue;
+        List<SessionItem> list = new ArrayList<>();
+        try {
+            org.json.JSONArray array = new org.json.JSONArray(stdout);
+            for (int i = 0; i < array.length(); i++) {
+                org.json.JSONObject obj = array.getJSONObject(i);
+                String id = obj.getString("id");
+                String title = obj.getString("title");
+                list.add(new SessionItem(id, title));
             }
-            
-            // Extract folder name relative to brain dir
-            if (line.startsWith(brainPath + "/")) {
-                String relativeName = line.substring(brainPath.length() + 1);
-                if (!relativeName.isEmpty() && !list.contains(relativeName)) {
-                    list.add(relativeName);
-                }
-            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing sessions JSON", e);
         }
-
-        // Sort items (sessions)
-        Collections.sort(list);
 
         mSessionsList.clear();
         mSessionsList.addAll(list);
         mSessionsAdapter.notifyDataSetChanged();
+        updateActiveSessionLabel();
         
         if (mSessionsList.isEmpty()) {
             mTvEmptySessions.setVisibility(View.VISIBLE);
@@ -1011,8 +1023,8 @@ public class MainActivity extends Activity {
 
     // --- Session adapter sub-class ---
 
-    private class SessionAdapter extends ArrayAdapter<String> {
-        public SessionAdapter(Context context, List<String> sessions) {
+    private class SessionAdapter extends ArrayAdapter<SessionItem> {
+        public SessionAdapter(Context context, List<SessionItem> sessions) {
             super(context, R.layout.item_directory, sessions);
         }
         
@@ -1021,19 +1033,14 @@ public class MainActivity extends Activity {
             if (convertView == null) {
                 convertView = getLayoutInflater().inflate(R.layout.item_directory, parent, false);
             }
-            String sessionId = getItem(position);
+            SessionItem item = getItem(position);
             TextView tvDirName = convertView.findViewById(R.id.tv_dir_name);
             View viewIndicator = convertView.findViewById(R.id.view_indicator);
             ImageView imgFolder = convertView.findViewById(R.id.img_folder);
             
-            // Shorten display name
-            String displayName = sessionId;
-            if (sessionId.length() > 16) {
-                displayName = sessionId.substring(0, 14) + "...";
-            }
-            tvDirName.setText(displayName);
+            tvDirName.setText(item.title);
             
-            boolean isSelected = sessionId.equals(mSelectedSessionId);
+            boolean isSelected = item.id.equals(mSelectedSessionId);
             if (isSelected) {
                 convertView.setBackgroundColor(Color.parseColor("#3300F2FE")); // Glassy Cyan Tint
                 viewIndicator.setVisibility(View.VISIBLE);
@@ -1166,6 +1173,7 @@ public class MainActivity extends Activity {
 
         switch (state) {
             case "RECORDING":
+                mIsResuming = false;
                 mTvStatus.setText("LISTENING...");
                 mTvStatus.setTextColor(Color.parseColor("#FF2D55"));
                 mBtnMic.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#FF2D55")));
@@ -1178,6 +1186,7 @@ public class MainActivity extends Activity {
                 break;
 
             case "THINKING":
+                mIsResuming = false;
                 mTvStatus.setText("THINKING...");
                 mTvStatus.setTextColor(Color.parseColor("#00F2FE"));
                 mBtnMic.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#0D1A2E")));
@@ -1207,7 +1216,16 @@ public class MainActivity extends Activity {
                 mBtnMic.setImageTintList(ColorStateList.valueOf(Color.parseColor("#FFFFFF")));
                 mPbThinking.setVisibility(View.GONE);
 
-                streamAgentResponse(text);
+                if (mIsResuming) {
+                    if (mActiveAgentTextView == null) {
+                        addAgentBubble(text);
+                    } else {
+                        mActiveAgentTextView.setText(renderMarkdown(text));
+                    }
+                } else {
+                    streamAgentResponse(text);
+                }
+                mIsResuming = false;
 
                 mRingInner.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#4CD964")));
                 mRingMiddle.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#4CD964")));
@@ -1217,6 +1235,7 @@ public class MainActivity extends Activity {
 
             case "IDLE":
             default:
+                mIsResuming = false;
                 mTvStatus.setText("IDLE");
                 mTvStatus.setTextColor(Color.parseColor("#8A8A8F"));
                 mBtnMic.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#2D1F54")));
