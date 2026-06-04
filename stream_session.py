@@ -13,20 +13,42 @@ def find_log_path(session_id):
         path = os.path.join(BRAIN_DIR, session_id, ".system_generated", "logs", "transcript_full.jsonl")
         return path
     
+    # Capture initial directories to exclude them (avoid latching onto the previous session)
+    initial_dirs = set()
+    if os.path.exists(BRAIN_DIR):
+        try:
+            initial_dirs = {d for d in os.listdir(BRAIN_DIR) if os.path.isdir(os.path.join(BRAIN_DIR, d))}
+        except Exception:
+            pass
+            
     # Wait for a new transcript file to appear
     start_time = time.time()
-    while time.time() - start_time < 15:
+    while time.time() - start_time < 30:
         try:
-            subdirs = [os.path.join(BRAIN_DIR, d) for d in os.listdir(BRAIN_DIR)]
-            subdirs = [d for d in subdirs if os.path.isdir(d)]
-            if subdirs:
-                latest_dir = max(subdirs, key=os.path.getmtime)
-                path = os.path.join(latest_dir, ".system_generated", "logs", "transcript_full.jsonl")
-                if os.path.exists(path):
-                    return path
+            if os.path.exists(BRAIN_DIR):
+                current_dirs = {d for d in os.listdir(BRAIN_DIR) if os.path.isdir(os.path.join(BRAIN_DIR, d))}
+                new_dirs = current_dirs - initial_dirs
+                if new_dirs:
+                    new_paths = [os.path.join(BRAIN_DIR, d) for d in new_dirs]
+                    latest_dir = max(new_paths, key=os.path.getmtime)
+                    path = os.path.join(latest_dir, ".system_generated", "logs", "transcript_full.jsonl")
+                    if os.path.exists(path):
+                        return path
         except Exception:
             pass
         time.sleep(0.2)
+        
+    # Fallback to the latest directory overall if no new directory was created after timeout
+    try:
+        subdirs = [os.path.join(BRAIN_DIR, d) for d in os.listdir(BRAIN_DIR) if os.path.isdir(os.path.join(BRAIN_DIR, d))]
+        if subdirs:
+            latest_dir = max(subdirs, key=os.path.getmtime)
+            path = os.path.join(latest_dir, ".system_generated", "logs", "transcript_full.jsonl")
+            if os.path.exists(path):
+                return path
+    except Exception:
+        pass
+        
     return None
 
 def send_broadcast(session_id, step_index, role, text):

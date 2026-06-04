@@ -549,6 +549,20 @@ public class ToggleTalkService extends Service {
             org.json.JSONObject obj = new org.json.JSONObject(cleanJson);
             String latestResponse = obj.optString("latest_response", "");
             String sanitizedTts = obj.optString("sanitized_tts", "");
+            String sessionId = obj.optString("session_id", "");
+            
+            if (mSelectedSessionId == null || mSelectedSessionId.isEmpty()) {
+                if (sessionId != null && !sessionId.isEmpty()) {
+                    mSelectedSessionId = sessionId;
+                    mContinueSession = true;
+                    getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putString("selected_session_id", sessionId).apply();
+                    Log.d(TAG, "Adopted new session ID from final response: " + sessionId);
+                    
+                    Intent sessionIntent = new Intent("com.toggletalk.android.ACTION_NEW_SESSION_ADOPTED");
+                    sessionIntent.putExtra("session_id", sessionId);
+                    sendBroadcast(sessionIntent);
+                }
+            }
             
             if (latestResponse.isEmpty()) {
                 latestResponse = jsonString;
