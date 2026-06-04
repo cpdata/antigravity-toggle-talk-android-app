@@ -100,16 +100,23 @@ def load_history(session_id):
         if not deduped or deduped[-1] != msg:
             deduped.append(msg)
 
-    # Write to a shared file on the SDCard to bypass Binder 100KB limits
-    out_dir = "/sdcard/ToggleTalkModels"
-    os.makedirs(out_dir, exist_ok=True)
-    out_path = os.path.join(out_dir, "session_history.json")
-    try:
-        with open(out_path, "w", encoding="utf-8") as out_f:
-            json.dump(deduped, out_f)
-        print(json.dumps({"status": "success", "file": out_path}))
-    except Exception as e:
-        print(json.dumps({"error": f"Failed to write history file: {str(e)}"}))
+    json_str = json.dumps(deduped)
+
+    # If the JSON string fits within Termux's 100KB intent limit, return it directly.
+    # Otherwise, write to a shared file on the SDCard to bypass the Binder limit.
+    if len(json_str.encode('utf-8')) < 90 * 1024:
+        print(json_str)
+    else:
+        out_dir = "/sdcard/Android/media/com.toggletalk.android"
+        os.makedirs(out_dir, exist_ok=True)
+        out_path = os.path.join(out_dir, "session_history.json")
+        try:
+            with open(out_path, "w", encoding="utf-8") as out_f:
+                out_f.write(json_str)
+            print(json.dumps({"status": "success", "file": out_path}))
+        except Exception as e:
+            # Fallback if writing fails
+            print(json_str)
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
