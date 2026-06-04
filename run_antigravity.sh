@@ -19,47 +19,39 @@ AGY_BIN="/data/data/com.termux/files/home/.local/bin/agy.va39"
 cd "$TARGET_DIR" 2>/dev/null || cd "$HOME"
 TARGET_DIR="$(pwd)"
 
-PROMPT_SUFFIX="
-
-[Context: Your active working directory for this session is '$(basename "$TARGET_DIR")'.
-Format your response in standard Markdown to display inside of a markdown renderer.
-Do not enclose your response in triple backticks.
-CRITICAL: You MUST wrap any text that should be spoken out loud by the Text-to-Speech (TTS) system inside <tts>...</tts> tags. This must be in the final response output meant for the user, NOT inside tool calls, thought processes, or intermediate steps. ONLY the content inside <tts>...</tts> tags will be spoken. Place all thoughts, intermediate reasoning, tool calls, and verbose explanations outside the <tts>...</tts> tags so they are only displayed visually, keeping the spoken response concise and natural.
-
-Example Response:
-Here is a summary of the files I updated:
-- [main.py](file:///path/to/main.py): Modified run configuration.
-
-<tts>I have completed the requested changes. Please verify and run the tests.</tts>]"
-PROMPT="${TRANSCRIPT}${PROMPT_SUFFIX}"
+PROMPT="${TRANSCRIPT}"
 
 # Start streaming updates in the background
-python3 "/data/data/com.termux/files/home/ToggleTalkAndroid/stream_session.py" "$SESSION_ID" &
+python3 "/data/data/com.termux/files/home/ToggleTalkAndroid/stream_session.py" "$SESSION_ID" "$TRANSCRIPT" &
 STREAM_PID=$!
 
-# Run Antigravity
+# Build agy argument list
+AGY_ARGS=("$GLIBC_LINKER" --library-path "$GLIBC_LIBS" "$AGY_BIN" --dangerously-skip-permissions)
+
 if [ "$CONTINUE_SESSION" = "true" ]; then
     if [ -n "$SESSION_ID" ]; then
-        CONV_OPT="--conversation"
-        CONV_VAL="$SESSION_ID"
+        AGY_ARGS+=(--conversation "$SESSION_ID")
     else
-        CONV_OPT="-c"
-        CONV_VAL=""
+        AGY_ARGS+=(-c)
     fi
-else
-    CONV_OPT=""
-    CONV_VAL=""
 fi
 
+AGY_ARGS+=(-p "$PROMPT" --print-timeout 60m)
+
+# Run Antigravity via proot
+# CRITICAL: Use -w to set working directory. Do NOT use 'cd' inside the proot
+# shell - proot's guest path translation can fail causing fallback to '/'.
 RESPONSE=$(env -u LD_PRELOAD -u LD_LIBRARY_PATH "$PROOT_BIN" --kill-on-exit \
+      -w "$TARGET_DIR" \
       -b /data/data/com.termux/files/usr/etc/resolv.conf:/etc/resolv.conf \
       -b /data/data/com.termux/files/usr/bin/env:/usr/bin/env \
       -b /data/data/com.termux/files/usr/bin/sh:/bin/sh \
       -b /data/data/com.termux/files/usr/bin/bash:/bin/bash \
-      /bin/sh -c 'cd "$1" && if [ -n "$5" ]; then if [ -n "$6" ]; then "$2" --library-path "$3" "$4" --dangerously-skip-permissions "$5" "$6" -p "$7" --print-timeout 60m; else "$2" --library-path "$3" "$4" --dangerously-skip-permissions "$5" -p "$7" --print-timeout 60m; fi; else "$2" --library-path "$3" "$4" --dangerously-skip-permissions -p "$7" --print-timeout 60m; fi' sh "$TARGET_DIR" "$GLIBC_LINKER" "$GLIBC_LIBS" "$AGY_BIN" "$CONV_OPT" "$CONV_VAL" "$PROMPT" < /dev/null 2>>"$ERR_FILE")
+      "${AGY_ARGS[@]}" < /dev/null 2>>"$ERR_FILE")
 
 # Stop streaming updates
 kill $STREAM_PID 2>/dev/null
+wait $STREAM_PID 2>/dev/null
 
 # Find the session ID if it was not passed (new chat)
 if [ -z "$SESSION_ID" ]; then
