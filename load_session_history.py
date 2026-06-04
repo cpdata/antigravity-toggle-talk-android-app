@@ -45,7 +45,7 @@ def load_history(session_id):
     for idx, obj in enumerate(raw_steps):
         msg_type = obj.get("type", "")
         source = obj.get("source", "")
-        content = obj.get("content") or ""
+        content = obj.get("content") or obj.get("thinking") or ""
         tool_calls = obj.get("tool_calls") or []
 
         if msg_type == "USER_INPUT" and content.strip():

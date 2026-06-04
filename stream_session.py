@@ -5,8 +5,17 @@ import json
 import time
 import re
 import subprocess
+import signal
 
 BRAIN_DIR = "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain"
+stop_requested = False
+
+def handle_signal(signum, frame):
+    global stop_requested
+    stop_requested = True
+
+signal.signal(signal.SIGTERM, handle_signal)
+signal.signal(signal.SIGINT, handle_signal)
 
 def find_log_path(session_id):
     if session_id:
@@ -63,15 +72,40 @@ def send_broadcast(session_id, step_index, role, text):
     ]
     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-def tail_transcript(path, session_id):
-    # Determine initial lines to skip
-    initial_count = 0
+def find_start_index(lines, prompt):
+    if not prompt:
+        return len(lines)
+    
+    # Normalize prompt for comparison
+    norm_prompt = re.sub(r'\s+', ' ', prompt.strip().lower())
+    
+    # Search backwards for a matching USER_INPUT
+    for idx in range(len(lines) - 1, -1, -1):
+        try:
+            obj = json.loads(lines[idx].strip())
+            if obj.get("type") == "USER_INPUT":
+                content = obj.get("content") or ""
+                norm_content = re.sub(r'\s+', ' ', content.strip().lower())
+                if norm_prompt in norm_content or norm_content in norm_prompt:
+                    return idx
+        except Exception:
+            pass
+    return len(lines)
+
+def tail_transcript(path, session_id, prompt):
+    global stop_requested
+    
+    # Read initial lines if file exists
+    initial_lines = []
     if os.path.exists(path):
         try:
             with open(path, "r", encoding="utf-8") as f:
-                initial_count = sum(1 for _ in f)
+                initial_lines = f.readlines()
         except Exception:
             pass
+
+    # Find the starting index for streaming
+    start_idx = find_start_index(initial_lines, prompt)
 
     # Extract session ID from path if not provided
     if not session_id:
@@ -81,11 +115,13 @@ def tail_transcript(path, session_id):
         else:
             session_id = "unknown"
 
-    print(f"Streaming from {path} for session {session_id}, skipping first {initial_count} lines")
+    print(f"Streaming from {path} for session {session_id}, starting from index {start_idx}")
 
-    current_line_idx = 0
+    current_line_idx = start_idx
     while True:
         if not os.path.exists(path):
+            if stop_requested:
+                break
             time.sleep(0.5)
             continue
             
@@ -101,10 +137,6 @@ def tail_transcript(path, session_id):
                 line = lines[current_line_idx].strip()
                 current_line_idx += 1
                 
-                # Skip lines that were already in the file at startup
-                if current_line_idx <= initial_count:
-                    continue
-                    
                 if not line:
                     continue
                     
@@ -112,11 +144,8 @@ def tail_transcript(path, session_id):
                     obj = json.loads(line)
                     msg_type = obj.get("type", "")
                     source = obj.get("source", "")
-                    content = obj.get("content") or ""
+                    content = obj.get("content") or obj.get("thinking") or ""
                     step_index = obj.get("step_index", -1)
-                    
-                    role = None
-                    text = None
                     
                     if msg_type == "USER_INPUT" and content.strip():
                         m = re.search(r"<USER_REQUEST>(.*?)(?:</USER_REQUEST>|$)", content, re.DOTALL)
@@ -137,7 +166,8 @@ def tail_transcript(path, session_id):
                                 args_str = ", ".join(f"{k}={v}" for k, v in tc_args.items())
                                 send_broadcast(session_id, step_index, "tool_call", f"Calling tool {tc_name}({args_str})")
                         else:
-                            send_broadcast(session_id, step_index, "agent", content.strip())
+                            if content.strip():
+                                send_broadcast(session_id, step_index, "agent", content.strip())
                             
                     elif msg_type in ["RUN_COMMAND", "LIST_DIRECTORY", "GENERIC", "SYSTEM_MESSAGE"] and content.strip():
                         status = obj.get("status", "")
@@ -145,18 +175,26 @@ def tail_transcript(path, session_id):
                         send_broadcast(session_id, step_index, "tool_call", f"Tool result{status_suffix}:\n{content.strip()}")
                 except Exception as e:
                     print(f"Error parsing line: {e}")
+            
+            # Break if stop was requested and we have read all lines
+            if stop_requested and current_line_idx >= len(lines):
+                break
+                
         except Exception as e:
             print(f"Error reading file: {e}")
+            if stop_requested:
+                break
             
         time.sleep(0.5)
 
 def main():
     session_id = sys.argv[1] if len(sys.argv) > 1 else ""
+    prompt = sys.argv[2] if len(sys.argv) > 2 else ""
     path = find_log_path(session_id)
     if not path:
         print("Transcript file not found.")
         sys.exit(1)
-    tail_transcript(path, session_id)
+    tail_transcript(path, session_id, prompt)
 
 if __name__ == "__main__":
     main()

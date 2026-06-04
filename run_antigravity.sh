@@ -39,15 +39,15 @@ fi
 AGY_ARGS+=(-p "$PROMPT" --print-timeout 60m)
 
 # Run Antigravity via proot
-# CRITICAL: Use -w to set working directory. Do NOT use 'cd' inside the proot
-# shell - proot's guest path translation can fail causing fallback to '/'.
-RESPONSE=$(env -u LD_PRELOAD -u LD_LIBRARY_PATH "$PROOT_BIN" --kill-on-exit \
+# Ensure PWD env variable is explicitly set so Go binaries (like agy) read the correct working directory,
+# and explicitly use /bin/sh to launch the linker to establish a proper environment context.
+RESPONSE=$(env -u LD_PRELOAD -u LD_LIBRARY_PATH PWD="$TARGET_DIR" "$PROOT_BIN" --kill-on-exit \
       -w "$TARGET_DIR" \
       -b /data/data/com.termux/files/usr/etc/resolv.conf:/etc/resolv.conf \
       -b /data/data/com.termux/files/usr/bin/env:/usr/bin/env \
       -b /data/data/com.termux/files/usr/bin/sh:/bin/sh \
       -b /data/data/com.termux/files/usr/bin/bash:/bin/bash \
-      "${AGY_ARGS[@]}" < /dev/null 2>>"$ERR_FILE")
+      /bin/sh -c 'cd "$1" 2>/dev/null || true; shift; exec "$@"' sh "$TARGET_DIR" "${AGY_ARGS[@]}" < /dev/null 2>>"$ERR_FILE")
 
 # Stop streaming updates
 kill $STREAM_PID 2>/dev/null
