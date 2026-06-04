@@ -23,7 +23,13 @@ PROMPT_SUFFIX="
 [Context: Your active working directory for this session is '$(basename "$TARGET_DIR")'.
 Format your response in standard Markdown to display inside of a markdown renderer.
 Do not enclose your response in triple backticks.
-CRITICAL: You MUST wrap any text that should be spoken out loud by the Text-to-Speech (TTS) system inside <tts>...</tts> tags. ONLY the content inside these tags will be spoken. Place all thoughts, intermediate reasoning, tool calls, and verbose explanations outside the <tts>...</tts> tags so they are only displayed visually, keeping the spoken response concise and natural.]"
+CRITICAL: You MUST wrap any text that should be spoken out loud by the Text-to-Speech (TTS) system inside <tts>...</tts> tags. This must be in the final response output meant for the user, NOT inside tool calls, thought processes, or intermediate steps. ONLY the content inside <tts>...</tts> tags will be spoken. Place all thoughts, intermediate reasoning, tool calls, and verbose explanations outside the <tts>...</tts> tags so they are only displayed visually, keeping the spoken response concise and natural.
+
+Example Response:
+Here is a summary of the files I updated:
+- [main.py](file:///path/to/main.py): Modified run configuration.
+
+<tts>I have completed the requested changes. Please verify and run the tests.</tts>]"
 PROMPT="${TRANSCRIPT}${PROMPT_SUFFIX}"
 
 # Start streaming updates in the background
@@ -38,6 +44,7 @@ if [ "$CONTINUE_SESSION" = "true" ]; then
         CONV_ARG="-c"
     fi
     RESPONSE=$(env -u LD_PRELOAD -u LD_LIBRARY_PATH "$PROOT_BIN" --kill-on-exit \
+      -w "$TARGET_DIR" \
       -b /data/data/com.termux/files/usr/etc/resolv.conf:/etc/resolv.conf \
       -b /data/data/com.termux/files/usr/bin/env:/usr/bin/env \
       -b /data/data/com.termux/files/usr/bin/sh:/bin/sh \
@@ -46,6 +53,7 @@ if [ "$CONTINUE_SESSION" = "true" ]; then
       --dangerously-skip-permissions $CONV_ARG -p "$PROMPT" --print-timeout 60m < /dev/null 2>>"$ERR_FILE")
 else
     RESPONSE=$(env -u LD_PRELOAD -u LD_LIBRARY_PATH "$PROOT_BIN" --kill-on-exit \
+      -w "$TARGET_DIR" \
       -b /data/data/com.termux/files/usr/etc/resolv.conf:/etc/resolv.conf \
       -b /data/data/com.termux/files/usr/bin/env:/usr/bin/env \
       -b /data/data/com.termux/files/usr/bin/sh:/bin/sh \

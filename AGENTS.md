@@ -19,6 +19,20 @@ This file outlines the environment details and integration configurations for th
 - **Termux Bridge**: The app coordinates the interaction loop and calls Termux asynchronously via the `com.termux.RUN_COMMAND` intent only for invoking the Antigravity agent reasoning CLI (`run_antigravity.sh`).
 - **Termux Storage**: Configured (`termux-setup-storage` has been run) allowing access to shared device storage at `~/storage/` (Access the SDCard at `/sdcard/` but don't write scripts that write temporary files to the SD card, we want to avoid causing repeated filesystem writes to the SD card).
 
+## Response Formatting & Text-to-Speech (TTS)
+- **CRITICAL**: You MUST wrap any text that should be spoken out loud by the Text-to-Speech (TTS) system inside `<tts>...</tts>` tags in your final response output meant for the user.
+- **Rules**:
+  - ONLY the content inside `<tts>...</tts>` tags will be spoken.
+  - Do NOT wrap text inside tool calls, thought processes, or intermediate steps.
+  - Place all thoughts, intermediate reasoning, tool calls, and verbose explanations outside the `<tts>...</tts>` tags so they are only displayed visually, keeping the spoken response concise and natural.
+  - Example:
+    ```markdown
+    Here is a summary of the files I updated:
+    - [main.py](file:///path/to/main.py): Modified run configuration.
+
+    <tts>I have completed the requested changes. Please verify and run the tests.</tts>
+    ```
+
 ## Git
 - Always git stage and commit your file changes at the end of every turn  Always use the current 'main' branch unless instructed otherwise.
 
