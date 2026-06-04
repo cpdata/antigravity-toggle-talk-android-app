@@ -47,6 +47,10 @@ public class MainActivity extends Activity {
     private TextView mBtnNewChatDrawer;
     private TextView mTvActiveSessionTop;
     private CheckBox mCbMockMode;
+    private View mSettingsPopupRoot;
+    private TextView mBtnSettings;
+    private View mBtnSettingsClose;
+    private View mSettingsDimBackground;
     private boolean mBypassAntigravity = false;
     private ImageButton mBtnMic;
     private ProgressBar mPbThinking;
@@ -264,6 +268,20 @@ public class MainActivity extends Activity {
         mBtnNewChatDrawer = findViewById(R.id.btn_new_chat_drawer);
         mTvActiveSessionTop = findViewById(R.id.tv_active_session_top);
         mCbMockMode = findViewById(R.id.cb_mock_mode);
+        mSettingsPopupRoot = findViewById(R.id.settings_popup_root);
+        mBtnSettings = findViewById(R.id.btn_settings);
+        mBtnSettingsClose = findViewById(R.id.btn_settings_close);
+        mSettingsDimBackground = findViewById(R.id.settings_popup_dim_background);
+
+        if (mBtnSettings != null) {
+            mBtnSettings.setOnClickListener(v -> openSettings());
+        }
+        if (mBtnSettingsClose != null) {
+            mBtnSettingsClose.setOnClickListener(v -> closeSettings());
+        }
+        if (mSettingsDimBackground != null) {
+            mSettingsDimBackground.setOnClickListener(v -> closeSettings());
+        }
         mBtnMic = findViewById(R.id.btn_mic);
         mPbThinking = findViewById(R.id.pb_thinking);
         mEtMessage = findViewById(R.id.et_message);
@@ -797,6 +815,31 @@ public class MainActivity extends Activity {
         animateRightDrawer(mRightDrawerContent.getTranslationX(), width, 0f, false);
     }
 
+    private void openSettings() {
+        if (mSettingsPopupRoot != null) {
+            mSettingsPopupRoot.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void closeSettings() {
+        if (mSettingsPopupRoot != null) {
+            mSettingsPopupRoot.setVisibility(View.GONE);
+        }
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (mSettingsPopupRoot != null && mSettingsPopupRoot.getVisibility() == View.VISIBLE) {
+            closeSettings();
+        } else if (mIsDrawerOpen) {
+            closeDrawer();
+        } else if (mIsRightDrawerOpen) {
+            closeRightDrawer();
+        } else {
+            super.onBackPressed();
+        }
+    }
+
     private void animateRightDrawer(float fromTranslationX, float toTranslationX, float toAlpha, final boolean open) {
         mIsRightDrawerOpen = open;
 
@@ -940,7 +983,7 @@ public class MainActivity extends Activity {
                     mActiveAgentTextView = null; // don't stream-overwrite history bubbles
                 }
             }
-            addSystemMessage("✓ Session loaded. Continue the conversation below.", "#4CD964");
+
         } catch (Exception e) {
             Log.e(TAG, "Error parsing session history JSON", e);
             addSystemMessage("Error loading session history.", "#FF6B6B");
@@ -978,6 +1021,7 @@ public class MainActivity extends Activity {
         tv.setTextColor(Color.parseColor(colorHex));
         tv.setTextSize(12);
         tv.setPadding((int)(8 * density), (int)(5 * density), (int)(8 * density), (int)(5 * density));
+        tv.setTextIsSelectable(true);
         
         // Extract the last 6 hex digits (RGB) for the stroke color - handles both #RRGGBB and #AARRGGBB
         String rgbHex = colorHex.replaceAll("^#[0-9A-Fa-f]{2}([0-9A-Fa-f]{6})$", "#$1");
@@ -1010,13 +1054,13 @@ public class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         lp.setMargins(0, (int)(5 * density), 0, (int)(5 * density));
         bubbleLayout.setLayoutParams(lp);
-        bubbleLayout.setGravity(android.view.Gravity.END);
         
         TextView tv = new TextView(this);
         tv.setText(message);
         tv.setTextColor(Color.WHITE);
         tv.setTextSize(13);
         tv.setPadding((int)(10 * density), (int)(7 * density), (int)(10 * density), (int)(7 * density));
+        tv.setTextIsSelectable(true);
         
         android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
         gd.setColor(Color.parseColor("#4D9D50BB"));
@@ -1025,8 +1069,9 @@ public class MainActivity extends Activity {
         tv.setBackground(gd);
         
         android.widget.LinearLayout.LayoutParams tvLp = new android.widget.LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        tvLp.setMarginStart((int)(30 * density));
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        tvLp.setMarginStart((int)(4 * density));
+        tvLp.setMarginEnd((int)(4 * density));
         tv.setLayoutParams(tvLp);
         
         bubbleLayout.addView(tv);
@@ -1045,13 +1090,13 @@ public class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         lp.setMargins(0, (int)(5 * density), 0, (int)(5 * density));
         bubbleLayout.setLayoutParams(lp);
-        bubbleLayout.setGravity(android.view.Gravity.START);
         
         TextView tv = new TextView(this);
         tv.setText(renderMarkdown(initialText));
         tv.setTextColor(Color.WHITE);
         tv.setTextSize(13);
         tv.setPadding((int)(10 * density), (int)(7 * density), (int)(10 * density), (int)(7 * density));
+        tv.setTextIsSelectable(true);
         
         android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
         gd.setColor(Color.parseColor("#2600F2FE"));
@@ -1060,8 +1105,9 @@ public class MainActivity extends Activity {
         tv.setBackground(gd);
         
         android.widget.LinearLayout.LayoutParams tvLp = new android.widget.LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        tvLp.setMarginEnd((int)(30 * density));
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        tvLp.setMarginStart((int)(4 * density));
+        tvLp.setMarginEnd((int)(4 * density));
         tv.setLayoutParams(tvLp);
         
         bubbleLayout.addView(tv);
@@ -1402,10 +1448,9 @@ public class MainActivity extends Activity {
                     addAgentBubble("...");
                 }
 
-                mRingInner.setScaleX(1.15f);
-                mRingInner.setScaleY(1.15f);
-                mRingInner.setAlpha(0.15f);
-                mRingInner.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#00F2FE")));
+                mRingInner.setAlpha(0f);
+                mRingMiddle.setAlpha(0f);
+                mRingOuter.setAlpha(0f);
                 break;
 
             case "SPEAKING":

@@ -112,6 +112,19 @@
                     android:orientation="vertical"
                     android:padding="2dp" />
             </ScrollView>
+
+            <!-- Thinking Spinner Progress Bar -->
+            <ProgressBar
+                android:id="@+id/pb_thinking"
+                android:layout_width="wrap_content"
+                android:layout_height="24dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="4dp"
+                android:indeterminate="true"
+                android:visibility="gone"
+                android:indeterminateTintMode="src_atop"
+                android:indeterminateTint="#00F2FE" />
         </LinearLayout>
 
         <!-- Bottom Settings (Continue session & Setup info) -->
@@ -151,16 +164,22 @@
                     android:focusable="true"
                     android:contentDescription="Start a new chat session" />
 
-                <!-- Styled Mock Mode Checkbox -->
-                <CheckBox
-                    android:id="@+id/cb_mock_mode"
+                <!-- Settings Button -->
+                <TextView
+                    android:id="@+id/btn_settings"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Mock Mode"
-                    android:textColor="#E6E6FA"
+                    android:text="⚙ Settings"
+                    android:textColor="#00F2FE"
                     android:textSize="12sp"
-                    android:buttonTint="#9D50BB"
-                    android:checked="false" />
+                    android:textStyle="bold"
+                    android:background="@drawable/card_glass"
+                    android:padding="6dp"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:contentDescription="Open settings" />
             </LinearLayout>
 
             <!-- Input Bar Layout -->
@@ -223,16 +242,7 @@
                         android:background="@drawable/bg_mic_btn"
                         android:alpha="0" />
 
-                    <!-- Thinking Spinner Progress Bar -->
-                    <ProgressBar
-                        android:id="@+id/pb_thinking"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:layout_gravity="center"
-                        android:indeterminate="true"
-                        android:visibility="gone"
-                        android:indeterminateTintMode="src_atop"
-                        android:indeterminateTint="#00F2FE" />
+
 
                     <!-- Main Mic Action Button -->
                     <ImageButton
@@ -530,6 +540,90 @@
                 android:textStyle="bold"
                 android:gravity="center"
                 android:letterSpacing="0.05" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- Settings Popup Overlay Container -->
+    <FrameLayout
+        android:id="@+id/settings_popup_root"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true">
+
+        <!-- Translucent dim background panel -->
+        <View
+            android:id="@+id/settings_popup_dim_background"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#A6000000" />
+
+        <!-- Settings Card Container (Glassmorphic) centered -->
+        <LinearLayout
+            android:layout_width="280dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:orientation="vertical"
+            android:background="#FA0B0518"
+            android:padding="16dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:elevation="24dp">
+
+            <!-- Title Header -->
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="SETTINGS"
+                    android:textColor="#E6E6FA"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.05" />
+
+                <!-- Close Button -->
+                <ImageButton
+                    android:id="@+id/btn_settings_close"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:src="@android:drawable/ic_menu_close_clear_cancel"
+                    android:tint="#E6E6FA"
+                    android:contentDescription="Close settings" />
+            </RelativeLayout>
+
+            <!-- Scrollable Settings Content -->
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="180dp"
+                android:fillViewport="true">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <!-- Mock Mode Checkbox -->
+                    <CheckBox
+                        android:id="@+id/cb_mock_mode"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Mock Mode"
+                        android:textColor="#E6E6FA"
+                        android:textSize="14sp"
+                        android:buttonTint="#9D50BB"
+                        android:paddingStart="8dp"
+                        android:layout_marginBottom="12dp"
+                        android:checked="false" />
+                </LinearLayout>
+            </ScrollView>
         </LinearLayout>
     </FrameLayout>
 </FrameLayout>
