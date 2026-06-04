@@ -169,14 +169,25 @@ public class ToggleTalkService extends Service {
             String action = intent.getAction();
             Log.d(TAG, "onStartCommand action: " + action);
 
+            if (intent.hasExtra("session_id")) {
+                String intentSessionId = intent.getStringExtra("session_id");
+                if (intentSessionId != null) {
+                    mSelectedSessionId = intentSessionId;
+                    getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putString("selected_session_id", mSelectedSessionId).apply();
+                    Log.d(TAG, "onStartCommand: updated mSelectedSessionId to: " + mSelectedSessionId);
+                }
+            }
+
             if (ACTION_TOGGLE.equals(action)) {
-                mContinueSession = (mSelectedSessionId != null && !mSelectedSessionId.isEmpty());
+                boolean continueIntent = intent.getBooleanExtra("continue_session", false);
+                mContinueSession = continueIntent || (mSelectedSessionId != null && !mSelectedSessionId.isEmpty());
                 handleToggle();
             } else if (ACTION_STOP.equals(action)) {
                 handleStop();
             } else if ("com.toggletalk.android.ACTION_SEND_PROMPT".equals(action)) {
                 String prompt = intent.getStringExtra("prompt");
-                mContinueSession = (mSelectedSessionId != null && !mSelectedSessionId.isEmpty());
+                boolean continueIntent = intent.getBooleanExtra("continue_session", false);
+                mContinueSession = continueIntent || (mSelectedSessionId != null && !mSelectedSessionId.isEmpty());
                 boolean bypass = intent.getBooleanExtra("bypass_antigravity", mBypassAntigravity);
                 if (prompt != null && !prompt.trim().isEmpty()) {
                     mStopRequested = false; // reset stop flag for new request
@@ -427,6 +438,17 @@ public class ToggleTalkService extends Service {
                 } else {
                     responseText = "### Echo Mode\nReceived prompt: **" + queryText + "**\n\nThis is a mocked response simulating Antigravity.\n\n" +
                         "<tts>Echoing your prompt. You said: " + queryText + "</tts>";
+                }
+
+                if (mSelectedSessionId == null || mSelectedSessionId.isEmpty()) {
+                    String mockSessionId = "mock_session_" + (System.currentTimeMillis() / 1000);
+                    mSelectedSessionId = mockSessionId;
+                    getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putString("selected_session_id", mockSessionId).apply();
+                    Log.d(TAG, "Adopted new mock session ID: " + mockSessionId);
+                    
+                    Intent sessionIntent = new Intent("com.toggletalk.android.ACTION_NEW_SESSION_ADOPTED");
+                    sessionIntent.putExtra("session_id", mockSessionId);
+                    sendBroadcast(sessionIntent);
                 }
 
                 try {

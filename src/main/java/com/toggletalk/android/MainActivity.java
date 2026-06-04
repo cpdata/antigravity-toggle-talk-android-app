@@ -130,6 +130,7 @@ public class MainActivity extends Activity {
     private boolean mShowThoughtsAndToolCalls = false;
     private boolean mShowAllEarlierMessages = false;
     private org.json.JSONArray mCurrentSessionHistory = new org.json.JSONArray();
+    private View mNewChatStartedBubble = null;
 
     private final BroadcastReceiver mStreamDisplayReceiver = new BroadcastReceiver() {
         @Override
@@ -146,6 +147,7 @@ public class MainActivity extends Activity {
                     mSelectedSessionId = sessionId;
                     mContinueSession = true;
                     getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putString("selected_session_id", sessionId).apply();
+                    updateActiveSessionLabel();
                     queryTermuxSessions();
                 }
             } else if ("com.toggletalk.android.ACTION_REFRESH_HISTORY".equals(action)) {
@@ -533,6 +535,7 @@ public class MainActivity extends Activity {
         Intent intent = new Intent(this, ToggleTalkService.class);
         intent.setAction(ToggleTalkService.ACTION_TOGGLE);
         intent.putExtra("continue_session", mContinueSession);
+        intent.putExtra("session_id", mSelectedSessionId);
         startService(intent);
     }
 
@@ -570,7 +573,7 @@ public class MainActivity extends Activity {
         mShowAllEarlierMessages = false;
         mSessionsAdapter.notifyDataSetChanged();
 
-        addSystemMessage("✦ New chat started. Type or speak your message.", "#00F2FE");
+        mNewChatStartedBubble = addSystemMessage("✦ New chat started. Type or speak your message.", "#00F2FE");
         Toast.makeText(this, "New chat started", Toast.LENGTH_SHORT).show();
     }
 
@@ -804,6 +807,7 @@ public class MainActivity extends Activity {
         intent.setAction("com.toggletalk.android.ACTION_SEND_PROMPT");
         intent.putExtra("prompt", message);
         intent.putExtra("continue_session", mContinueSession);
+        intent.putExtra("session_id", mSelectedSessionId);
         intent.putExtra("bypass_antigravity", mBypassAntigravity);
         startService(intent);
     }
@@ -948,6 +952,7 @@ public class MainActivity extends Activity {
     private void loadSessionHistory(String sessionId) {
         // Clear current chat log
         if (mChatContainer != null) mChatContainer.removeAllViews();
+        mNewChatStartedBubble = null;
         mActiveAgentTextView = null;
         mUserPrompt = "";
         mDisplayedStepKeys.clear();
@@ -995,6 +1000,7 @@ public class MainActivity extends Activity {
 
     private void receiveSessionHistory(String stdout, String errmsg) {
         if (mChatContainer != null) mChatContainer.removeAllViews();
+        mNewChatStartedBubble = null;
         mActiveAgentTextView = null;
 
         if (stdout == null || stdout.trim().isEmpty()) {
@@ -1261,6 +1267,11 @@ public class MainActivity extends Activity {
             msg.put("text", text);
             mCurrentSessionHistory.put(msg);
 
+            if ("thought".equals(role) || "tool_call".equals(role)) {
+                mShowThoughtsAndToolCalls = true;
+                updateBtnExpandAllText();
+            }
+
             if ("agent".equals(role)) {
                 displayMessagesUpTo(mCurrentSessionHistory.length() - 1, mShowAllEarlierMessages);
                 streamAgentResponse(text);
@@ -1269,6 +1280,12 @@ public class MainActivity extends Activity {
             }
         } catch (Exception e) {
             Log.e(TAG, "Error handling streamed display", e);
+        }
+    }
+
+    private void updateBtnExpandAllText() {
+        if (mBtnExpandAll != null) {
+            mBtnExpandAll.setText(mShowThoughtsAndToolCalls ? "▼ Collapse All" : "▶ Expand All");
         }
     }
 
@@ -1294,8 +1311,8 @@ public class MainActivity extends Activity {
         if (mTvActiveSessionTop != null) mTvActiveSessionTop.setText(displayTitle);
     }
 
-    private void addSystemMessage(String text, String colorHex) {
-        if (mChatContainer == null) return;
+    private TextView addSystemMessage(String text, String colorHex) {
+        if (mChatContainer == null) return null;
         float density = getResources().getDisplayMetrics().density;
         
         TextView tv = new TextView(this);
@@ -1323,6 +1340,7 @@ public class MainActivity extends Activity {
         
         mChatContainer.addView(tv);
         mScrollLog.post(() -> mScrollLog.fullScroll(View.FOCUS_DOWN));
+        return tv;
     }
 
     private void addUserBubble(String message) {
@@ -1731,6 +1749,10 @@ public class MainActivity extends Activity {
 
                 // After loading a session, mActiveAgentTextView is null so new bubbles are fresh
                 if (!"Transcribing...".equals(text)) {
+                    if (mNewChatStartedBubble != null && mChatContainer != null) {
+                        mChatContainer.removeView(mNewChatStartedBubble);
+                        mNewChatStartedBubble = null;
+                    }
                     if (!text.isEmpty() && !text.equals(mUserPrompt)) {
                         mUserPrompt = text;
                         addUserBubble(mUserPrompt);
