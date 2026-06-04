@@ -104,10 +104,11 @@ def tail_transcript(path, session_id):
                         if text:
                             send_broadcast(session_id, step_index, "user", text)
                         
-                    elif msg_type == "PLANNER_RESPONSE" and source == "MODEL" and content.strip():
+                    elif msg_type == "PLANNER_RESPONSE" and source == "MODEL":
                         tool_calls = obj.get("tool_calls") or []
                         if tool_calls:
-                            send_broadcast(session_id, step_index, "thought", content.strip())
+                            if content.strip():
+                                send_broadcast(session_id, step_index, "thought", content.strip())
                             for tc in tool_calls:
                                 tc_name = tc.get("name", "")
                                 tc_args = tc.get("args", {})

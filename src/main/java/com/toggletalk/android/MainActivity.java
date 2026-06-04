@@ -148,6 +148,10 @@ public class MainActivity extends Activity {
                     getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putString("selected_session_id", sessionId).apply();
                     queryTermuxSessions();
                 }
+            } else if ("com.toggletalk.android.ACTION_REFRESH_HISTORY".equals(action)) {
+                if (mSelectedSessionId != null && !mSelectedSessionId.isEmpty()) {
+                    loadSessionHistory(mSelectedSessionId);
+                }
             }
         }
     };
@@ -455,6 +459,7 @@ public class MainActivity extends Activity {
         IntentFilter streamFilter = new IntentFilter();
         streamFilter.addAction("com.toggletalk.android.ACTION_STREAM_DISPLAY");
         streamFilter.addAction("com.toggletalk.android.ACTION_NEW_SESSION_ADOPTED");
+        streamFilter.addAction("com.toggletalk.android.ACTION_REFRESH_HISTORY");
         registerReceiver(mStreamDisplayReceiver, streamFilter);
 
         // Check Permissions

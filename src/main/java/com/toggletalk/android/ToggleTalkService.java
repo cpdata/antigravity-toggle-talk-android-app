@@ -106,6 +106,14 @@ public class ToggleTalkService extends Service {
                     int exitCode = resultBundle.getInt("exitCode", -1);
                     Log.d(TAG, "Exit code: " + exitCode + ", stdout: " + stdout + ", errmsg: " + errmsg);
                     
+                    if (exitCode != 0) {
+                        Log.e(TAG, "Antigravity failed with exit code: " + exitCode + ". Error: " + errmsg);
+                        updateState("IDLE", "Error: " + (errmsg != null && !errmsg.isEmpty() ? errmsg : "Process exited with code " + exitCode));
+                        Intent refreshIntent = new Intent("com.toggletalk.android.ACTION_REFRESH_HISTORY");
+                        sendBroadcast(refreshIntent);
+                        return;
+                    }
+                    
                     if (stdout != null && !stdout.trim().isEmpty()) {
                         handleAntigravityResponse(stdout);
                     } else {
@@ -162,13 +170,13 @@ public class ToggleTalkService extends Service {
             Log.d(TAG, "onStartCommand action: " + action);
 
             if (ACTION_TOGGLE.equals(action)) {
-                mContinueSession = intent.getBooleanExtra("continue_session", false);
+                mContinueSession = (mSelectedSessionId != null && !mSelectedSessionId.isEmpty());
                 handleToggle();
             } else if (ACTION_STOP.equals(action)) {
                 handleStop();
             } else if ("com.toggletalk.android.ACTION_SEND_PROMPT".equals(action)) {
                 String prompt = intent.getStringExtra("prompt");
-                mContinueSession = intent.getBooleanExtra("continue_session", false);
+                mContinueSession = (mSelectedSessionId != null && !mSelectedSessionId.isEmpty());
                 boolean bypass = intent.getBooleanExtra("bypass_antigravity", mBypassAntigravity);
                 if (prompt != null && !prompt.trim().isEmpty()) {
                     mStopRequested = false; // reset stop flag for new request
@@ -194,11 +202,11 @@ public class ToggleTalkService extends Service {
                 }
             } else if ("com.toggletalk.android.ACTION_SET_SESSION_ID".equals(action)) {
                 String sessionId = intent.getStringExtra("session_id");
-                mContinueSession = intent.getBooleanExtra("continue_session", mContinueSession);
                 if (sessionId != null) {
                     mSelectedSessionId = sessionId;
+                    mContinueSession = !sessionId.isEmpty();
                     getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putString("selected_session_id", sessionId).apply();
-                    Log.d(TAG, "Session ID updated to: " + sessionId);
+                    Log.d(TAG, "Session ID updated to: " + sessionId + ", continue: " + mContinueSession);
                 }
             } else if ("com.toggletalk.android.ACTION_GET_STATE".equals(action)) {
                 broadcastStateToApp();

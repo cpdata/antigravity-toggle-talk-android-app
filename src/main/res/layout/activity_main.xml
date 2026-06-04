@@ -169,7 +169,7 @@
                     android:id="@+id/btn_expand_all"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="▶ Expand All"
+                    android:text="⛶ Expand All"
                     android:textColor="#00F2FE"
                     android:textSize="12sp"
                     android:textStyle="bold"
