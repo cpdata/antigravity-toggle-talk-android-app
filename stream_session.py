@@ -32,6 +32,7 @@ def find_log_path(session_id):
 def send_broadcast(session_id, step_index, role, text):
     cmd = [
         "am", "broadcast", "--user", "0",
+        "-p", "com.toggletalk.android",
         "-a", "com.toggletalk.android.ACTION_STREAM_UPDATE",
         "--es", "session_id", session_id,
         "--ei", "step_index", str(step_index),
@@ -54,7 +55,7 @@ def tail_transcript(path, session_id):
     if not session_id:
         parts = path.split(os.sep)
         if len(parts) >= 6:
-            session_id = parts[-5]
+            session_id = parts[-4]
         else:
             session_id = "unknown"
 

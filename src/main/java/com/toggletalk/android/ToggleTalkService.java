@@ -733,7 +733,17 @@ public class ToggleTalkService extends Service {
     }
 
     private void handleStreamedUpdate(String sessionId, int stepIndex, String role, String text) {
-        if (mSelectedSessionId == null || !mSelectedSessionId.equals(sessionId)) {
+        if (mSelectedSessionId == null || mSelectedSessionId.isEmpty()) {
+            mSelectedSessionId = sessionId;
+            getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putString("selected_session_id", sessionId).apply();
+            Log.d(TAG, "Adopted new session ID from stream: " + sessionId);
+            
+            Intent sessionIntent = new Intent("com.toggletalk.android.ACTION_NEW_SESSION_ADOPTED");
+            sessionIntent.putExtra("session_id", sessionId);
+            sendBroadcast(sessionIntent);
+        }
+
+        if (!mSelectedSessionId.equals(sessionId)) {
             Log.d(TAG, "Ignoring streamed update: sessionId mismatch. expected=" + mSelectedSessionId + ", got=" + sessionId);
             return;
         }

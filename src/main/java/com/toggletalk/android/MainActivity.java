@@ -130,11 +130,20 @@ public class MainActivity extends Activity {
     private final BroadcastReceiver mStreamDisplayReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if ("com.toggletalk.android.ACTION_STREAM_DISPLAY".equals(intent.getAction())) {
+            String action = intent.getAction();
+            if ("com.toggletalk.android.ACTION_STREAM_DISPLAY".equals(action)) {
                 int stepIndex = intent.getIntExtra("step_index", -1);
                 String role = intent.getStringExtra("role");
                 String text = intent.getStringExtra("text");
                 handleStreamedDisplay(stepIndex, role, text);
+            } else if ("com.toggletalk.android.ACTION_NEW_SESSION_ADOPTED".equals(action)) {
+                String sessionId = intent.getStringExtra("session_id");
+                if (sessionId != null && !sessionId.isEmpty()) {
+                    mSelectedSessionId = sessionId;
+                    mContinueSession = true;
+                    updateActiveSessionLabel();
+                    getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putString("selected_session_id", sessionId).apply();
+                }
             }
         }
     };
@@ -429,7 +438,10 @@ public class MainActivity extends Activity {
         registerReceiver(mSessionHistoryReceiver, new IntentFilter(ACTION_SESSION_HISTORY));
 
         // Register Stream Display Receiver
-        registerReceiver(mStreamDisplayReceiver, new IntentFilter("com.toggletalk.android.ACTION_STREAM_DISPLAY"));
+        IntentFilter streamFilter = new IntentFilter();
+        streamFilter.addAction("com.toggletalk.android.ACTION_STREAM_DISPLAY");
+        streamFilter.addAction("com.toggletalk.android.ACTION_NEW_SESSION_ADOPTED");
+        registerReceiver(mStreamDisplayReceiver, streamFilter);
 
         // Check Permissions
         checkPermissionsAndPreferences();
@@ -1540,14 +1552,16 @@ public class MainActivity extends Activity {
                 mBtnMic.setImageTintList(ColorStateList.valueOf(Color.parseColor("#FFFFFF")));
                 mPbThinking.setVisibility(View.GONE);
 
-                if (mIsResuming) {
-                    if (mActiveAgentTextView == null) {
-                        addAgentBubble(text);
+                if (mDisplayedStepIndices.isEmpty()) {
+                    if (mIsResuming) {
+                        if (mActiveAgentTextView == null) {
+                            addAgentBubble(text);
+                        } else {
+                            mActiveAgentTextView.setText(renderMarkdown(text));
+                        }
                     } else {
-                        mActiveAgentTextView.setText(renderMarkdown(text));
+                        streamAgentResponse(text);
                     }
-                } else {
-                    streamAgentResponse(text);
                 }
                 mIsResuming = false;
 
