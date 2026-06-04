@@ -10,6 +10,7 @@ import os
 import sys
 import json
 import re
+from transcript_parser import parse_transcript_steps
 
 BRAIN_DIR = "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain"
 
@@ -39,70 +40,8 @@ def load_history(session_id):
         print(json.dumps({"error": str(e)}))
         return
 
-    messages = []
-    num_steps = len(raw_steps)
-
-    for idx, obj in enumerate(raw_steps):
-        msg_type = obj.get("type", "")
-        source = obj.get("source", "")
-        content = obj.get("content") or obj.get("thinking") or ""
-        tool_calls = obj.get("tool_calls") or []
-
-        if msg_type == "USER_INPUT" and content.strip():
-            # Strip wrapping tags, keep the user request text
-            m = re.search(
-                r"<USER_REQUEST>(.*?)(?:</USER_REQUEST>|$)",
-                content, re.DOTALL
-            )
-            text = m.group(1).strip() if m else content.strip()
-            # Remove remaining XML/metadata tags
-            text = re.sub(r"<[^>]+>.*?</[^>]+>", "", text, flags=re.DOTALL).strip()
-            text = re.sub(r"<[^>]+>", "", text).strip()
-            if text:
-                messages.append({"role": "user", "text": text})
-
-        elif msg_type == "PLANNER_RESPONSE" and source == "MODEL":
-            # Check if this is the final agent response of a turn.
-            # It is final if:
-            # 1. It has no tool calls AND
-            # 2. There are no subsequent PLANNER_RESPONSE or tool result messages before the next USER_INPUT.
-            is_final = False
-            if not tool_calls:
-                is_final = True
-                for next_idx in range(idx + 1, num_steps):
-                    next_obj = raw_steps[next_idx]
-                    next_type = next_obj.get("type", "")
-                    if next_type == "USER_INPUT":
-                        break
-                    elif next_type in ["PLANNER_RESPONSE", "RUN_COMMAND", "LIST_DIRECTORY", "GENERIC", "SYSTEM_MESSAGE"] or next_obj.get("tool_calls"):
-                        is_final = False
-                        break
-
-            stripped_content = content.strip() if content else ""
-            if stripped_content:
-                if is_final:
-                    messages.append({"role": "agent", "text": stripped_content})
-                else:
-                    messages.append({"role": "thought", "text": stripped_content})
-
-            for tc in tool_calls:
-                tc_name = tc.get("name", "")
-                tc_args = tc.get("args", {})
-                args_str = ", ".join(f"{k}={v}" for k, v in tc_args.items())
-                messages.append({"role": "tool_call", "text": f"Calling tool {tc_name}({args_str})"})
-
-        elif msg_type in ["RUN_COMMAND", "LIST_DIRECTORY", "GENERIC", "SYSTEM_MESSAGE"] and content.strip():
-            status = obj.get("status", "")
-            status_suffix = f" ({status})" if status and status != "DONE" else ""
-            messages.append({"role": "tool_call", "text": f"Tool result{status_suffix}:\n{content.strip()}"})
-
-    # Deduplicate consecutive identical messages
-    deduped = []
-    for msg in messages:
-        if not deduped or deduped[-1] != msg:
-            deduped.append(msg)
-
-    json_str = json.dumps(deduped)
+    messages = parse_transcript_steps(raw_steps)
+    json_str = json.dumps(messages)
 
     # If the JSON string fits within Termux's 100KB intent limit, return it directly.
     # Otherwise, write to a shared file on the SDCard to bypass the Binder limit.

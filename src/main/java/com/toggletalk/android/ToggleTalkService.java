@@ -126,10 +126,10 @@ public class ToggleTalkService extends Service {
                 }
             } else if ("com.toggletalk.android.ACTION_STREAM_UPDATE".equals(action)) {
                 String sessionId = intent.getStringExtra("session_id");
-                int stepIndex = intent.getIntExtra("step_index", -1);
-                String role = intent.getStringExtra("role");
-                String text = intent.getStringExtra("text");
-                handleStreamedUpdate(sessionId, stepIndex, role, text);
+                String messagesJson = intent.getStringExtra("messages_json");
+                String filePath = intent.getStringExtra("file_path");
+                String ttsText = intent.getStringExtra("tts_text");
+                handleStreamedUpdate(sessionId, messagesJson, filePath, ttsText);
             }
         }
     };
@@ -782,7 +782,7 @@ public class ToggleTalkService extends Service {
         }).start();
     }
 
-    private void handleStreamedUpdate(String sessionId, int stepIndex, String role, String text) {
+    private void handleStreamedUpdate(String sessionId, String messagesJson, String filePath, String ttsText) {
         if (mSelectedSessionId == null || mSelectedSessionId.isEmpty()) {
             mSelectedSessionId = sessionId;
             mContinueSession = true;
@@ -800,28 +800,14 @@ public class ToggleTalkService extends Service {
         }
 
         Intent intent = new Intent("com.toggletalk.android.ACTION_STREAM_DISPLAY");
-        intent.putExtra("step_index", stepIndex);
-        intent.putExtra("role", role);
-        intent.putExtra("text", text);
+        intent.putExtra("messages_json", messagesJson);
+        intent.putExtra("file_path", filePath);
         sendBroadcast(intent);
 
-        if ("agent".equals(role) || "thought".equals(role)) {
-            java.util.List<String> ttsSegments = new java.util.ArrayList<>();
-            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("<tts>(.*?)</tts>", java.util.regex.Pattern.DOTALL);
-            java.util.regex.Matcher matcher = pattern.matcher(text);
-            while (matcher.find()) {
-                ttsSegments.add(matcher.group(1));
-            }
-            
-            if (!ttsSegments.isEmpty()) {
-                StringBuilder sb = new StringBuilder();
-                for (String seg : ttsSegments) {
-                    sb.append(seg).append(" ");
-                }
-                String textToSpeak = sanitizeInApp(sb.toString().trim());
-                if (!textToSpeak.isEmpty()) {
-                    queueTtsText(textToSpeak);
-                }
+        if (ttsText != null && !ttsText.trim().isEmpty()) {
+            String textToSpeak = sanitizeInApp(ttsText.trim());
+            if (!textToSpeak.isEmpty()) {
+                queueTtsText(textToSpeak);
             }
         }
     }

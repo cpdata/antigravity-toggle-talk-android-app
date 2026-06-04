@@ -131,16 +131,16 @@ public class MainActivity extends Activity {
     private boolean mShowAllEarlierMessages = false;
     private org.json.JSONArray mCurrentSessionHistory = new org.json.JSONArray();
     private View mNewChatStartedBubble = null;
+    private String mLastStreamedAgentText = "";
 
     private final BroadcastReceiver mStreamDisplayReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             if ("com.toggletalk.android.ACTION_STREAM_DISPLAY".equals(action)) {
-                int stepIndex = intent.getIntExtra("step_index", -1);
-                String role = intent.getStringExtra("role");
-                String text = intent.getStringExtra("text");
-                handleStreamedDisplay(stepIndex, role, text);
+                String messagesJson = intent.getStringExtra("messages_json");
+                String filePath = intent.getStringExtra("file_path");
+                handleStreamedDisplay(messagesJson, filePath);
             } else if ("com.toggletalk.android.ACTION_NEW_SESSION_ADOPTED".equals(action)) {
                 String sessionId = intent.getStringExtra("session_id");
                 if (sessionId != null && !sessionId.isEmpty()) {
@@ -571,6 +571,7 @@ public class MainActivity extends Activity {
         mDisplayedStepKeys.clear();
         mCurrentSessionHistory = new org.json.JSONArray();
         mShowAllEarlierMessages = false;
+        mLastStreamedAgentText = "";
         mSessionsAdapter.notifyDataSetChanged();
 
         mNewChatStartedBubble = addSystemMessage("✦ New chat started. Type or speak your message.", "#00F2FE");
@@ -958,6 +959,7 @@ public class MainActivity extends Activity {
         mDisplayedStepKeys.clear();
         mCurrentSessionHistory = new org.json.JSONArray();
         mShowAllEarlierMessages = false;
+        mLastStreamedAgentText = "";
 
         addSystemMessage("Loading session history...", "#80FFFFFF");
 
@@ -1087,6 +1089,7 @@ public class MainActivity extends Activity {
         }
 
         java.util.List<org.json.JSONObject> pendingCollapsible = new java.util.ArrayList<>();
+        boolean hasAgentResponseAtEnd = false;
 
         for (int i = start; i < total; i++) {
             try {
@@ -1104,9 +1107,11 @@ public class MainActivity extends Activity {
                     }
                     if ("user".equals(role)) {
                         addUserBubble(text);
+                        hasAgentResponseAtEnd = false;
                     } else if ("agent".equals(role)) {
                         addAgentBubble(text);
                         mActiveAgentTextView = null;
+                        hasAgentResponseAtEnd = true;
                     }
                 }
             } catch (Exception e) {
@@ -1118,6 +1123,11 @@ public class MainActivity extends Activity {
             addCollapsibleBlock(pendingCollapsible);
             pendingCollapsible.clear();
         }
+
+        if (mIsAgentActive && !hasAgentResponseAtEnd && mActiveAgentTextView == null) {
+            addAgentBubble("...");
+        }
+
         mScrollLog.post(() -> mScrollLog.fullScroll(View.FOCUS_DOWN));
     }
 
@@ -1255,27 +1265,47 @@ public class MainActivity extends Activity {
         mChatContainer.addView(tv);
     }
 
-    private void handleStreamedDisplay(int stepIndex, String role, String text) {
-        String key = stepIndex + "_" + role + "_" + (text != null ? text.hashCode() : 0);
-        if (stepIndex == -1 || mDisplayedStepKeys.contains(key)) {
-            return;
-        }
-        mDisplayedStepKeys.add(key);
-
+    private void handleStreamedDisplay(String messagesJson, String filePath) {
         try {
-            org.json.JSONObject msg = new org.json.JSONObject();
-            msg.put("role", role);
-            msg.put("text", text);
-            mCurrentSessionHistory.put(msg);
+            String jsonContent = messagesJson;
+            if ((jsonContent == null || jsonContent.isEmpty()) && filePath != null && !filePath.isEmpty()) {
+                jsonContent = readFileContent(filePath);
+            }
+            if (jsonContent == null || jsonContent.isEmpty()) {
+                return;
+            }
 
-            if ("thought".equals(role) || "tool_call".equals(role)) {
+            org.json.JSONArray newHistory = new org.json.JSONArray(jsonContent);
+            if (newHistory.toString().equals(mCurrentSessionHistory.toString())) {
+                return;
+            }
+
+            mCurrentSessionHistory = newHistory;
+
+            boolean hasThoughtsOrToolCalls = false;
+            for (int i = 0; i < mCurrentSessionHistory.length(); i++) {
+                String role = mCurrentSessionHistory.getJSONObject(i).optString("role", "");
+                if ("thought".equals(role) || "tool_call".equals(role)) {
+                    hasThoughtsOrToolCalls = true;
+                    break;
+                }
+            }
+            if (hasThoughtsOrToolCalls) {
                 mShowThoughtsAndToolCalls = true;
                 updateBtnExpandAllText();
             }
 
-            if ("agent".equals(role)) {
-                displayMessagesUpTo(mCurrentSessionHistory.length() - 1, mShowAllEarlierMessages);
-                streamAgentResponse(text);
+            if (mCurrentSessionHistory.length() > 0) {
+                org.json.JSONObject lastMsg = mCurrentSessionHistory.getJSONObject(mCurrentSessionHistory.length() - 1);
+                String role = lastMsg.optString("role", "");
+                String text = lastMsg.optString("text", "");
+                if ("agent".equals(role) && !text.equals(mLastStreamedAgentText)) {
+                    mLastStreamedAgentText = text;
+                    displayMessagesUpTo(mCurrentSessionHistory.length() - 1, mShowAllEarlierMessages);
+                    streamAgentResponse(text);
+                } else {
+                    displayMessages(mCurrentSessionHistory, mShowAllEarlierMessages);
+                }
             } else {
                 displayMessages(mCurrentSessionHistory, mShowAllEarlierMessages);
             }

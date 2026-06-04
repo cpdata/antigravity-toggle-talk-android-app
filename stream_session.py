@@ -60,36 +60,64 @@ def find_log_path(session_id):
         
     return None
 
-def send_broadcast(session_id, step_index, role, text):
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from transcript_parser import parse_transcript_steps
+
+def send_broadcast(session_id, json_str=None, file_path=None, tts_text=None):
     cmd = [
         "am", "broadcast", "--user", "0",
         "-p", "com.toggletalk.android",
         "-a", "com.toggletalk.android.ACTION_STREAM_UPDATE",
-        "--es", "session_id", session_id,
-        "--ei", "step_index", str(step_index),
-        "--es", "role", role,
-        "--es", "text", text
+        "--es", "session_id", session_id
     ]
+    if json_str:
+        cmd += ["--es", "messages_json", json_str]
+    if file_path:
+        cmd += ["--es", "file_path", file_path]
+    if tts_text:
+        cmd += ["--es", "tts_text", tts_text]
     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+def extract_tts_text(step_obj):
+    msg_type = step_obj.get("type", "")
+    source = step_obj.get("source", "")
+    if msg_type == "PLANNER_RESPONSE" and source == "MODEL":
+        content = step_obj.get("content") or step_obj.get("thinking") or ""
+        # Find all occurrences of <tts>...</tts>
+        tts_segments = re.findall(r"<tts>(.*?)</tts>", content, re.DOTALL)
+        if tts_segments:
+            return " ".join(seg.strip() for seg in tts_segments).strip()
+    return None
 
 def find_start_index(lines, prompt):
     if not prompt:
         return len(lines)
     
-    # Normalize prompt for comparison
-    norm_prompt = re.sub(r'\s+', ' ', prompt.strip().lower())
-    
-    # Search backwards for a matching USER_INPUT
+    # Find the index of the last final PLANNER_RESPONSE (the end of the last turn)
+    last_final_resp_idx = -1
     for idx in range(len(lines) - 1, -1, -1):
         try:
             obj = json.loads(lines[idx].strip())
-            if obj.get("type") == "USER_INPUT":
-                content = obj.get("content") or ""
-                norm_content = re.sub(r'\s+', ' ', content.strip().lower())
-                if norm_prompt in norm_content or norm_content in norm_prompt:
-                    return idx
+            if obj.get("type") == "PLANNER_RESPONSE" and obj.get("source") == "MODEL":
+                tool_calls = obj.get("tool_calls") or []
+                if not tool_calls: # Final response has no tool calls
+                    last_final_resp_idx = idx
+                    break
         except Exception:
             pass
+            
+    # Look for the USER_INPUT step after the last final response
+    for idx in range(last_final_resp_idx + 1, len(lines)):
+        try:
+            obj = json.loads(lines[idx].strip())
+            if obj.get("type") == "USER_INPUT":
+                # Found the new user input! Start streaming from here.
+                return idx
+        except Exception:
+            pass
+            
+    # If no USER_INPUT was found after the last final response, it hasn't been written yet.
+    # Start streaming from the end of the file.
     return len(lines)
 
 def tail_transcript(path, session_id, prompt):
@@ -142,37 +170,35 @@ def tail_transcript(path, session_id, prompt):
                     
                 try:
                     obj = json.loads(line)
-                    msg_type = obj.get("type", "")
-                    source = obj.get("source", "")
-                    content = obj.get("content") or obj.get("thinking") or ""
-                    step_index = obj.get("step_index", -1)
+                    # Extract any TTS text to speak from this new step
+                    tts_text = extract_tts_text(obj)
                     
-                    if msg_type == "USER_INPUT" and content.strip():
-                        m = re.search(r"<USER_REQUEST>(.*?)(?:</USER_REQUEST>|$)", content, re.DOTALL)
-                        text = m.group(1).strip() if m else content.strip()
-                        text = re.sub(r"<[^>]+>.*?</[^>]+>", "", text, flags=re.DOTALL).strip()
-                        text = re.sub(r"<[^>]+>", "", text).strip()
-                        if text:
-                            send_broadcast(session_id, step_index, "user", text)
-                        
-                    elif msg_type == "PLANNER_RESPONSE" and source == "MODEL":
-                        tool_calls = obj.get("tool_calls") or []
-                        if tool_calls:
-                            if content.strip():
-                                send_broadcast(session_id, step_index, "thought", content.strip())
-                            for tc in tool_calls:
-                                tc_name = tc.get("name", "")
-                                tc_args = tc.get("args", {})
-                                args_str = ", ".join(f"{k}={v}" for k, v in tc_args.items())
-                                send_broadcast(session_id, step_index, "tool_call", f"Calling tool {tc_name}({args_str})")
-                        else:
-                            if content.strip():
-                                send_broadcast(session_id, step_index, "agent", content.strip())
-                            
-                    elif msg_type in ["RUN_COMMAND", "LIST_DIRECTORY", "GENERIC", "SYSTEM_MESSAGE"] and content.strip():
-                        status = obj.get("status", "")
-                        status_suffix = f" ({status})" if status and status != "DONE" else ""
-                        send_broadcast(session_id, step_index, "tool_call", f"Tool result{status_suffix}:\n{content.strip()}")
+                    # Parse all steps up to the current line
+                    parsed_steps = []
+                    for l in lines[:current_line_idx]:
+                        l = l.strip()
+                        if l:
+                            try:
+                                parsed_steps.append(json.loads(l))
+                            except Exception:
+                                pass
+                    
+                    messages = parse_transcript_steps(parsed_steps)
+                    json_str = json.dumps(messages)
+                    
+                    if len(json_str.encode('utf-8')) < 90 * 1024:
+                        send_broadcast(session_id, json_str=json_str, tts_text=tts_text)
+                    else:
+                        out_dir = "/sdcard/Android/media/com.toggletalk.android"
+                        os.makedirs(out_dir, exist_ok=True)
+                        out_path = os.path.join(out_dir, "stream_history.json")
+                        try:
+                            with open(out_path, "w", encoding="utf-8") as out_f:
+                                out_f.write(json_str)
+                            send_broadcast(session_id, file_path=out_path, tts_text=tts_text)
+                        except Exception:
+                            # Fallback if SD card write fails
+                            send_broadcast(session_id, json_str=json_str, tts_text=tts_text)
                 except Exception as e:
                     print(f"Error parsing line: {e}")
             
