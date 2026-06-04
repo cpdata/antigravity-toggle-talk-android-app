@@ -1522,21 +1522,27 @@ public class MainActivity extends Activity {
             case "THINKING":
                 mIsResuming = false;
                 mIsAgentActive = true;
-                mTvStatus.setText("THINKING...");
+                if ("Transcribing...".equals(text)) {
+                    mTvStatus.setText("TRANSCRIBING...");
+                } else {
+                    mTvStatus.setText("THINKING...");
+                }
                 mTvStatus.setTextColor(Color.parseColor("#00F2FE"));
                 mBtnMic.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#0D1A2E")));
                 mBtnMic.setImageTintList(ColorStateList.valueOf(Color.parseColor("#00F2FE")));
                 mPbThinking.setVisibility(View.VISIBLE);
 
                 // After loading a session, mActiveAgentTextView is null so new bubbles are fresh
-                if (!text.isEmpty() && !text.equals(mUserPrompt)) {
-                    mUserPrompt = text;
-                    addUserBubble(mUserPrompt);
-                    addAgentBubble("...");
-                } else if (mUserPrompt.isEmpty()) {
-                    mUserPrompt = text.isEmpty() ? "Voice Command" : text;
-                    addUserBubble(mUserPrompt);
-                    addAgentBubble("...");
+                if (!"Transcribing...".equals(text)) {
+                    if (!text.isEmpty() && !text.equals(mUserPrompt)) {
+                        mUserPrompt = text;
+                        addUserBubble(mUserPrompt);
+                        addAgentBubble("...");
+                    } else if (mUserPrompt.isEmpty()) {
+                        mUserPrompt = text.isEmpty() ? "Voice Command" : text;
+                        addUserBubble(mUserPrompt);
+                        addAgentBubble("...");
+                    }
                 }
 
                 mRingInner.setAlpha(0f);
