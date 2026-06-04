@@ -143,6 +143,7 @@ public class ToggleTalkService extends Service {
         // Load target directory path and active session ID from preferences
         mTargetDirectory = getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).getString("target_directory", "Home");
         mSelectedSessionId = getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).getString("selected_session_id", "");
+        mContinueSession = (mSelectedSessionId != null && !mSelectedSessionId.isEmpty());
         mBypassAntigravity = getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).getBoolean("bypass_antigravity", false);
         
         startForeground(NOTIFICATION_ID, buildNotification("IDLE", ""));
@@ -443,6 +444,7 @@ public class ToggleTalkService extends Service {
                 if (mSelectedSessionId == null || mSelectedSessionId.isEmpty()) {
                     String mockSessionId = "mock_session_" + (System.currentTimeMillis() / 1000);
                     mSelectedSessionId = mockSessionId;
+                    mContinueSession = true;
                     getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putString("selected_session_id", mockSessionId).apply();
                     Log.d(TAG, "Adopted new mock session ID: " + mockSessionId);
                     
@@ -769,6 +771,7 @@ public class ToggleTalkService extends Service {
     private void handleStreamedUpdate(String sessionId, int stepIndex, String role, String text) {
         if (mSelectedSessionId == null || mSelectedSessionId.isEmpty()) {
             mSelectedSessionId = sessionId;
+            mContinueSession = true;
             getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putString("selected_session_id", sessionId).apply();
             Log.d(TAG, "Adopted new session ID from stream: " + sessionId);
             

@@ -45,7 +45,7 @@ if [ "$CONTINUE_SESSION" = "true" ]; then
         CONV_ARG="-c"
     fi
     RESPONSE=$(env -u LD_PRELOAD -u LD_LIBRARY_PATH "$PROOT_BIN" --kill-on-exit \
-      -w "$TARGET_DIR" \
+      -b "$TARGET_DIR:$TARGET_DIR" \
       -b /data/data/com.termux/files/usr/etc/resolv.conf:/etc/resolv.conf \
       -b /data/data/com.termux/files/usr/bin/env:/usr/bin/env \
       -b /data/data/com.termux/files/usr/bin/sh:/bin/sh \
@@ -54,7 +54,7 @@ if [ "$CONTINUE_SESSION" = "true" ]; then
       --dangerously-skip-permissions $CONV_ARG -p "$PROMPT" --print-timeout 60m < /dev/null 2>>"$ERR_FILE")
 else
     RESPONSE=$(env -u LD_PRELOAD -u LD_LIBRARY_PATH "$PROOT_BIN" --kill-on-exit \
-      -w "$TARGET_DIR" \
+      -b "$TARGET_DIR:$TARGET_DIR" \
       -b /data/data/com.termux/files/usr/etc/resolv.conf:/etc/resolv.conf \
       -b /data/data/com.termux/files/usr/bin/env:/usr/bin/env \
       -b /data/data/com.termux/files/usr/bin/sh:/bin/sh \

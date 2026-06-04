@@ -1118,6 +1118,7 @@ public class MainActivity extends Activity {
             addCollapsibleBlock(pendingCollapsible);
             pendingCollapsible.clear();
         }
+        mScrollLog.post(() -> mScrollLog.fullScroll(View.FOCUS_DOWN));
     }
 
     private void addCollapsibleBlock(final java.util.List<org.json.JSONObject> messages) {
