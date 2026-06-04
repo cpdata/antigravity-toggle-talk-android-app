@@ -1078,6 +1078,8 @@ public class MainActivity extends Activity {
     }
 
     private void displayMessagesInternal(final org.json.JSONArray array, int limitCount, boolean showAll) {
+        updateBtnExpandAllText();
+        boolean wasAtBottom = isScrolledToBottom();
         if (mChatContainer != null) mChatContainer.removeAllViews();
         mActiveAgentTextView = null;
 
@@ -1128,7 +1130,7 @@ public class MainActivity extends Activity {
             addAgentBubble("...");
         }
 
-        mScrollLog.post(() -> mScrollLog.fullScroll(View.FOCUS_DOWN));
+        scrollToBottomIfNeeded(wasAtBottom);
     }
 
     private void addCollapsibleBlock(final java.util.List<org.json.JSONObject> messages) {
@@ -1187,7 +1189,7 @@ public class MainActivity extends Activity {
             if (text.isEmpty()) continue;
 
             TextView tv = new TextView(this);
-            tv.setText(text);
+            tv.setText(renderMarkdown(text));
             tv.setTextSize(11);
             tv.setPadding((int)(8 * density), (int)(5 * density), (int)(8 * density), (int)(5 * density));
             tv.setTextIsSelectable(true);
@@ -1282,19 +1284,6 @@ public class MainActivity extends Activity {
 
             mCurrentSessionHistory = newHistory;
 
-            boolean hasThoughtsOrToolCalls = false;
-            for (int i = 0; i < mCurrentSessionHistory.length(); i++) {
-                String role = mCurrentSessionHistory.getJSONObject(i).optString("role", "");
-                if ("thought".equals(role) || "tool_call".equals(role)) {
-                    hasThoughtsOrToolCalls = true;
-                    break;
-                }
-            }
-            if (hasThoughtsOrToolCalls) {
-                mShowThoughtsAndToolCalls = true;
-                updateBtnExpandAllText();
-            }
-
             if (mCurrentSessionHistory.length() > 0) {
                 org.json.JSONObject lastMsg = mCurrentSessionHistory.getJSONObject(mCurrentSessionHistory.length() - 1);
                 String role = lastMsg.optString("role", "");
@@ -1344,10 +1333,11 @@ public class MainActivity extends Activity {
 
     private TextView addSystemMessage(String text, String colorHex) {
         if (mChatContainer == null) return null;
+        boolean wasAtBottom = isScrolledToBottom();
         float density = getResources().getDisplayMetrics().density;
         
         TextView tv = new TextView(this);
-        tv.setText(text);
+        tv.setText(renderMarkdown(text));
         tv.setTextColor(Color.parseColor(colorHex));
         tv.setTextSize(12);
         tv.setPadding((int)(8 * density), (int)(5 * density), (int)(8 * density), (int)(5 * density));
@@ -1370,7 +1360,7 @@ public class MainActivity extends Activity {
         tv.setLayoutParams(lp);
         
         mChatContainer.addView(tv);
-        mScrollLog.post(() -> mScrollLog.fullScroll(View.FOCUS_DOWN));
+        scrollToBottomIfNeeded(wasAtBottom);
         return tv;
     }
 
@@ -1387,7 +1377,7 @@ public class MainActivity extends Activity {
         bubbleLayout.setLayoutParams(lp);
         
         TextView tv = new TextView(this);
-        tv.setText(message);
+        tv.setText(renderMarkdown(message));
         tv.setTextColor(Color.WHITE);
         tv.setTextSize(13);
         tv.setPadding((int)(10 * density), (int)(7 * density), (int)(10 * density), (int)(7 * density));
@@ -1407,11 +1397,12 @@ public class MainActivity extends Activity {
         
         bubbleLayout.addView(tv);
         mChatContainer.addView(bubbleLayout);
-        mScrollLog.post(() -> mScrollLog.fullScroll(View.FOCUS_DOWN));
+        scrollToBottom();
     }
 
     private void addAgentBubble(String initialText) {
         if (mChatContainer == null) return;
+        boolean wasAtBottom = isScrolledToBottom();
         
         float density = getResources().getDisplayMetrics().density;
         
@@ -1444,7 +1435,7 @@ public class MainActivity extends Activity {
         bubbleLayout.addView(tv);
         mChatContainer.addView(bubbleLayout);
         mActiveAgentTextView = tv;
-        mScrollLog.post(() -> mScrollLog.fullScroll(View.FOCUS_DOWN));
+        scrollToBottomIfNeeded(wasAtBottom);
     }
 
     private android.os.Handler mTypeHandler = new android.os.Handler(android.os.Looper.getMainLooper());
@@ -1465,17 +1456,43 @@ public class MainActivity extends Activity {
             public void run() {
                 if (index[0] <= fullText.length()) {
                     String part = fullText.substring(0, index[0]);
+                    boolean wasAtBottom = isScrolledToBottom();
                     mActiveAgentTextView.setText(renderMarkdown(part));
-                    mScrollLog.post(() -> mScrollLog.fullScroll(View.FOCUS_DOWN));
+                    scrollToBottomIfNeeded(wasAtBottom);
                     index[0] += 8;
                     mTypeHandler.postDelayed(this, 15);
                 } else {
+                    boolean wasAtBottom = isScrolledToBottom();
                     mActiveAgentTextView.setText(renderMarkdown(fullText));
-                    mScrollLog.post(() -> mScrollLog.fullScroll(View.FOCUS_DOWN));
+                    scrollToBottomIfNeeded(wasAtBottom);
                 }
             }
         };
         mTypeHandler.post(mTypeRunnable);
+    }
+
+    private boolean isScrolledToBottom() {
+        if (mScrollLog == null || mScrollLog.getChildCount() == 0) return true;
+        View child = mScrollLog.getChildAt(0);
+        int diff = child.getBottom() - (mScrollLog.getHeight() + mScrollLog.getScrollY());
+        float density = getResources().getDisplayMetrics().density;
+        int tolerance = (int) (24 * density); // 24dp tolerance
+        return diff <= tolerance;
+    }
+
+    private void scrollToBottom() {
+        if (mScrollLog == null) return;
+        mScrollLog.post(() -> {
+            if (mScrollLog.getChildCount() > 0) {
+                mScrollLog.scrollTo(0, mScrollLog.getChildAt(0).getBottom());
+            }
+        });
+    }
+
+    private void scrollToBottomIfNeeded(boolean wasAtBottom) {
+        if (wasAtBottom) {
+            scrollToBottom();
+        }
     }
 
     private static android.text.Spanned renderMarkdown(String markdown) {
@@ -1737,6 +1754,7 @@ public class MainActivity extends Activity {
     // --- App States Visual Management ---
 
     private void onStateChanged(String state, String text) {
+        boolean wasAtBottom = isScrolledToBottom();
         mCurrentState = state;
         if (mCbMockMode != null) {
             mCbMockMode.setChecked(mBypassAntigravity);
@@ -1860,7 +1878,7 @@ public class MainActivity extends Activity {
         }
 
         updateSendButtonState();
-        mScrollLog.post(() -> mScrollLog.fullScroll(View.FOCUS_DOWN));
+        scrollToBottomIfNeeded(wasAtBottom);
     }
 
     private void startPulseAnimation(final View view, long duration, long delay) {
