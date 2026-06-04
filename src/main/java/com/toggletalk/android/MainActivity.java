@@ -49,6 +49,7 @@ public class MainActivity extends Activity {
     private CheckBox mCbMockMode;
     private View mSettingsPopupRoot;
     private TextView mBtnSettings;
+    private TextView mBtnExpandAll;
     private View mBtnSettingsClose;
     private View mSettingsDimBackground;
     private boolean mBypassAntigravity = false;
@@ -125,7 +126,10 @@ public class MainActivity extends Activity {
     // Animation list
     private final List<ViewAnimation> mRunningAnimations = new ArrayList<>();
 
-    private final java.util.Set<Integer> mDisplayedStepIndices = new java.util.HashSet<>();
+    private final java.util.Set<String> mDisplayedStepKeys = new java.util.HashSet<>();
+    private boolean mShowThoughtsAndToolCalls = false;
+    private boolean mShowAllEarlierMessages = false;
+    private org.json.JSONArray mCurrentSessionHistory = new org.json.JSONArray();
 
     private final BroadcastReceiver mStreamDisplayReceiver = new BroadcastReceiver() {
         @Override
@@ -141,8 +145,8 @@ public class MainActivity extends Activity {
                 if (sessionId != null && !sessionId.isEmpty()) {
                     mSelectedSessionId = sessionId;
                     mContinueSession = true;
-                    updateActiveSessionLabel();
                     getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putString("selected_session_id", sessionId).apply();
+                    queryTermuxSessions();
                 }
             }
         }
@@ -293,6 +297,16 @@ public class MainActivity extends Activity {
         mCbMockMode = findViewById(R.id.cb_mock_mode);
         mSettingsPopupRoot = findViewById(R.id.settings_popup_root);
         mBtnSettings = findViewById(R.id.btn_settings);
+        mBtnExpandAll = findViewById(R.id.btn_expand_all);
+        if (mBtnExpandAll != null) {
+            mBtnExpandAll.setOnClickListener(v -> {
+                mShowThoughtsAndToolCalls = !mShowThoughtsAndToolCalls;
+                mBtnExpandAll.setText(mShowThoughtsAndToolCalls ? "▼ Collapse All" : "▶ Expand All");
+                if (mCurrentSessionHistory != null) {
+                    displayMessages(mCurrentSessionHistory, mShowAllEarlierMessages);
+                }
+            });
+        }
         mBtnSettingsClose = findViewById(R.id.btn_settings_close);
         mSettingsDimBackground = findViewById(R.id.settings_popup_dim_background);
 
@@ -546,7 +560,9 @@ public class MainActivity extends Activity {
         if (mChatContainer != null) mChatContainer.removeAllViews();
         mActiveAgentTextView = null;
         mUserPrompt = "";
-        mDisplayedStepIndices.clear();
+        mDisplayedStepKeys.clear();
+        mCurrentSessionHistory = new org.json.JSONArray();
+        mShowAllEarlierMessages = false;
         mSessionsAdapter.notifyDataSetChanged();
 
         addSystemMessage("✦ New chat started. Type or speak your message.", "#00F2FE");
@@ -929,7 +945,9 @@ public class MainActivity extends Activity {
         if (mChatContainer != null) mChatContainer.removeAllViews();
         mActiveAgentTextView = null;
         mUserPrompt = "";
-        mDisplayedStepIndices.clear();
+        mDisplayedStepKeys.clear();
+        mCurrentSessionHistory = new org.json.JSONArray();
+        mShowAllEarlierMessages = false;
 
         addSystemMessage("Loading session history...", "#80FFFFFF");
 
@@ -997,7 +1015,8 @@ public class MainActivity extends Activity {
                 return;
             }
 
-            displayMessages(array, false);
+            mCurrentSessionHistory = array;
+            displayMessages(mCurrentSessionHistory, false);
         } catch (Exception e) {
             Log.e(TAG, "Error parsing session history JSON", e);
             addSystemMessage("Error loading session history.", "#FF6B6B");
@@ -1005,15 +1024,27 @@ public class MainActivity extends Activity {
     }
 
     private void displayMessages(final org.json.JSONArray array, boolean showAll) {
+        mShowAllEarlierMessages = showAll;
+        displayMessagesInternal(array, array.length(), showAll);
+    }
+
+    private void displayMessagesUpTo(int limitCount, boolean showAll) {
+        mShowAllEarlierMessages = showAll;
+        displayMessagesInternal(mCurrentSessionHistory, limitCount, showAll);
+    }
+
+    private void displayMessagesInternal(final org.json.JSONArray array, int limitCount, boolean showAll) {
         if (mChatContainer != null) mChatContainer.removeAllViews();
         mActiveAgentTextView = null;
 
-        int total = array.length();
+        int total = Math.min(array.length(), limitCount);
         int start = showAll ? 0 : Math.max(0, total - 50);
 
         if (start > 0) {
             addOmittedMessagesClickable(start, array);
         }
+
+        java.util.List<org.json.JSONObject> pendingCollapsible = new java.util.ArrayList<>();
 
         for (int i = start; i < total; i++) {
             try {
@@ -1021,16 +1052,135 @@ public class MainActivity extends Activity {
                 String role = msg.optString("role", "");
                 String text = msg.optString("text", "");
                 if (text.isEmpty()) continue;
-                if ("user".equals(role)) {
-                    addUserBubble(text);
-                } else if ("agent".equals(role)) {
-                    addAgentBubble(text);
-                    mActiveAgentTextView = null;
+
+                if ("thought".equals(role) || "tool_call".equals(role)) {
+                    pendingCollapsible.add(msg);
+                } else {
+                    if (!pendingCollapsible.isEmpty()) {
+                        addCollapsibleBlock(pendingCollapsible);
+                        pendingCollapsible.clear();
+                    }
+                    if ("user".equals(role)) {
+                        addUserBubble(text);
+                    } else if ("agent".equals(role)) {
+                        addAgentBubble(text);
+                        mActiveAgentTextView = null;
+                    }
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Error displaying message at " + i, e);
             }
         }
+
+        if (!pendingCollapsible.isEmpty()) {
+            addCollapsibleBlock(pendingCollapsible);
+            pendingCollapsible.clear();
+        }
+    }
+
+    private void addCollapsibleBlock(final java.util.List<org.json.JSONObject> messages) {
+        if (mChatContainer == null || messages.isEmpty()) return;
+
+        float density = getResources().getDisplayMetrics().density;
+        
+        int thoughtsCount = 0;
+        int toolCallsCount = 0;
+        for (org.json.JSONObject msg : messages) {
+            String role = msg.optString("role", "");
+            if ("thought".equals(role)) {
+                thoughtsCount++;
+            } else if ("tool_call".equals(role)) {
+                toolCallsCount++;
+            }
+        }
+
+        final android.widget.LinearLayout blockLayout = new android.widget.LinearLayout(this);
+        blockLayout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        android.widget.LinearLayout.LayoutParams blockLp = new android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        blockLp.setMargins(0, (int)(4 * density), 0, (int)(4 * density));
+        blockLayout.setLayoutParams(blockLp);
+
+        final TextView headerTv = new TextView(this);
+        headerTv.setTextColor(Color.parseColor("#00F2FE"));
+        headerTv.setTextSize(12);
+        headerTv.setPadding((int)(12 * density), (int)(6 * density), (int)(12 * density), (int)(6 * density));
+        headerTv.setClickable(true);
+        headerTv.setFocusable(true);
+
+        android.graphics.drawable.GradientDrawable headerGd = new android.graphics.drawable.GradientDrawable();
+        headerGd.setColor(Color.parseColor("#1A00F2FE"));
+        headerGd.setCornerRadius(density * 8);
+        headerGd.setStroke((int)density, Color.parseColor("#3300F2FE"));
+        headerTv.setBackground(headerGd);
+
+        android.widget.LinearLayout.LayoutParams headerLp = new android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        headerLp.setMargins((int)(8 * density), 0, (int)(8 * density), 0);
+        headerTv.setLayoutParams(headerLp);
+
+        blockLayout.addView(headerTv);
+
+        final android.widget.LinearLayout childrenContainer = new android.widget.LinearLayout(this);
+        childrenContainer.setOrientation(android.widget.LinearLayout.VERTICAL);
+        android.widget.LinearLayout.LayoutParams childrenLp = new android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        childrenLp.setMargins((int)(12 * density), (int)(4 * density), (int)(12 * density), 0);
+        childrenContainer.setLayoutParams(childrenLp);
+
+        for (org.json.JSONObject msg : messages) {
+            String role = msg.optString("role", "");
+            String text = msg.optString("text", "");
+            if (text.isEmpty()) continue;
+
+            TextView tv = new TextView(this);
+            tv.setText(text);
+            tv.setTextSize(11);
+            tv.setPadding((int)(8 * density), (int)(5 * density), (int)(8 * density), (int)(5 * density));
+            tv.setTextIsSelectable(true);
+
+            android.graphics.drawable.GradientDrawable childGd = new android.graphics.drawable.GradientDrawable();
+            if ("thought".equals(role)) {
+                tv.setTextColor(Color.parseColor("#D0FFFFFF"));
+                childGd.setColor(Color.parseColor("#1AFFFFFF"));
+                childGd.setStroke((int)density, Color.parseColor("#1AFFFFFF"));
+            } else {
+                tv.setTextColor(Color.parseColor("#A0E6FF"));
+                tv.setTypeface(android.graphics.Typeface.MONOSPACE);
+                childGd.setColor(Color.parseColor("#1000F2FE"));
+                childGd.setStroke((int)density, Color.parseColor("#2000F2FE"));
+            }
+            childGd.setCornerRadius(density * 6);
+            tv.setBackground(childGd);
+
+            android.widget.LinearLayout.LayoutParams tvLp = new android.widget.LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            tvLp.setMargins(0, 0, 0, (int)(4 * density));
+            tv.setLayoutParams(tvLp);
+
+            childrenContainer.addView(tv);
+        }
+
+        blockLayout.addView(childrenContainer);
+
+        final int finalThoughtsCount = thoughtsCount;
+        final int finalToolCallsCount = toolCallsCount;
+
+        final boolean isExpanded = mShowThoughtsAndToolCalls;
+        childrenContainer.setVisibility(isExpanded ? View.VISIBLE : View.GONE);
+        headerTv.setText((isExpanded ? "▼ " : "▶ ") + "[" + finalThoughtsCount + "] thoughts, [" + finalToolCallsCount + "] tool calls");
+
+        headerTv.setOnClickListener(new View.OnClickListener() {
+            private boolean mExpanded = isExpanded;
+            @Override
+            public void onClick(View v) {
+                mExpanded = !mExpanded;
+                childrenContainer.setVisibility(mExpanded ? View.VISIBLE : View.GONE);
+                headerTv.setText((mExpanded ? "▼ " : "▶ ") + "[" + finalThoughtsCount + "] thoughts, [" + finalToolCallsCount + "] tool calls");
+            }
+        });
+
+        mChatContainer.addView(blockLayout);
     }
 
     private void addOmittedMessagesClickable(final int count, final org.json.JSONArray array) {
@@ -1063,29 +1213,34 @@ public class MainActivity extends Activity {
     }
 
     private void handleStreamedDisplay(int stepIndex, String role, String text) {
-        if (stepIndex == -1 || mDisplayedStepIndices.contains(stepIndex)) {
+        String key = stepIndex + "_" + role + "_" + (text != null ? text.hashCode() : 0);
+        if (stepIndex == -1 || mDisplayedStepKeys.contains(key)) {
             return;
         }
-        mDisplayedStepIndices.add(stepIndex);
+        mDisplayedStepKeys.add(key);
 
-        if ("user".equals(role)) {
-            addUserBubble(text);
-        } else if ("agent".equals(role)) {
-            if (mActiveAgentTextView != null && "...".equals(mActiveAgentTextView.getText().toString())) {
-                mActiveAgentTextView.setText(renderMarkdown(text));
-                mActiveAgentTextView = null;
+        try {
+            org.json.JSONObject msg = new org.json.JSONObject();
+            msg.put("role", role);
+            msg.put("text", text);
+            mCurrentSessionHistory.put(msg);
+
+            if ("agent".equals(role)) {
+                displayMessagesUpTo(mCurrentSessionHistory.length() - 1, mShowAllEarlierMessages);
+                streamAgentResponse(text);
             } else {
-                addAgentBubble(text);
-                mActiveAgentTextView = null;
+                displayMessages(mCurrentSessionHistory, mShowAllEarlierMessages);
             }
+        } catch (Exception e) {
+            Log.e(TAG, "Error handling streamed display", e);
         }
     }
 
     private void updateActiveSessionLabel() {
         String displayTitle = null;
         if (mSelectedSessionId == null || mSelectedSessionId.isEmpty()) {
-            if (mTvActiveSession != null) mTvActiveSession.setText("Active: None");
-            if (mTvActiveSessionTop != null) mTvActiveSessionTop.setText("");
+            if (mTvActiveSession != null) mTvActiveSession.setText("Active: New Chat");
+            if (mTvActiveSessionTop != null) mTvActiveSessionTop.setText("New Chat");
             return;
         }
         for (SessionItem item : mSessionsList) {
@@ -1227,7 +1382,7 @@ public class MainActivity extends Activity {
                     String part = fullText.substring(0, index[0]);
                     mActiveAgentTextView.setText(renderMarkdown(part));
                     mScrollLog.post(() -> mScrollLog.fullScroll(View.FOCUS_DOWN));
-                    index[0] += 2;
+                    index[0] += 8;
                     mTypeHandler.postDelayed(this, 15);
                 } else {
                     mActiveAgentTextView.setText(renderMarkdown(fullText));
@@ -1513,6 +1668,9 @@ public class MainActivity extends Activity {
                 mBtnMic.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#FF2D55")));
                 mBtnMic.setImageTintList(ColorStateList.valueOf(Color.parseColor("#FFFFFF")));
                 mPbThinking.setVisibility(View.GONE);
+                
+                // Keep screen on
+                getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
                 startPulseAnimation(mRingInner, 1200, 0);
                 startPulseAnimation(mRingMiddle, 1200, 400);
@@ -1531,6 +1689,9 @@ public class MainActivity extends Activity {
                 mBtnMic.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#0D1A2E")));
                 mBtnMic.setImageTintList(ColorStateList.valueOf(Color.parseColor("#00F2FE")));
                 mPbThinking.setVisibility(View.VISIBLE);
+                
+                // Keep screen on
+                getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
                 // After loading a session, mActiveAgentTextView is null so new bubbles are fresh
                 if (!"Transcribing...".equals(text)) {
@@ -1557,8 +1718,11 @@ public class MainActivity extends Activity {
                 mBtnMic.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#4CD964")));
                 mBtnMic.setImageTintList(ColorStateList.valueOf(Color.parseColor("#FFFFFF")));
                 mPbThinking.setVisibility(View.GONE);
+                
+                // Keep screen on
+                getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
-                if (mDisplayedStepIndices.isEmpty()) {
+                if (mDisplayedStepKeys.isEmpty()) {
                     if (mIsResuming) {
                         if (mActiveAgentTextView == null) {
                             addAgentBubble(text);
@@ -1586,6 +1750,9 @@ public class MainActivity extends Activity {
                 mBtnMic.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#2D1F54")));
                 mBtnMic.setImageTintList(ColorStateList.valueOf(Color.parseColor("#E6E6FA")));
                 mPbThinking.setVisibility(View.GONE);
+                
+                // Clear keep screen on
+                getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
                 mRingInner.setAlpha(0f);
                 mRingMiddle.setAlpha(0f);

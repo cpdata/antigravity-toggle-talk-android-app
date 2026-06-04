@@ -101,14 +101,25 @@ def tail_transcript(path, session_id):
                         text = m.group(1).strip() if m else content.strip()
                         text = re.sub(r"<[^>]+>.*?</[^>]+>", "", text, flags=re.DOTALL).strip()
                         text = re.sub(r"<[^>]+>", "", text).strip()
-                        role = "user"
+                        if text:
+                            send_broadcast(session_id, step_index, "user", text)
                         
                     elif msg_type == "PLANNER_RESPONSE" and source == "MODEL" and content.strip():
-                        text = content.strip()
-                        role = "agent"
-                        
-                    if role and text:
-                        send_broadcast(session_id, step_index, role, text)
+                        tool_calls = obj.get("tool_calls") or []
+                        if tool_calls:
+                            send_broadcast(session_id, step_index, "thought", content.strip())
+                            for tc in tool_calls:
+                                tc_name = tc.get("name", "")
+                                tc_args = tc.get("args", {})
+                                args_str = ", ".join(f"{k}={v}" for k, v in tc_args.items())
+                                send_broadcast(session_id, step_index, "tool_call", f"Calling tool {tc_name}({args_str})")
+                        else:
+                            send_broadcast(session_id, step_index, "agent", content.strip())
+                            
+                    elif msg_type in ["RUN_COMMAND", "LIST_DIRECTORY", "GENERIC", "SYSTEM_MESSAGE"] and content.strip():
+                        status = obj.get("status", "")
+                        status_suffix = f" ({status})" if status and status != "DONE" else ""
+                        send_broadcast(session_id, step_index, "tool_call", f"Tool result{status_suffix}:\n{content.strip()}")
                 except Exception as e:
                     print(f"Error parsing line: {e}")
         except Exception as e:

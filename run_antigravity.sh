@@ -16,7 +16,8 @@ GLIBC_LINKER="/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1"
 GLIBC_LIBS="/data/data/com.termux/files/home/.local/lib/agy-glibc:/data/data/com.termux/files/usr/glibc/lib"
 AGY_BIN="/data/data/com.termux/files/home/.local/bin/agy.va39"
 
-cd "$TARGET_DIR" 2>/dev/null
+cd "$TARGET_DIR" 2>/dev/null || cd "$HOME"
+TARGET_DIR="$(pwd)"
 
 PROMPT_SUFFIX="
 

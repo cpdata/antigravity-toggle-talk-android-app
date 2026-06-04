@@ -454,11 +454,15 @@ public class ToggleTalkService extends Service {
         argList.add(scriptPath);
         argList.add(transcript);
         
-        if (mTargetDirectory != null && !mTargetDirectory.isEmpty() && !"Home".equals(mTargetDirectory) && !"/data/data/com.termux/files/home".equals(mTargetDirectory)) {
-            argList.add(mTargetDirectory);
-        } else {
-            argList.add("/data/data/com.termux/files/home");
+        String absoluteTargetDir = "/data/data/com.termux/files/home";
+        if (mTargetDirectory != null && !mTargetDirectory.isEmpty() && !"Home".equals(mTargetDirectory)) {
+            if (mTargetDirectory.startsWith("/")) {
+                absoluteTargetDir = mTargetDirectory;
+            } else {
+                absoluteTargetDir = "/data/data/com.termux/files/home/" + mTargetDirectory;
+            }
         }
+        argList.add(absoluteTargetDir);
         
         argList.add(String.valueOf(mContinueSession));
         if (mContinueSession && mSelectedSessionId != null && !mSelectedSessionId.isEmpty()) {
@@ -1095,7 +1099,7 @@ public class ToggleTalkService extends Service {
             if (mWakeLock == null) {
                 android.os.PowerManager pm = (android.os.PowerManager) getSystemService(Context.POWER_SERVICE);
                 if (pm != null) {
-                    mWakeLock = pm.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "ToggleTalk::WakeLock");
+                    mWakeLock = pm.newWakeLock(android.os.PowerManager.SCREEN_BRIGHT_WAKE_LOCK | android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP, "ToggleTalk::WakeLock");
                 }
             }
             if (mWakeLock != null && !mWakeLock.isHeld()) {
