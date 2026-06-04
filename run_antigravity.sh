@@ -26,7 +26,7 @@ python3 "/data/data/com.termux/files/home/ToggleTalkAndroid/stream_session.py" "
 STREAM_PID=$!
 
 # Build agy argument list
-AGY_ARGS=("$GLIBC_LINKER" --library-path "$GLIBC_LIBS" "$AGY_BIN" --dangerously-skip-permissions)
+AGY_ARGS=("$GLIBC_LINKER" --library-path "$GLIBC_LIBS" "$AGY_BIN" --dangerously-skip-permissions --add-dir "$TARGET_DIR")
 
 if [ "$CONTINUE_SESSION" = "true" ]; then
     if [ -n "$SESSION_ID" ]; then
