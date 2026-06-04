@@ -73,6 +73,6 @@ def parse_transcript_steps(raw_steps):
                 friendly_type = msg_type.replace("_", " ").title()
                 status = obj.get("status", "")
                 status_suffix = f" ({status})" if status and status != "DONE" else ""
-                messages.append({"role": "tool_call", "text": f"{friendly_type}{status_suffix}:\n{text}"})
+                messages.append({"role": "tool_result", "text": f"{friendly_type}{status_suffix}:\n{text}"})
 
     return messages

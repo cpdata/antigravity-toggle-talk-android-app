@@ -112,7 +112,29 @@ public class MainActivity extends Activity {
         }
     }
     
+    private static class ToolResultHolder {
+        final android.widget.LinearLayout layout;
+        final TextView headerTv;
+        final TextView contentTv;
+        final String headerText;
+        boolean expanded = false;
+
+        ToolResultHolder(android.widget.LinearLayout layout, TextView headerTv, TextView contentTv, String headerText) {
+            this.layout = layout;
+            this.headerTv = headerTv;
+            this.contentTv = contentTv;
+            this.headerText = headerText;
+        }
+
+        void setExpanded(boolean exp) {
+            this.expanded = exp;
+            contentTv.setVisibility(exp ? View.VISIBLE : View.GONE);
+            headerTv.setText((exp ? "▼ " : "▶ ") + headerText);
+        }
+    }
+    
     private final List<SessionItem> mSessionsList = new ArrayList<>();
+    private final List<ToolResultHolder> mToolResultHolders = new ArrayList<>();
     private ArrayAdapter<SessionItem> mSessionsAdapter;
 
     private static final String ACTION_SESSIONS_LIST = "com.toggletalk.android.ACTION_SESSIONS_LIST";
@@ -1114,6 +1136,7 @@ public class MainActivity extends Activity {
     }
 
     private void displayMessagesInternal(final org.json.JSONArray array, int limitCount, boolean showAll) {
+        mToolResultHolders.clear();
         updateBtnExpandAllText();
         boolean wasAtBottom = isScrolledToBottom();
         if (mChatContainer != null) mChatContainer.removeAllViews();
@@ -1136,7 +1159,7 @@ public class MainActivity extends Activity {
                 String text = msg.optString("text", "");
                 if (text.isEmpty()) continue;
 
-                if ("thought".equals(role) || "tool_call".equals(role)) {
+                if ("thought".equals(role) || "tool_call".equals(role) || "tool_result".equals(role)) {
                     pendingCollapsible.add(msg);
                 } else {
                     if (!pendingCollapsible.isEmpty()) {
@@ -1180,7 +1203,7 @@ public class MainActivity extends Activity {
             String role = msg.optString("role", "");
             if ("thought".equals(role)) {
                 thoughtsCount++;
-            } else if ("tool_call".equals(role)) {
+            } else if ("tool_call".equals(role) || "tool_result".equals(role)) {
                 toolCallsCount++;
             }
         }
@@ -1224,32 +1247,107 @@ public class MainActivity extends Activity {
             String text = msg.optString("text", "");
             if (text.isEmpty()) continue;
 
-            TextView tv = new TextView(this);
-            tv.setText(renderMarkdown(text));
-            tv.setTextSize(11);
-            tv.setPadding((int)(8 * density), (int)(5 * density), (int)(8 * density), (int)(5 * density));
-            tv.setTextIsSelectable(true);
+            if ("tool_result".equals(role)) {
+                String header = "";
+                String content = "";
+                int firstNewline = text.indexOf('\n');
+                if (firstNewline != -1) {
+                    header = text.substring(0, firstNewline).trim();
+                    content = text.substring(firstNewline + 1).trim();
+                } else {
+                    header = text.trim();
+                    content = "";
+                }
 
-            android.graphics.drawable.GradientDrawable childGd = new android.graphics.drawable.GradientDrawable();
-            if ("thought".equals(role)) {
-                tv.setTextColor(Color.parseColor("#D0FFFFFF"));
-                childGd.setColor(Color.parseColor("#1AFFFFFF"));
-                childGd.setStroke((int)density, Color.parseColor("#1AFFFFFF"));
-            } else {
-                tv.setTextColor(Color.parseColor("#A0E6FF"));
-                tv.setTypeface(android.graphics.Typeface.MONOSPACE);
+                final android.widget.LinearLayout toolLayout = new android.widget.LinearLayout(this);
+                toolLayout.setOrientation(android.widget.LinearLayout.VERTICAL);
+                toolLayout.setPadding((int)(8 * density), (int)(5 * density), (int)(8 * density), (int)(5 * density));
+                toolLayout.setClickable(true);
+                toolLayout.setFocusable(true);
+
+                android.graphics.drawable.GradientDrawable childGd = new android.graphics.drawable.GradientDrawable();
                 childGd.setColor(Color.parseColor("#1000F2FE"));
                 childGd.setStroke((int)density, Color.parseColor("#2000F2FE"));
+                childGd.setCornerRadius(density * 6);
+                toolLayout.setBackground(childGd);
+
+                android.widget.LinearLayout.LayoutParams toolLp = new android.widget.LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                toolLp.setMargins(0, 0, 0, (int)(4 * density));
+                toolLayout.setLayoutParams(toolLp);
+
+                final TextView toolHeaderTv = new TextView(this);
+                toolHeaderTv.setTextSize(11);
+                toolHeaderTv.setTextColor(Color.parseColor("#A0E6FF"));
+                toolHeaderTv.setTypeface(android.graphics.Typeface.MONOSPACE);
+
+                final TextView contentTv = new TextView(this);
+                contentTv.setTextSize(11);
+                contentTv.setTextColor(Color.parseColor("#A0E6FF"));
+                contentTv.setTypeface(android.graphics.Typeface.MONOSPACE);
+                contentTv.setTextIsSelectable(true);
+                contentTv.setPadding(0, (int)(4 * density), 0, 0);
+
+                String lang = detectLanguage(content, header);
+                if (!lang.isEmpty() || looksLikeCode(content)) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        contentTv.setText(android.text.Html.fromHtml(renderAndHighlightCodeBlock(content, lang), android.text.Html.FROM_HTML_MODE_LEGACY));
+                    } else {
+                        contentTv.setText(android.text.Html.fromHtml(renderAndHighlightCodeBlock(content, lang)));
+                    }
+                } else {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        contentTv.setText(android.text.Html.fromHtml(renderPlainMonospace(content), android.text.Html.FROM_HTML_MODE_LEGACY));
+                    } else {
+                        contentTv.setText(android.text.Html.fromHtml(renderPlainMonospace(content)));
+                    }
+                }
+
+                toolLayout.addView(toolHeaderTv);
+                toolLayout.addView(contentTv);
+
+                final ToolResultHolder holder = new ToolResultHolder(toolLayout, toolHeaderTv, contentTv, header);
+                mToolResultHolders.add(holder);
+                holder.setExpanded(false);
+
+                View.OnClickListener clickListener = new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        toggleToolResult(holder);
+                    }
+                };
+                toolLayout.setOnClickListener(clickListener);
+                toolHeaderTv.setOnClickListener(clickListener);
+
+                childrenContainer.addView(toolLayout);
+            } else {
+                TextView tv = new TextView(this);
+                tv.setText(renderMarkdown(text));
+                tv.setTextSize(11);
+                tv.setPadding((int)(8 * density), (int)(5 * density), (int)(8 * density), (int)(5 * density));
+                tv.setTextIsSelectable(true);
+
+                android.graphics.drawable.GradientDrawable childGd = new android.graphics.drawable.GradientDrawable();
+                if ("thought".equals(role)) {
+                    tv.setTextColor(Color.parseColor("#D0FFFFFF"));
+                    childGd.setColor(Color.parseColor("#1AFFFFFF"));
+                    childGd.setStroke((int)density, Color.parseColor("#1AFFFFFF"));
+                } else {
+                    tv.setTextColor(Color.parseColor("#A0E6FF"));
+                    tv.setTypeface(android.graphics.Typeface.MONOSPACE);
+                    childGd.setColor(Color.parseColor("#1000F2FE"));
+                    childGd.setStroke((int)density, Color.parseColor("#2000F2FE"));
+                }
+                childGd.setCornerRadius(density * 6);
+                tv.setBackground(childGd);
+
+                android.widget.LinearLayout.LayoutParams tvLp = new android.widget.LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                tvLp.setMargins(0, 0, 0, (int)(4 * density));
+                tv.setLayoutParams(tvLp);
+
+                childrenContainer.addView(tv);
             }
-            childGd.setCornerRadius(density * 6);
-            tv.setBackground(childGd);
-
-            android.widget.LinearLayout.LayoutParams tvLp = new android.widget.LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            tvLp.setMargins(0, 0, 0, (int)(4 * density));
-            tv.setLayoutParams(tvLp);
-
-            childrenContainer.addView(tv);
         }
 
         blockLayout.addView(childrenContainer);
@@ -1272,6 +1370,19 @@ public class MainActivity extends Activity {
         });
 
         mChatContainer.addView(blockLayout);
+    }
+
+    private void toggleToolResult(ToolResultHolder clickedHolder) {
+        boolean targetState = !clickedHolder.expanded;
+        if (targetState) {
+            for (ToolResultHolder holder : mToolResultHolders) {
+                if (holder != clickedHolder && holder.expanded) {
+                    holder.setExpanded(false);
+                }
+            }
+        }
+        clickedHolder.setExpanded(targetState);
+        scrollToBottom();
     }
 
     private void addOmittedMessagesClickable(final int count, final org.json.JSONArray array) {
@@ -1535,11 +1646,271 @@ public class MainActivity extends Activity {
         }
     }
 
+    private static boolean looksLikeCode(String text) {
+        if (text == null || text.trim().isEmpty()) return false;
+        String trimmed = text.trim();
+        if (trimmed.startsWith("#!") || trimmed.startsWith("<?xml")) return true;
+        
+        String[] lines = text.split("\n");
+        int codeScore = 0;
+        int totalLines = 0;
+        
+        java.util.regex.Pattern pKeywords = java.util.regex.Pattern.compile(
+            "\\b(public|private|protected|class|interface|enum|extends|implements|import|package|static|final|volatile|transient|synchronized|native|fun|val|var|const|let|function|new|return|if|else|for|while|do|switch|case|break|continue|throw|throws|try|catch|finally|this|super|instanceof|void|int|double|float|long|short|byte|char|boolean|true|false|null)\\b"
+        );
+        java.util.regex.Pattern pBracesOrIndents = java.util.regex.Pattern.compile(
+            "[{};]|\\s{4}|\\t"
+        );
+        
+        for (String line : lines) {
+            String l = line.trim();
+            if (l.isEmpty()) continue;
+            totalLines++;
+            if (pKeywords.matcher(l).find() || pBracesOrIndents.matcher(line).find()) {
+                codeScore++;
+            }
+        }
+        
+        if (totalLines > 0) {
+            float ratio = (float) codeScore / totalLines;
+            return ratio >= 0.6f && totalLines >= 2;
+        }
+        return false;
+    }
+
+    private static String detectLanguage(String code, String headerText) {
+        if (headerText != null) {
+            String lowerHeader = headerText.toLowerCase();
+            if (lowerHeader.contains(".java")) return "java";
+            if (lowerHeader.contains(".kt")) return "kotlin";
+            if (lowerHeader.contains(".py")) return "python";
+            if (lowerHeader.contains(".sh") || lowerHeader.contains("bash") || lowerHeader.contains("command")) return "bash";
+            if (lowerHeader.contains(".json")) return "json";
+            if (lowerHeader.contains(".xml") || lowerHeader.contains(".html")) return "xml";
+            if (lowerHeader.contains(".gradle")) return "groovy";
+            if (lowerHeader.contains(".md")) return "markdown";
+            if (lowerHeader.contains(".cpp") || lowerHeader.contains(".h") || lowerHeader.contains(".c")) return "cpp";
+            if (lowerHeader.contains(".js") || lowerHeader.contains(".ts")) return "javascript";
+        }
+        
+        String trimmed = code.trim();
+        if (trimmed.startsWith("#!") || trimmed.startsWith("echo ") || trimmed.startsWith("git ") || trimmed.startsWith("cd ")) {
+            return "bash";
+        }
+        if (trimmed.contains("import java.") || trimmed.contains("public class ") || trimmed.contains("private final ") || trimmed.contains("@Override")) {
+            return "java";
+        }
+        if (trimmed.contains("import kotlin.") || trimmed.contains("fun ") || trimmed.contains("val ") || trimmed.contains("var ")) {
+            return "kotlin";
+        }
+        if (trimmed.contains("def ") || trimmed.contains("import os") || trimmed.contains("import sys") || trimmed.contains("print(")) {
+            return "python";
+        }
+        if (trimmed.startsWith("<?xml") || (trimmed.startsWith("<") && trimmed.contains("xmlns:"))) {
+            return "xml";
+        }
+        if (trimmed.startsWith("{") && trimmed.endsWith("}") && trimmed.contains("\":")) {
+            return "json";
+        }
+        
+        return "";
+    }
+
+    private static String escapeHtml(String text) {
+        if (text == null) return "";
+        return text.replace("&", "&amp;")
+                   .replace("<", "&lt;")
+                   .replace(">", "&gt;")
+                   .replace("\"", "&quot;")
+                   .replace("'", "&#39;");
+    }
+
+    private static String replaceSpacesOutsideTags(String htmlCode) {
+        StringBuilder sb = new StringBuilder();
+        int len = htmlCode.length();
+        boolean inTag = false;
+        for (int i = 0; i < len; i++) {
+            char c = htmlCode.charAt(i);
+            if (c == '<') {
+                inTag = true;
+                sb.append(c);
+            } else if (c == '>') {
+                inTag = false;
+                sb.append(c);
+            } else if (c == ' ' && !inTag) {
+                sb.append("&nbsp;");
+            } else if (c == '\t' && !inTag) {
+                sb.append("&nbsp;&nbsp;&nbsp;&nbsp;");
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    private static String highlightCode(String escapedCode, String lang) {
+        if (lang == null) lang = "";
+        lang = lang.toLowerCase().trim();
+
+        List<String> protectedTokens = new ArrayList<>();
+        boolean isHashComment = "python".equals(lang) || "bash".equals(lang) || "yaml".equals(lang) || "dockerfile".equals(lang);
+        
+        String regex;
+        if (isHashComment) {
+            regex = "(\"(?:\\\\\"|[^\"])*\")|('(?:\\\\'|[^'])*')|(#.*)";
+        } else if ("xml".equals(lang) || "html".equals(lang)) {
+            regex = "(<!--.*?-->)|(\"(?:\\\\\"|[^\"])*\")|('(?:\\\\'|[^'])*')";
+        } else {
+            regex = "(\"(?:\\\\\"|[^\"])*\")|('(?:\\\\'|[^'])*')|(\\/\\/.*)|(\\/\\*.*?\\*\\/)";
+        }
+        
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(regex, java.util.regex.Pattern.DOTALL);
+        java.util.regex.Matcher matcher = pattern.matcher(escapedCode);
+        
+        StringBuilder sb = new StringBuilder();
+        int lastEnd = 0;
+        while (matcher.find()) {
+            sb.append(escapedCode, lastEnd, matcher.start());
+            String match = matcher.group();
+            String styled;
+            if (match.startsWith("//") || match.startsWith("#") || match.startsWith("/*") || match.startsWith("<!--")) {
+                styled = "<font color=\"#6272A4\"><i>" + match + "</i></font>";
+            } else {
+                styled = "<font color=\"#50FA7B\">" + match + "</font>";
+            }
+            protectedTokens.add(styled);
+            sb.append("___TOKEN_PLACEHOLDER_").append(protectedTokens.size() - 1).append("___");
+            lastEnd = matcher.end();
+        }
+        sb.append(escapedCode, lastEnd, escapedCode.length());
+        String codeText = sb.toString();
+
+        if ("java".equals(lang) || "kotlin".equals(lang) || "groovy".equals(lang) || "cpp".equals(lang) || "javascript".equals(lang) || "typescript".equals(lang)) {
+            codeText = codeText.replaceAll(
+                "\\b(public|private|protected|class|interface|enum|extends|implements|import|package|static|final|volatile|transient|synchronized|native|fun|val|var|const|let|function|new|return|if|else|for|while|do|switch|case|break|continue|throw|throws|try|catch|finally|this|super|instanceof|void|int|double|float|long|short|byte|char|boolean|true|false|null)\\b",
+                "<font color=\"#FF79C6\"><b>$1</b></font>"
+            );
+            codeText = codeText.replaceAll(
+                "\\b(String|Override|Integer|Double|Float|Long|Boolean|Character|Byte|Short|List|ArrayList|Map|HashMap|Set|HashSet|View|TextView|LinearLayout|ViewGroup|Context|Intent|Activity|Bundle|Log|Build)\\b",
+                "<font color=\"#8BE9FD\">$1</font>"
+            );
+            codeText = codeText.replaceAll(
+                "(@[a-zA-Z0-9_]+)",
+                "<font color=\"#F1FA8C\">$1</font>"
+            );
+        } else if ("python".equals(lang)) {
+            codeText = codeText.replaceAll(
+                "\\b(def|class|return|if|elif|else|for|while|break|continue|in|is|not|and|or|import|from|as|try|except|finally|raise|assert|global|nonlocal|lambda|pass|with|yield|None|True|False)\\b",
+                "<font color=\"#FF79C6\"><b>$1</b></font>"
+            );
+            codeText = codeText.replaceAll(
+                "\\b(print|len|str|int|float|list|dict|set|tuple|range|enumerate|zip|open|sum|max|min|abs|map|filter|any|all)\\b",
+                "<font color=\"#8BE9FD\">$1</font>"
+            );
+        } else if ("bash".equals(lang)) {
+            codeText = codeText.replaceAll(
+                "\\b(if|then|elif|else|fi|for|in|do|done|while|until|case|esac|break|continue|exit|return|function|local|export|alias|echo|cd|ls|grep|sed|awk|cat|mkdir|rm|cp|mv|chmod|chown|ssh|git|adb|python|python3|pip|npm|npx|gradle|gradlew)\\b",
+                "<font color=\"#FF79C6\"><b>$1</b></font>"
+            );
+            codeText = codeText.replaceAll(
+                "(\\$[a-zA-Z_][a-zA-Z0-9_]*)",
+                "<font color=\"#BD93F9\">$1</font>"
+            );
+        } else if ("json".equals(lang)) {
+            codeText = codeText.replaceAll(
+                "\\b(true|false|null)\\b",
+                "<font color=\"#FF79C6\">$1</font>"
+            );
+        } else if ("xml".equals(lang) || "html".equals(lang)) {
+            codeText = codeText.replaceAll(
+                "(&lt;\\/?[a-zA-Z0-9:-]+)",
+                "<font color=\"#FF79C6\"><b>$1</b></font>"
+            );
+            codeText = codeText.replaceAll(
+                "(&gt;)",
+                "<font color=\"#FF79C6\"><b>$1</b></font>"
+            );
+        }
+
+        codeText = codeText.replaceAll(
+            "\\b([0-9]+)\\b",
+            "<font color=\"#BD93F9\">$1</font>"
+        );
+
+        for (int i = 0; i < protectedTokens.size(); i++) {
+            codeText = codeText.replace("___TOKEN_PLACEHOLDER_" + i + "___", protectedTokens.get(i));
+        }
+
+        return codeText;
+    }
+
+    private static String renderAndHighlightCodeBlock(String code, String lang) {
+        if (lang == null || lang.isEmpty()) {
+            lang = detectLanguage(code, "");
+        }
+        String escaped = escapeHtml(code);
+        String highlighted = highlightCode(escaped, lang);
+        String formatted = replaceSpacesOutsideTags(highlighted)
+                                      .replace("\n", "<br/>");
+        return "<br/><font face=\"monospace\" color=\"#A0E6FF\"><tt>" + formatted + "</tt></font><br/>";
+    }
+
+    private static String renderPlainMonospace(String text) {
+        String escaped = escapeHtml(text);
+        String formatted = replaceSpacesOutsideTags(escaped)
+                                      .replace("\n", "<br/>");
+        return "<font face=\"monospace\" color=\"#A0E6FF\"><tt>" + formatted + "</tt></font>";
+    }
+
     private static android.text.Spanned renderMarkdown(String markdown) {
         if (markdown == null) return new android.text.SpannableString("");
+
+        java.util.List<String> renderedCodeBlocks = new java.util.ArrayList<>();
+        String text = markdown;
         
+        int index = 0;
+        while (true) {
+            int startIdx = text.indexOf("```", index);
+            if (startIdx == -1) break;
+            
+            int endIdx = text.indexOf("```", startIdx + 3);
+            String blockContent;
+            String lang = "";
+            int nextIndex;
+            
+            if (endIdx != -1) {
+                blockContent = text.substring(startIdx + 3, endIdx);
+                nextIndex = endIdx + 3;
+            } else {
+                blockContent = text.substring(startIdx + 3);
+                nextIndex = text.length();
+            }
+            
+            int firstNewline = blockContent.indexOf('\n');
+            if (firstNewline != -1) {
+                lang = blockContent.substring(0, firstNewline).trim();
+                blockContent = blockContent.substring(firstNewline + 1);
+            }
+            
+            String rendered = renderAndHighlightCodeBlock(blockContent, lang);
+            renderedCodeBlocks.add(rendered);
+            
+            String placeholder = "___CODE_BLOCK_PLACEHOLDER_" + (renderedCodeBlocks.size() - 1) + "___";
+            text = text.substring(0, startIdx) + placeholder + text.substring(nextIndex);
+            index = startIdx + placeholder.length();
+        }
+
+        if (renderedCodeBlocks.isEmpty() && looksLikeCode(markdown)) {
+            String rendered = renderAndHighlightCodeBlock(markdown, "");
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                return android.text.Html.fromHtml(rendered, android.text.Html.FROM_HTML_MODE_LEGACY);
+            } else {
+                return android.text.Html.fromHtml(rendered);
+            }
+        }
+
         // Headers
-        String html = markdown.replaceAll("(?m)^###\\s+(.*)$", "<br/><font color=\"#00F2FE\"><b>$1</b></font><br/>");
+        String html = text.replaceAll("(?m)^###\\s+(.*)$", "<br/><font color=\"#00F2FE\"><b>$1</b></font><br/>");
         html = html.replaceAll("(?m)^##\\s+(.*)$", "<br/><font color=\"#00F2FE\"><b><big>$1</big></b></font><br/>");
         html = html.replaceAll("(?m)^#\\s+(.*)$", "<br/><font color=\"#00F2FE\"><b><big><big>$1</big></big></b></font><br/>");
 
@@ -1554,9 +1925,6 @@ public class MainActivity extends Activity {
         // Bullets
         html = html.replaceAll("(?m)^[\\-*]\\s+(.*)$", "&#8226; $1<br/>");
 
-        // Code blocks
-        html = html.replaceAll("(?s)```[a-zA-Z0-9_-]*\\n(.*?)\\n```", "<br/><font face=\"monospace\" color=\"#00F2FE\"><tt>$1</tt></font><br/>");
-
         // Inline code
         html = html.replaceAll("`([^`]+)`", "<font face=\"monospace\" color=\"#E6E6FA\"><tt>$1</tt></font>");
 
@@ -1566,6 +1934,11 @@ public class MainActivity extends Activity {
         // Convert newlines
         html = html.replaceAll("\\n", "<br/>");
         html = html.replaceAll("(<br/>\\s*){2,}", "<br/><br/>");
+
+        // Restore placeholders
+        for (int i = 0; i < renderedCodeBlocks.size(); i++) {
+            html = html.replace("___CODE_BLOCK_PLACEHOLDER_" + i + "___", renderedCodeBlocks.get(i));
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             return android.text.Html.fromHtml(html, android.text.Html.FROM_HTML_MODE_LEGACY);
