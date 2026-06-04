@@ -788,7 +788,7 @@ public class ToggleTalkService extends Service {
         intent.putExtra("text", text);
         sendBroadcast(intent);
 
-        if ("agent".equals(role)) {
+        if ("agent".equals(role) || "thought".equals(role)) {
             java.util.List<String> ttsSegments = new java.util.ArrayList<>();
             java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("<tts>(.*?)</tts>", java.util.regex.Pattern.DOTALL);
             java.util.regex.Matcher matcher = pattern.matcher(text);

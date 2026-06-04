@@ -61,7 +61,7 @@ def load_history(session_id):
             if text:
                 messages.append({"role": "user", "text": text})
 
-        elif msg_type == "PLANNER_RESPONSE" and source == "MODEL" and content.strip():
+        elif msg_type == "PLANNER_RESPONSE" and source == "MODEL":
             # Check if this is the final agent response of a turn.
             # It is final if:
             # 1. It has no tool calls AND
@@ -78,10 +78,12 @@ def load_history(session_id):
                         is_final = False
                         break
 
-            if is_final:
-                messages.append({"role": "agent", "text": content.strip()})
-            else:
-                messages.append({"role": "thought", "text": content.strip()})
+            stripped_content = content.strip() if content else ""
+            if stripped_content:
+                if is_final:
+                    messages.append({"role": "agent", "text": stripped_content})
+                else:
+                    messages.append({"role": "thought", "text": stripped_content})
 
             for tc in tool_calls:
                 tc_name = tc.get("name", "")
