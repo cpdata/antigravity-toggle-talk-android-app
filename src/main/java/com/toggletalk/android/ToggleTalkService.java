@@ -800,6 +800,7 @@ public class ToggleTalkService extends Service {
         }
 
         Intent intent = new Intent("com.toggletalk.android.ACTION_STREAM_DISPLAY");
+        intent.putExtra("session_id", sessionId);
         intent.putExtra("messages_json", messagesJson);
         intent.putExtra("file_path", filePath);
         sendBroadcast(intent);

@@ -52,6 +52,7 @@ public class MainActivity extends Activity {
     private TextView mBtnExpandAll;
     private View mBtnSettingsClose;
     private View mSettingsDimBackground;
+    private View mBtnClearSessionCache;
     private boolean mBypassAntigravity = false;
     private ImageButton mBtnMic;
     private ProgressBar mPbThinking;
@@ -138,9 +139,10 @@ public class MainActivity extends Activity {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             if ("com.toggletalk.android.ACTION_STREAM_DISPLAY".equals(action)) {
+                String sessionId = intent.getStringExtra("session_id");
                 String messagesJson = intent.getStringExtra("messages_json");
                 String filePath = intent.getStringExtra("file_path");
-                handleStreamedDisplay(messagesJson, filePath);
+                handleStreamedDisplay(sessionId, messagesJson, filePath);
             } else if ("com.toggletalk.android.ACTION_NEW_SESSION_ADOPTED".equals(action)) {
                 String sessionId = intent.getStringExtra("session_id");
                 if (sessionId != null && !sessionId.isEmpty()) {
@@ -267,8 +269,9 @@ public class MainActivity extends Activity {
                     stdout = resultBundle.getString("stdout");
                     errmsg = resultBundle.getString("errmsg");
                 }
+                String sessionId = intent.getStringExtra("session_id");
                 Log.d(TAG, "Session history stdout len=" + (stdout == null ? "null" : stdout.length()) + " errmsg=" + errmsg);
-                receiveSessionHistory(stdout, errmsg);
+                receiveSessionHistory(sessionId, stdout, errmsg);
             }
         }
     };
@@ -315,6 +318,7 @@ public class MainActivity extends Activity {
         }
         mBtnSettingsClose = findViewById(R.id.btn_settings_close);
         mSettingsDimBackground = findViewById(R.id.settings_popup_dim_background);
+        mBtnClearSessionCache = findViewById(R.id.btn_clear_session_cache);
 
         if (mBtnSettings != null) {
             mBtnSettings.setOnClickListener(v -> openSettings());
@@ -324,6 +328,12 @@ public class MainActivity extends Activity {
         }
         if (mSettingsDimBackground != null) {
             mSettingsDimBackground.setOnClickListener(v -> closeSettings());
+        }
+        if (mBtnClearSessionCache != null) {
+            mBtnClearSessionCache.setOnClickListener(v -> {
+                clearSessionHistoryCache();
+                closeSettings();
+            });
         }
         mBtnMic = findViewById(R.id.btn_mic);
         mPbThinking = findViewById(R.id.pb_thinking);
@@ -961,11 +971,32 @@ public class MainActivity extends Activity {
         mShowAllEarlierMessages = false;
         mLastStreamedAgentText = "";
 
+        // Check if cached session history exists on the app side
+        java.io.File cacheDir = new java.io.File(getCacheDir(), "session_history_cache");
+        java.io.File cacheFile = new java.io.File(cacheDir, sessionId + ".json");
+        if (cacheFile.exists()) {
+            String cachedJson = readFileContent(cacheFile.getAbsolutePath());
+            if (cachedJson != null && !cachedJson.isEmpty()) {
+                try {
+                    org.json.JSONArray array = new org.json.JSONArray(cachedJson);
+                    if (array.length() > 0) {
+                        mCurrentSessionHistory = array;
+                        displayMessages(mCurrentSessionHistory, false);
+                        Log.d(TAG, "Loaded session history from app-side cache for " + sessionId);
+                        return; // Bypass Termux Python execution entirely
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error parsing cached session history", e);
+                }
+            }
+        }
+
         addSystemMessage("Loading session history...", "#80FFFFFF");
 
         // The transcript files live in Termux's private data dir which this app
         // cannot read directly (different UIDs). Delegate to Termux via RUN_COMMAND.
         Intent callbackIntent = new Intent(ACTION_SESSION_HISTORY);
+        callbackIntent.putExtra("session_id", sessionId);
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             flags |= PendingIntent.FLAG_MUTABLE;
@@ -1000,7 +1031,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void receiveSessionHistory(String stdout, String errmsg) {
+    private void receiveSessionHistory(String sessionId, String stdout, String errmsg) {
         if (mChatContainer != null) mChatContainer.removeAllViews();
         mNewChatStartedBubble = null;
         mActiveAgentTextView = null;
@@ -1041,6 +1072,11 @@ public class MainActivity extends Activity {
             }
 
             mCurrentSessionHistory = array;
+            
+            // Cache the successfully retrieved session history
+            String activeSessionId = (sessionId != null && !sessionId.isEmpty()) ? sessionId : mSelectedSessionId;
+            writeSessionToCache(activeSessionId, jsonContent);
+
             displayMessages(mCurrentSessionHistory, false);
         } catch (Exception e) {
             Log.e(TAG, "Error parsing session history JSON", e);
@@ -1267,7 +1303,7 @@ public class MainActivity extends Activity {
         mChatContainer.addView(tv);
     }
 
-    private void handleStreamedDisplay(String messagesJson, String filePath) {
+    private void handleStreamedDisplay(String sessionId, String messagesJson, String filePath) {
         try {
             String jsonContent = messagesJson;
             if ((jsonContent == null || jsonContent.isEmpty()) && filePath != null && !filePath.isEmpty()) {
@@ -1283,6 +1319,10 @@ public class MainActivity extends Activity {
             }
 
             mCurrentSessionHistory = newHistory;
+
+            // Cache the streamed session history
+            String activeSessionId = (sessionId != null && !sessionId.isEmpty()) ? sessionId : mSelectedSessionId;
+            writeSessionToCache(activeSessionId, jsonContent);
 
             if (mCurrentSessionHistory.length() > 0) {
                 org.json.JSONObject lastMsg = mCurrentSessionHistory.getJSONObject(mCurrentSessionHistory.length() - 1);
@@ -1980,6 +2020,68 @@ public class MainActivity extends Activity {
             }
             
             return convertView;
+        }
+    }
+
+    private void writeSessionToCache(String sessionId, String jsonContent) {
+        if (sessionId == null || sessionId.isEmpty() || jsonContent == null || jsonContent.isEmpty()) {
+            return;
+        }
+        try {
+            java.io.File cacheDir = new java.io.File(getCacheDir(), "session_history_cache");
+            if (!cacheDir.exists()) {
+                cacheDir.mkdirs();
+            }
+            java.io.File cacheFile = new java.io.File(cacheDir, sessionId + ".json");
+            java.io.FileWriter writer = new java.io.FileWriter(cacheFile);
+            writer.write(jsonContent);
+            writer.close();
+            Log.d(TAG, "Cached session history for: " + sessionId);
+        } catch (Exception e) {
+            Log.e(TAG, "Error writing session to cache", e);
+        }
+    }
+
+    private void clearSessionHistoryCache() {
+        // Delete cache files
+        java.io.File cacheDir = new java.io.File(getCacheDir(), "session_history_cache");
+        if (cacheDir.exists()) {
+            java.io.File[] files = cacheDir.listFiles();
+            if (files != null) {
+                for (java.io.File f : files) {
+                    f.delete();
+                }
+            }
+        }
+        
+        // Delete SD card history files
+        try {
+            java.io.File sdDir = new java.io.File("/sdcard/Android/media/com.toggletalk.android");
+            if (sdDir.exists()) {
+                java.io.File sessionHist = new java.io.File(sdDir, "session_history.json");
+                if (sessionHist.exists()) sessionHist.delete();
+                java.io.File streamHist = new java.io.File(sdDir, "stream_history.json");
+                if (streamHist.exists()) streamHist.delete();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error deleting SD card history files", e);
+        }
+        
+        Toast.makeText(this, "Session history cache cleared", Toast.LENGTH_SHORT).show();
+        
+        // Clear active session chat, reset memory variables and re-pull from transcript
+        if (mSelectedSessionId != null && !mSelectedSessionId.isEmpty()) {
+            loadSessionHistory(mSelectedSessionId);
+        } else {
+            if (mChatContainer != null) {
+                mChatContainer.removeAllViews();
+            }
+            mNewChatStartedBubble = null;
+            mActiveAgentTextView = null;
+            mUserPrompt = "";
+            mDisplayedStepKeys.clear();
+            mCurrentSessionHistory = new org.json.JSONArray();
+            mLastStreamedAgentText = "";
         }
     }
 }

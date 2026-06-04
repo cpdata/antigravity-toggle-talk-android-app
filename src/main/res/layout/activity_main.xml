@@ -620,7 +620,7 @@
             <!-- Scrollable Settings Content -->
             <ScrollView
                 android:layout_width="match_parent"
-                android:layout_height="180dp"
+                android:layout_height="220dp"
                 android:fillViewport="true">
 
                 <LinearLayout
@@ -640,6 +640,24 @@
                         android:paddingStart="8dp"
                         android:layout_marginBottom="12dp"
                         android:checked="false" />
+
+                    <!-- Clear Session History Cache Button -->
+                    <TextView
+                        android:id="@+id/btn_clear_session_cache"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Clear Session History Cache"
+                        android:textColor="#FF416C"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:gravity="center"
+                        android:padding="12dp"
+                        android:layout_marginTop="8dp"
+                        android:layout_marginBottom="12dp"
+                        android:background="@drawable/card_glass"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:contentDescription="Clear session history cache" />
                 </LinearLayout>
             </ScrollView>
         </LinearLayout>
