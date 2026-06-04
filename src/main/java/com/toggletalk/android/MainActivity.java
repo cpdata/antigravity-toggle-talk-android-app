@@ -125,6 +125,20 @@ public class MainActivity extends Activity {
     // Animation list
     private final List<ViewAnimation> mRunningAnimations = new ArrayList<>();
 
+    private final java.util.Set<Integer> mDisplayedStepIndices = new java.util.HashSet<>();
+
+    private final BroadcastReceiver mStreamDisplayReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if ("com.toggletalk.android.ACTION_STREAM_DISPLAY".equals(intent.getAction())) {
+                int stepIndex = intent.getIntExtra("step_index", -1);
+                String role = intent.getStringExtra("role");
+                String text = intent.getStringExtra("text");
+                handleStreamedDisplay(stepIndex, role, text);
+            }
+        }
+    };
+
     // Broadcast Receiver for App State Updates
     private final BroadcastReceiver mStateReceiver = new BroadcastReceiver() {
         @Override
@@ -414,6 +428,9 @@ public class MainActivity extends Activity {
         // Register Session History Broadcast Callback
         registerReceiver(mSessionHistoryReceiver, new IntentFilter(ACTION_SESSION_HISTORY));
 
+        // Register Stream Display Receiver
+        registerReceiver(mStreamDisplayReceiver, new IntentFilter("com.toggletalk.android.ACTION_STREAM_DISPLAY"));
+
         // Check Permissions
         checkPermissionsAndPreferences();
 
@@ -436,6 +453,7 @@ public class MainActivity extends Activity {
         try { unregisterReceiver(mTranscriptionReceiver); } catch (Exception ignored) {}
         try { unregisterReceiver(mSessionsReceiver); } catch (Exception ignored) {}
         try { unregisterReceiver(mSessionHistoryReceiver); } catch (Exception ignored) {}
+        try { unregisterReceiver(mStreamDisplayReceiver); } catch (Exception ignored) {}
         clearAllAnimations();
     }
 
@@ -516,6 +534,7 @@ public class MainActivity extends Activity {
         if (mChatContainer != null) mChatContainer.removeAllViews();
         mActiveAgentTextView = null;
         mUserPrompt = "";
+        mDisplayedStepIndices.clear();
         mSessionsAdapter.notifyDataSetChanged();
 
         addSystemMessage("✦ New chat started. Type or speak your message.", "#00F2FE");
@@ -898,6 +917,7 @@ public class MainActivity extends Activity {
         if (mChatContainer != null) mChatContainer.removeAllViews();
         mActiveAgentTextView = null;
         mUserPrompt = "";
+        mDisplayedStepIndices.clear();
 
         addSystemMessage("Loading session history...", "#80FFFFFF");
 
@@ -949,7 +969,6 @@ public class MainActivity extends Activity {
         }
 
         try {
-            // Check for error object
             String trimmed = stdout.trim();
             if (trimmed.startsWith("{")) {
                 org.json.JSONObject errObj = new org.json.JSONObject(trimmed);
@@ -966,12 +985,26 @@ public class MainActivity extends Activity {
                 return;
             }
 
-            // Show up to last 50 messages
-            int start = Math.max(0, array.length() - 50);
-            if (start > 0) {
-                addSystemMessage("... (" + start + " earlier messages omitted) ...", "#60FFFFFF");
-            }
-            for (int i = start; i < array.length(); i++) {
+            displayMessages(array, false);
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing session history JSON", e);
+            addSystemMessage("Error loading session history.", "#FF6B6B");
+        }
+    }
+
+    private void displayMessages(final org.json.JSONArray array, boolean showAll) {
+        if (mChatContainer != null) mChatContainer.removeAllViews();
+        mActiveAgentTextView = null;
+
+        int total = array.length();
+        int start = showAll ? 0 : Math.max(0, total - 50);
+
+        if (start > 0) {
+            addOmittedMessagesClickable(start, array);
+        }
+
+        for (int i = start; i < total; i++) {
+            try {
                 org.json.JSONObject msg = array.getJSONObject(i);
                 String role = msg.optString("role", "");
                 String text = msg.optString("text", "");
@@ -980,13 +1013,59 @@ public class MainActivity extends Activity {
                     addUserBubble(text);
                 } else if ("agent".equals(role)) {
                     addAgentBubble(text);
-                    mActiveAgentTextView = null; // don't stream-overwrite history bubbles
+                    mActiveAgentTextView = null;
                 }
+            } catch (Exception e) {
+                Log.e(TAG, "Error displaying message at " + i, e);
             }
+        }
+    }
 
-        } catch (Exception e) {
-            Log.e(TAG, "Error parsing session history JSON", e);
-            addSystemMessage("Error loading session history.", "#FF6B6B");
+    private void addOmittedMessagesClickable(final int count, final org.json.JSONArray array) {
+        if (mChatContainer == null) return;
+        float density = getResources().getDisplayMetrics().density;
+        
+        TextView tv = new TextView(this);
+        tv.setText("... (" + count + " earlier messages omitted. Tap to show all) ...");
+        tv.setTextColor(Color.parseColor("#60FFFFFF"));
+        tv.setTextSize(12);
+        tv.setPadding((int)(8 * density), (int)(5 * density), (int)(8 * density), (int)(5 * density));
+        tv.setTextIsSelectable(false);
+        tv.setFocusable(true);
+        tv.setClickable(true);
+        
+        android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
+        gd.setColor(Color.parseColor("#1AFFFFFF"));
+        gd.setCornerRadius(density * 6);
+        gd.setStroke((int)density, Color.parseColor("#33FFFFFF"));
+        tv.setBackground(gd);
+        
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(0, (int)(4 * density), 0, (int)(4 * density));
+        tv.setLayoutParams(lp);
+
+        tv.setOnClickListener(v -> displayMessages(array, true));
+        
+        mChatContainer.addView(tv);
+    }
+
+    private void handleStreamedDisplay(int stepIndex, String role, String text) {
+        if (stepIndex == -1 || mDisplayedStepIndices.contains(stepIndex)) {
+            return;
+        }
+        mDisplayedStepIndices.add(stepIndex);
+
+        if ("user".equals(role)) {
+            addUserBubble(text);
+        } else if ("agent".equals(role)) {
+            if (mActiveAgentTextView != null && "...".equals(mActiveAgentTextView.getText().toString())) {
+                mActiveAgentTextView.setText(renderMarkdown(text));
+                mActiveAgentTextView = null;
+            } else {
+                addAgentBubble(text);
+                mActiveAgentTextView = null;
+            }
         }
     }
 

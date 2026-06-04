@@ -26,6 +26,10 @@ Do not enclose your response in triple backticks.
 CRITICAL: You MUST wrap any text that should be spoken out loud by the Text-to-Speech (TTS) system inside <tts>...</tts> tags. ONLY the content inside these tags will be spoken. Place all thoughts, intermediate reasoning, tool calls, and verbose explanations outside the <tts>...</tts> tags so they are only displayed visually, keeping the spoken response concise and natural.]"
 PROMPT="${TRANSCRIPT}${PROMPT_SUFFIX}"
 
+# Start streaming updates in the background
+python3 "/data/data/com.termux/files/home/ToggleTalkAndroid/stream_session.py" "$SESSION_ID" &
+STREAM_PID=$!
+
 # Run Antigravity
 if [ "$CONTINUE_SESSION" = "true" ]; then
     if [ -n "$SESSION_ID" ]; then
@@ -49,6 +53,9 @@ else
       "$GLIBC_LINKER" --library-path "$GLIBC_LIBS" "$AGY_BIN" \
       --dangerously-skip-permissions -p "$PROMPT" --print-timeout 60m < /dev/null 2>>"$ERR_FILE")
 fi
+
+# Stop streaming updates
+kill $STREAM_PID 2>/dev/null
 
 # Extract latest and sanitized versions
 LATEST_RESPONSE=$(printf "%s" "$RESPONSE" | python3 "$HOME/toggle-talk-antigravity/tts_sanitize.py" --history-file "$LOG_FILE" --history-only)

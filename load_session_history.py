@@ -59,7 +59,13 @@ def load_history(session_id):
         print(json.dumps({"error": str(e)}))
         return
 
-    print(json.dumps(messages))
+    # Deduplicate consecutive identical messages
+    deduped = []
+    for msg in messages:
+        if not deduped or deduped[-1] != msg:
+            deduped.append(msg)
+
+    print(json.dumps(deduped))
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
