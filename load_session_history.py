@@ -100,7 +100,16 @@ def load_history(session_id):
         if not deduped or deduped[-1] != msg:
             deduped.append(msg)
 
-    print(json.dumps(deduped))
+    # Write to a shared file on the SDCard to bypass Binder 100KB limits
+    out_dir = "/sdcard/ToggleTalkModels"
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, "session_history.json")
+    try:
+        with open(out_path, "w", encoding="utf-8") as out_f:
+            json.dump(deduped, out_f)
+        print(json.dumps({"status": "success", "file": out_path}))
+    except Exception as e:
+        print(json.dumps({"error": f"Failed to write history file: {str(e)}"}))
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

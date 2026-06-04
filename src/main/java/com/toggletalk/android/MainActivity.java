@@ -1005,16 +1005,28 @@ public class MainActivity extends Activity {
 
         try {
             String trimmed = stdout.trim();
+            String jsonContent = trimmed;
+
             if (trimmed.startsWith("{")) {
-                org.json.JSONObject errObj = new org.json.JSONObject(trimmed);
-                String err = errObj.optString("error", "");
+                org.json.JSONObject obj = new org.json.JSONObject(trimmed);
+                String err = obj.optString("error", "");
                 if (!err.isEmpty()) {
+                    Log.e(TAG, "History python script returned error: " + err);
                     addSystemMessage("No conversation history found for this session.", "#80FFFFFF");
                     return;
                 }
+                
+                String status = obj.optString("status", "");
+                if ("success".equals(status)) {
+                    String filePath = obj.optString("file", "");
+                    if (!filePath.isEmpty()) {
+                        Log.d(TAG, "Reading session history from file: " + filePath);
+                        jsonContent = readFileContent(filePath);
+                    }
+                }
             }
 
-            org.json.JSONArray array = new org.json.JSONArray(trimmed);
+            org.json.JSONArray array = new org.json.JSONArray(jsonContent);
             if (array.length() == 0) {
                 addSystemMessage("No messages found in this session.", "#80FFFFFF");
                 return;
@@ -1026,6 +1038,25 @@ public class MainActivity extends Activity {
             Log.e(TAG, "Error parsing session history JSON", e);
             addSystemMessage("Error loading session history.", "#FF6B6B");
         }
+    }
+
+    private String readFileContent(String filePath) {
+        StringBuilder sb = new StringBuilder();
+        java.io.BufferedReader reader = null;
+        try {
+            reader = new java.io.BufferedReader(new java.io.FileReader(filePath));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line).append("\n");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error reading file: " + filePath, e);
+        } finally {
+            if (reader != null) {
+                try { reader.close(); } catch (Exception ignored) {}
+            }
+        }
+        return sb.toString().trim();
     }
 
     private void displayMessages(final org.json.JSONArray array, boolean showAll) {
