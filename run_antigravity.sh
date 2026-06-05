@@ -37,7 +37,7 @@ else
     ) &
 fi
 
-trap 'rm -f "$HOME/.gemini/antigravity-cli/brain/$SESSION_ID/.system_generated/logs/run.pid"' EXIT
+trap 'kill "$STREAM_PID" 2>/dev/null; rm -f "$HOME/.gemini/antigravity-cli/brain/$SESSION_ID/.system_generated/logs/run.pid"' EXIT
 
 LOG_FILE="$HOME/.toggle_talk_antigravity.log"
 ERR_FILE="$HOME/.toggle_talk_antigravity.err"
