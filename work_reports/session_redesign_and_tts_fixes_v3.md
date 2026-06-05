@@ -28,7 +28,6 @@ This implementation plan provides a comprehensive blueprint, root cause analysis
 | **R-TTS-2** | TTS Stop & Flush | A separate X button below the mic button terminates current TTS playback and flushes the queue immediately. | Button is missing, or flushing fails to stop active audio track. |
 | **R-TTS-3** | Mic Recording Pauses TTS | Pressing mic button during TTS pauses playback immediately, keeping the TTS queue intact. | Mic recording starts without pausing TTS, or queue is cleared. |
 | **R-TTS-4** | Chunk Resumption & Repeat | Once recording is released, TTS playback resumes, repeating the exact sentence chunk that was playing when paused. | Playback skips the interrupted chunk or fails to resume. |
-| **R-TTS-5** | Display of TTS content | Spoken text inside `<tts>...</tts>` tags is NOT removed from visual chat displays. Only the literal `<tts>` and `</tts>` tags are stripped for rendering. | Text inside `<tts>` is stripped or invisible in the chat bubble. |
 | **R-UNS-1** | Unresolved Queue UI State | In a stopped/terminated session with a non-empty queue, the main Send button is hidden. A label `"Prompt Queue?"` and 4 vertical buttons (`Resume`, `Delete`, `Combine`, `Add`) are shown. | Send button remains visible, or the 4 vertical buttons are missing. |
 | **R-UNS-2** | Resume Action | Clicking `Resume` sends the next prompt from the queue to Antigravity and executes remaining queued prompts in succession as turns finish. | Queued prompts do not auto-run or are deleted. |
 | **R-UNS-3** | Delete All Action | Clicking `Delete` in the 4-button layout triggers an "Are you sure?" confirmation dialog. If "Yes", the entire queue is cleared, and the UI returns to normal. | Queue is cleared without confirmation, or UI doesn't restore. |
@@ -38,7 +37,6 @@ This implementation plan provides a comprehensive blueprint, root cause analysis
 | **R-UNS-7** | Pop-up Buttons (Unresolved State) | Editing individual prompts via clicking them in unresolved queue state shows only `Update`, `Delete`, and `Cancel`. The `Send` button is hidden. | `Send` button is visible for individual prompts. |
 | **R-UNS-8** | Resolution & State Restore | Once the queue is empty or resolved, the pulsating red border and 4 buttons disappear, and the main Send button is restored. | UI elements persist after resolution. |
 | **R-MOD-1** | Code Modularity | Core UI logic for the prompt queue, popup overlays, and animations are implemented in separate files rather than bloating `MainActivity.java`. | All features are dumped directly into `MainActivity.java`. |
-| **R-MDR-1** | Markdown & Code Highlighting | Formatting syntax highlighting is restricted to code blocks wrapped in ` ``` ` with auto-detection. Normal text handles markdown elements (e.g., `# headings`). | Raw markdown elements (like `#`) are ignored or syntax highlighting is applied globally. |
 
 ---
 
@@ -78,8 +76,7 @@ In this state:
 ## 4. Step-by-Step Implementation Details
 
 ### Step 4.1: Correct Turn Parsing in `transcript_parser.py`
-Group steps in `parse_transcript_steps` into logical blocks demarcated by `USER_INPUT` steps. The last `PLANNER_RESPONSE` with status `"DONE"` in a turn block will be marked as final (`role: "agent"`). The presence of `<tts>` tags must not decide `is_final`, and the parser MUST NOT split the message content into separate thought and agent messages based on the presence of `<tts>` tags. Instead, it must retain the original content with `<tts>` tags intact as a single message under the determined role (either `"thought"` or `"agent"`), allowing TTS notifications to be provided in any non-tool message.
-
+Group steps in `parse_transcript_steps` into logical blocks demarcated by `USER_INPUT` steps. The last `PLANNER_RESPONSE` with status `"DONE"` or containing `<tts>` tags in a turn block will be marked as final (`role: "agent"`).
 
 ### Step 4.2: Session Termination Logic
 1. **Update `run_antigravity.sh`**:
@@ -112,12 +109,6 @@ To avoid bloating `MainActivity.java`, implement features in these new dedicated
 2. **`PromptEditPopup.java`**: Manages the bottom-aligned popup overlay, focus, cursor placement, keyboard trigger, and input validation.
 3. **`GlowAnimationHelper.java`**: Manages the `ValueAnimator` for animating the stroke of the queue container's background drawable to create the red glowing pulsating effect.
 4. **`UnresolvedQueueManager.java`**: Handles the visibility toggles between the Send button and the 4 vertical buttons, and coordinates clicks on `Resume`, `Delete`, `Combine`, and `Add`.
-
-### Step 4.6: Markdown Formatting and Syntax Highlighting
-Ensure that:
-1. The markdown renderer handles formatting like `# headings`, lists, bold, italics, and links.
-2. Syntax highlighting is strictly restricted to fenced code blocks (` ```...``` `) with auto-language detection.
-3. Spoken text inside `<tts>...</tts>` is not removed from visual chat displays. Strip only the literal XML tags `<tts>` and `</tts>` during rendering.
 
 ---
 

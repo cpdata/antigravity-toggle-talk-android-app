@@ -12,6 +12,7 @@ This task details changes to `ToggleTalkService.java` to support advanced text-t
 | **R-TTS-2** | Tapping X button below mic immediately stops TTS playback and flushes queue. | Flushing fails to stop active audio track or clear queue. |
 | **R-TTS-3** | Pressing mic button pauses TTS playback immediately, keeping queue intact. | Mic starts without pausing, or queue gets cleared. |
 | **R-TTS-4** | Once mic is released, TTS playback resumes, repeating the exact sentence chunk that was playing when paused. | Playback skips chunk or fails to resume. |
+| **R-TTS-5** | Spoken text inside `<tts>...</tts>` is NOT removed from visual chat displays. Only the literal `<tts>` and `</tts>` tags are stripped for rendering. | Text inside `<tts>` is stripped or invisible in the chat bubble. |
 
 ---
 
@@ -19,6 +20,7 @@ This task details changes to `ToggleTalkService.java` to support advanced text-t
 
 ### Components & File Path
 - `ToggleTalkService.java`: `/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/java/com/toggletalk/android/ToggleTalkService.java`
+- `MainActivity.java`: `/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/java/com/toggletalk/android/MainActivity.java`
 
 ### Audio Generation & Threading
 `ToggleTalkService` handles speech synthesis via Kokoro offline TTS. It manages a background thread (`mTtsThread`) that polls items from a queue (`mTtsQueue`), generates PCM samples (`mTts.generate()`), and streams them to an `AudioTrack`.
@@ -27,6 +29,9 @@ Currently, `mTtsQueue` stores strings directly without session ID mappings, and 
 2. Pausing/resuming playback when microphone input interrupts speech without flushing the remaining queue.
 3. Repeating the interrupted chunk after resumption.
 4. Separate X button to flush the queue.
+
+### TTS Tag Display Rules
+Spoken text inside `<tts>...</tts>` tags must **never** be removed from the visual displaying output, nor should it decide finality. The agent can provide TTS notifications in any non-tool message, not just the final one. The literal XML tags `<tts>` and `</tts>` must simply be stripped from the rendering string, leaving the text fully visible inside the chat bubble.
 
 ---
 
@@ -74,9 +79,16 @@ When the user taps the mic button during playback:
    - Clear the pause flag: `mIsTtsPaused = false`.
    - Revert the session state to `IDLE` and broadcast it.
 
+### D. Displaying Spoken Text (Remove Stripping Logic)
+1. In `MainActivity.java`'s `renderMarkdown` method:
+   - Locate the regex pattern that strips `<tts>...</tts>` tags (e.g. `text = text.replaceAll("(?s)<tts>.*?</tts>", "");`).
+   - Remove or replace it to simply strip the literal XML tags themselves while leaving the content intact:
+     `text = text.replaceAll("<tts>", "").replaceAll("</tts>", "");`
+
 ---
 
 ## 4. Verification Plan
-- Play TTS audio from a session, tap the mic button to speak, verify speech pauses instantly.
+- Play TTS audio from a session, verify that the spoken text is visible in the chat bubble.
+- Tap the mic button to speak, verify speech pauses instantly.
 - Release the mic and verify that TTS resumes, repeating the exact sentence chunk that was playing when paused.
 - Trigger TTS, send `com.toggletalk.android.ACTION_TERMINATE_TTS` intent via ADB, verify playback stops immediately and the queue is flushed.
