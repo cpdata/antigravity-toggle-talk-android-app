@@ -1,7 +1,7 @@
 {
   "id": "P5YyCa",
   "title": "Add scroll to bottom button",
-  "description": "Add scroll to bottom button for conversation view that only shows when not at the bottom",
+  "description": "Add scroll to bottom button for conversation view that only shows when not at the bottom\n\nAlso make sure that the conversation view doent automatically pull down to the bottom if the user has scrolled up to see something.\n\nThe conversation view shouldnt move or jerk during a streaming active session.",
   "status": "pending",
   "priority": 0.3,
   "assignedTo": "main-agent",
@@ -9,7 +9,7 @@
   "payload": {},
   "metadata": {
     "createdAt": "2026-06-05T10:47:43.459Z",
-    "updatedAt": "2026-06-05T10:56:13.574Z",
+    "updatedAt": "2026-06-05T13:59:56.027Z",
     "createdBy": "main-agent",
     "tags": [
       "ui",
