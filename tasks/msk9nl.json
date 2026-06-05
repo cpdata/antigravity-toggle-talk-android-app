@@ -1,0 +1,19 @@
+{
+  "id": "msk9nl",
+  "title": "Part 4: Prompt Edit Popup Overlay",
+  "description": "Implement bottom-aligned edit popup overlay, keyboard triggers, focus, cursor newline, cancel-on-outside, delete confirmation dialog, and text validation in activity_main.xml and new helper class. Ref: work_reports/tasks_subdivision/4_prompt_edit_popup_overlay.md",
+  "status": "pending",
+  "priority": 0.4,
+  "assignedTo": "main-agent",
+  "dependencies": [],
+  "payload": {},
+  "metadata": {
+    "createdAt": "2026-06-05T10:09:57.432Z",
+    "updatedAt": "2026-06-05T10:09:57.432Z",
+    "createdBy": "main-agent",
+    "tags": [],
+    "requiredCapabilities": [],
+    "maxRetries": 3,
+    "retryCount": 0
+  }
+}
