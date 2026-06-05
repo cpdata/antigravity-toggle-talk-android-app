@@ -162,6 +162,8 @@ def tail_transcript(path, session_id, prompt):
                 current_line_idx = 0
                 
             while current_line_idx < len(lines):
+                if stop_requested:
+                    break
                 line = lines[current_line_idx].strip()
                 current_line_idx += 1
                 
