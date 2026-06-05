@@ -1267,6 +1267,7 @@ public class MainActivity extends Activity {
         contentTv.setTextSize(10);
         contentTv.setTextIsSelectable(true);
         contentTv.setPadding(0, (int)(4 * density), 0, 0);
+        contentTv.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
 
         if ("thought".equals(role)) {
             contentTv.setTextColor(Color.parseColor("#D0FFFFFF"));
@@ -1285,11 +1286,13 @@ public class MainActivity extends Activity {
                 } else {
                     htmlContent = renderPlainMonospace(content);
                 }
+                android.text.Spanned spanned;
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    contentTv.setText(android.text.Html.fromHtml(htmlContent, android.text.Html.FROM_HTML_MODE_LEGACY));
+                    spanned = android.text.Html.fromHtml(htmlContent, android.text.Html.FROM_HTML_MODE_LEGACY);
                 } else {
-                    contentTv.setText(android.text.Html.fromHtml(htmlContent));
+                    spanned = android.text.Html.fromHtml(htmlContent);
                 }
+                contentTv.setText(makeSpansInterceptable(spanned));
             }
         }
 
@@ -1461,6 +1464,7 @@ public class MainActivity extends Activity {
         tv.setTextSize(12);
         tv.setPadding((int)(8 * density), (int)(5 * density), (int)(8 * density), (int)(5 * density));
         tv.setTextIsSelectable(true);
+        tv.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
         
         // Extract the last 6 hex digits (RGB) for the stroke color - handles both #RRGGBB and #AARRGGBB
         String rgbHex = colorHex.replaceAll("^#[0-9A-Fa-f]{2}([0-9A-Fa-f]{6})$", "#$1");
@@ -1501,6 +1505,7 @@ public class MainActivity extends Activity {
         tv.setTextSize(13);
         tv.setPadding((int)(10 * density), (int)(7 * density), (int)(10 * density), (int)(7 * density));
         tv.setTextIsSelectable(true);
+        tv.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
         
         android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
         gd.setColor(Color.parseColor("#4D9D50BB"));
@@ -1538,6 +1543,7 @@ public class MainActivity extends Activity {
         tv.setTextSize(13);
         tv.setPadding((int)(10 * density), (int)(7 * density), (int)(10 * density), (int)(7 * density));
         tv.setTextIsSelectable(true);
+        tv.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
         
         android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
         gd.setColor(Color.parseColor("#2600F2FE"));
@@ -1896,6 +1902,9 @@ public class MainActivity extends Activity {
         // Numbered lists
         html = html.replaceAll("(?m)^(\\d+)\\.\\s+(.*)$", "$1. $2<br/>");
 
+        // Links: [text](url) -> <a href="url">text</a>
+        html = html.replaceAll("\\[([^\\]]+)\\]\\(([^)]+)\\)", "<a href=\"$2\">$1</a>");
+
         // Convert newlines
         html = html.replaceAll("\\n", "<br/>");
         html = html.replaceAll("(<br/>\\s*){3,}", "<br/><br/>");
@@ -1908,10 +1917,132 @@ public class MainActivity extends Activity {
             html = html.replace("%%CODE_BLOCK_" + i + "%%", renderedCodeBlocks.get(i));
         }
 
+        android.text.Spanned spanned;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            return android.text.Html.fromHtml(html, android.text.Html.FROM_HTML_MODE_LEGACY);
+            spanned = android.text.Html.fromHtml(html, android.text.Html.FROM_HTML_MODE_LEGACY);
         } else {
-            return android.text.Html.fromHtml(html);
+            spanned = android.text.Html.fromHtml(html);
+        }
+        return makeSpansInterceptable(spanned);
+    }
+
+    private static android.text.Spanned makeSpansInterceptable(android.text.Spanned spanned) {
+        if (spanned == null) return null;
+        android.text.SpannableStringBuilder ssb = new android.text.SpannableStringBuilder(spanned);
+        android.text.style.URLSpan[] spans = ssb.getSpans(0, ssb.length(), android.text.style.URLSpan.class);
+        for (android.text.style.URLSpan span : spans) {
+            int start = ssb.getSpanStart(span);
+            int end = ssb.getSpanEnd(span);
+            int flags = ssb.getSpanFlags(span);
+            final String url = span.getURL();
+            
+            android.text.style.ClickableSpan customSpan = new android.text.style.ClickableSpan() {
+                @Override
+                public void onClick(android.view.View widget) {
+                    android.content.Context context = widget.getContext();
+                    handleLinkClick(context, url);
+                }
+                
+                @Override
+                public void updateDrawState(android.text.TextPaint ds) {
+                    super.updateDrawState(ds);
+                    ds.setUnderlineText(true);
+                    ds.setColor(android.graphics.Color.parseColor("#00F2FE"));
+                }
+            };
+            
+            ssb.removeSpan(span);
+            ssb.setSpan(customSpan, start, end, flags);
+        }
+        return ssb;
+    }
+
+    private static void handleLinkClick(android.content.Context context, String url) {
+        if (url == null) return;
+        Log.d(TAG, "Clicked link: " + url);
+        
+        if (url.startsWith("http://") || url.startsWith("https://")) {
+            try {
+                android.content.Intent intent = new android.content.Intent(
+                        android.content.Intent.ACTION_VIEW,
+                        android.net.Uri.parse(url)
+                );
+                if (!(context instanceof android.app.Activity)) {
+                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                }
+                context.startActivity(intent);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to open web URL: " + url, e);
+                Toast.makeText(context, "Error opening link", Toast.LENGTH_SHORT).show();
+            }
+            return;
+        }
+        
+        String filePath = url;
+        if (filePath.startsWith("file://")) {
+            filePath = filePath.substring(7);
+        }
+        
+        if (filePath.startsWith("/data/data/com.termux/files/")) {
+            String cleanPath = filePath;
+            String lineNumber = null;
+            int hashIdx = filePath.indexOf('#');
+            if (hashIdx != -1) {
+                cleanPath = filePath.substring(0, hashIdx);
+                String fragment = filePath.substring(hashIdx + 1);
+                if (fragment.startsWith("L") || fragment.startsWith("l")) {
+                    fragment = fragment.substring(1);
+                }
+                int dashIdx = fragment.indexOf('-');
+                if (dashIdx != -1) {
+                    fragment = fragment.substring(0, dashIdx);
+                }
+                try {
+                    Integer.parseInt(fragment);
+                    lineNumber = fragment;
+                } catch (NumberFormatException ignored) {}
+            }
+            
+            Intent runCommandIntent = new Intent();
+            runCommandIntent.setClassName("com.termux", "com.termux.app.RunCommandService");
+            runCommandIntent.setAction("com.termux.RUN_COMMAND");
+            runCommandIntent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/nano");
+            
+            String[] arguments;
+            if (lineNumber != null) {
+                arguments = new String[]{"+" + lineNumber, cleanPath};
+            } else {
+                arguments = new String[]{cleanPath};
+            }
+            runCommandIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arguments);
+            runCommandIntent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", false);
+            runCommandIntent.putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home");
+            
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(runCommandIntent);
+                } else {
+                    context.startService(runCommandIntent);
+                }
+                Toast.makeText(context, "Opening in nano...", Toast.LENGTH_SHORT).show();
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to launch nano in Termux", e);
+                Toast.makeText(context, "Failed to launch nano in Termux", Toast.LENGTH_SHORT).show();
+            }
+        } else {
+            try {
+                android.content.Intent intent = new android.content.Intent(
+                        android.content.Intent.ACTION_VIEW,
+                        android.net.Uri.parse(url)
+                );
+                if (!(context instanceof android.app.Activity)) {
+                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                }
+                context.startActivity(intent);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to open link: " + url, e);
+                Toast.makeText(context, "No app found to open link", Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
