@@ -1,0 +1,21 @@
+{
+  "id": "HklynV",
+  "title": "Test",
+  "description": "Test",
+  "status": "ready",
+  "priority": 0.2,
+  "assignedTo": "main-agent",
+  "dependencies": [],
+  "payload": {},
+  "metadata": {
+    "createdAt": "2026-06-05T02:26:38.826Z",
+    "updatedAt": "2026-06-05T02:26:38.826Z",
+    "createdBy": "main-agent",
+    "tags": [
+      "delete"
+    ],
+    "requiredCapabilities": [],
+    "maxRetries": 3,
+    "retryCount": 0
+  }
+}
