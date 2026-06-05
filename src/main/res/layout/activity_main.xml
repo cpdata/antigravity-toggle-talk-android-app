@@ -380,6 +380,69 @@
                     android:contentDescription="Send text message"
                     android:elevation="6dp" />
 
+                <!-- Unresolved Queue State Actions -->
+                <LinearLayout
+                    android:id="@+id/layout_unresolved_actions"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:visibility="gone"
+                    android:layout_marginStart="5dp">
+                    
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Prompt Queue?"
+                        android:textColor="#FF3B30"
+                        android:textSize="9sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="2dp" />
+                        
+                    <Button
+                        android:id="@+id/btn_queue_resume"
+                        android:layout_width="75dp"
+                        android:layout_height="28dp"
+                        android:text="Resume"
+                        android:textSize="10sp"
+                        android:padding="0dp"
+                        android:background="@drawable/card_glass"
+                        android:textColor="#4CD964" />
+                        
+                    <Button
+                        android:id="@+id/btn_queue_delete"
+                        android:layout_width="75dp"
+                        android:layout_height="28dp"
+                        android:text="Delete"
+                        android:textSize="10sp"
+                        android:padding="0dp"
+                        android:background="@drawable/card_glass"
+                        android:textColor="#FF3B30"
+                        android:layout_marginTop="2dp" />
+                        
+                    <Button
+                        android:id="@+id/btn_queue_combine"
+                        android:layout_width="75dp"
+                        android:layout_height="28dp"
+                        android:text="Combine"
+                        android:textSize="10sp"
+                        android:padding="0dp"
+                        android:background="@drawable/card_glass"
+                        android:textColor="#00F2FE"
+                        android:layout_marginTop="2dp" />
+                        
+                    <Button
+                        android:id="@+id/btn_queue_add"
+                        android:layout_width="75dp"
+                        android:layout_height="28dp"
+                        android:text="Add"
+                        android:textSize="10sp"
+                        android:padding="0dp"
+                        android:background="@drawable/card_glass"
+                        android:textColor="#E6E6FA"
+                        android:layout_marginTop="2dp" />
+                </LinearLayout>
+
             </LinearLayout>
 
             <TextView

@@ -56,6 +56,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
     private boolean mIsQueueExpanded = false;
 
     private PromptEditPopup mPromptEditPopup;
+    private UnresolvedQueueManager mUnresolvedQueueManager;
     private int mEditingPromptIndex = -1;
 
     // Artifacts popup views
@@ -252,6 +253,9 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                     mPromptQueue.addAll(queue);
                     if (mPromptQueueView != null) {
                         mPromptQueueView.render(mPromptQueue, mIsQueueExpanded);
+                    }
+                    if (mUnresolvedQueueManager != null) {
+                        mUnresolvedQueueManager.onStateOrQueueChanged(mCurrentState, mPromptQueue);
                     }
                 }
             }
@@ -491,6 +495,8 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         View queueContainer = findViewById(R.id.layout_queue_container);
         if (queueContainer != null) {
             mPromptQueueView = new PromptQueueView(queueContainer, this);
+            View root = findViewById(android.R.id.content);
+            mUnresolvedQueueManager = new UnresolvedQueueManager(this, root, mBtnSend, mEtMessage, queueContainer);
         }
 
         // Initialize Prompt Edit Popup
@@ -520,14 +526,29 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
 
                 @Override
                 public void onSend(String text) {
-                    // This is used for "Combine" or similar if we ever use it
+                    // Send the combined prompt
                     Intent intent = new Intent(MainActivity.this, ToggleTalkService.class);
                     intent.setAction("com.toggletalk.android.ACTION_SEND_PROMPT");
                     intent.putExtra("prompt", text);
-                    intent.putExtra("continue_session", mContinueSession);
+                    intent.putExtra("continue_session", true);
                     intent.putExtra("session_id", mSelectedSessionId);
                     intent.putExtra("bypass_antigravity", mBypassAntigravity);
                     startService(intent);
+                    
+                    // Clear the queue since they were combined
+                    Intent clearIntent = new Intent(MainActivity.this, ToggleTalkService.class);
+                    clearIntent.setAction("com.toggletalk.android.ACTION_CLEAR_QUEUE");
+                    startService(clearIntent);
+                    
+                    // Clear the main input text
+                    if (mEtMessage != null) {
+                        mEtMessage.setText("");
+                    }
+                    
+                    // Clear unresolved state
+                    if (mUnresolvedQueueManager != null) {
+                        mUnresolvedQueueManager.clearUnresolvedState();
+                    }
                 }
 
                 @Override
@@ -1591,6 +1612,13 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         mEditingPromptIndex = index;
         if (mPromptEditPopup != null) {
             mPromptEditPopup.show(text, false);
+        }
+    }
+
+    public void showPromptEditPopupForCombine(String text) {
+        mEditingPromptIndex = -1; // Not editing a specific one
+        if (mPromptEditPopup != null) {
+            mPromptEditPopup.show(text, true);
         }
     }
 
@@ -2731,6 +2759,10 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         mCurrentState = state;
         if (mCbMockMode != null) {
             mCbMockMode.setChecked(mBypassAntigravity);
+        }
+        
+        if (mUnresolvedQueueManager != null) {
+            mUnresolvedQueueManager.onStateOrQueueChanged(mCurrentState, mPromptQueue);
         }
 
         clearAllAnimations();

@@ -239,6 +239,17 @@ public class ToggleTalkService extends Service {
                         }
                     }
                 }
+            } else if ("com.toggletalk.android.ACTION_ENQUEUE_PROMPT".equals(action)) {
+                String prompt = intent.getStringExtra("prompt");
+                if (prompt != null && !prompt.trim().isEmpty()) {
+                    java.util.List<String> queue = mSessionQueues.get(mSelectedSessionId);
+                    if (queue == null) {
+                        queue = new java.util.ArrayList<>();
+                        mSessionQueues.put(mSelectedSessionId, queue);
+                    }
+                    queue.add(prompt);
+                    broadcastQueueChanged();
+                }
             } else if (ACTION_UPDATE_PROMPT.equals(action)) {
                 int index = intent.getIntExtra("index", -1);
                 String text = intent.getStringExtra("text");
@@ -257,6 +268,12 @@ public class ToggleTalkService extends Service {
                         queue.remove(index);
                         broadcastQueueChanged();
                     }
+                }
+            } else if ("com.toggletalk.android.ACTION_CLEAR_QUEUE".equals(action)) {
+                java.util.List<String> queue = mSessionQueues.get(mSelectedSessionId);
+                if (queue != null) {
+                    queue.clear();
+                    broadcastQueueChanged();
                 }
             } else if ("com.toggletalk.android.ACTION_GET_STATE".equals(action)) {
                 broadcastStateToApp();
