@@ -66,6 +66,16 @@ public class ToggleTalkService extends Service {
     private final java.util.Map<String, java.util.List<String>> mSessionQueues = new java.util.HashMap<>();
     private final java.util.Map<String, String> mSessionStates = new java.util.HashMap<>();
     private final java.util.Map<String, String> mSessionTexts = new java.util.HashMap<>();
+    private final java.util.Map<String, Long> mSessionLastUpdateTimes = new java.util.HashMap<>();
+
+    private final android.os.Handler mWatchdogHandler = new android.os.Handler();
+    private final Runnable mWatchdogRunnable = new Runnable() {
+        @Override
+        public void run() {
+            checkThinkingSessions();
+            mWatchdogHandler.postDelayed(this, 30000); // Check every 30 seconds
+        }
+    };
     
     private static class TtsItem {
         String sessionId;
@@ -197,7 +207,10 @@ public class ToggleTalkService extends Service {
         filter.addAction("com.toggletalk.android.ACTION_TERMINATE_TTS");
         filter.addAction(ACTION_TERMINATE_SESSION);
         registerReceiver(mTermuxReceiver, filter);
-        
+
+        // Start watchdog
+        mWatchdogHandler.postDelayed(mWatchdogRunnable, 30000);
+
         // Lazily initialize speech models in background thread so service creation is instant
         new Thread(new Runnable() {
             @Override
@@ -320,6 +333,12 @@ public class ToggleTalkService extends Service {
                     broadcastStateToApp();
                     broadcastQueueChanged(mSelectedSessionId);
                 }
+            } else if (ACTION_TERMINATE_SESSION.equals(action)) {
+                String sessionId = intent.getStringExtra("session_id");
+                if (sessionId == null || sessionId.isEmpty()) {
+                    sessionId = mSelectedSessionId;
+                }
+                terminateSession(sessionId);
             }
         }
         return START_STICKY;
@@ -1154,6 +1173,7 @@ public class ToggleTalkService extends Service {
         Log.d(TAG, "updateState for " + sessionId + ": " + state + ", text: " + text);
         mSessionStates.put(sessionId, state);
         mSessionTexts.put(sessionId, text);
+        mSessionLastUpdateTimes.put(sessionId, System.currentTimeMillis());
 
         if ("FINISHED".equals(state)) {
             checkAndRunNextInQueue(sessionId);
@@ -1233,6 +1253,47 @@ public class ToggleTalkService extends Service {
 
         // 3. Move state to IDLE
         updateState(sessionId, "IDLE", "Terminated");
+    }
+
+    private void checkThinkingSessions() {
+        long now = System.currentTimeMillis();
+        for (String sessionId : new java.util.ArrayList<>(mSessionStates.keySet())) {
+            if ("THINKING".equals(mSessionStates.get(sessionId))) {
+                Long lastUpdate = mSessionLastUpdateTimes.get(sessionId);
+                if (lastUpdate != null && (now - lastUpdate > 120000)) { // No update for 120 seconds
+                    Log.d(TAG, "Watchdog: Session " + sessionId + " stuck in THINKING for 120s. Verifying...");
+                    verifySessionProcess(sessionId);
+                }
+            }
+        }
+    }
+
+    private void verifySessionProcess(String sessionId) {
+        String pidFilePath = "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain/" + sessionId + "/.system_generated/logs/run.pid";
+        Intent verifyIntent = new Intent();
+        verifyIntent.setClassName("com.termux", "com.termux.app.RunCommandService");
+        verifyIntent.setAction("com.termux.RUN_COMMAND");
+        verifyIntent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash");
+        
+        // Command to check if PID is alive and broadcast back if NOT alive
+        String cmd = "if [ -f " + pidFilePath + " ]; then " +
+                     "  PID=$(cat " + pidFilePath + "); " +
+                     "  if ! kill -0 $PID 2>/dev/null; then " +
+                     "    echo \"PID $PID is dead, broadcasting termination\"; " +
+                     "    am broadcast --user 0 -p com.toggletalk.android -a com.toggletalk.android.ACTION_TERMINATE_SESSION --es session_id " + sessionId + "; " +
+                     "  fi; " +
+                     "else " +
+                     "  echo \"PID file missing, broadcasting termination\"; " +
+                     "  am broadcast --user 0 -p com.toggletalk.android -a com.toggletalk.android.ACTION_TERMINATE_SESSION --es session_id " + sessionId + "; " +
+                     "fi";
+                     
+        verifyIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{"-c", cmd});
+        verifyIntent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
+        try {
+            startService(verifyIntent);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to start verify command", e);
+        }
     }
 
     private Notification buildNotification(String state, String text) {
@@ -1327,6 +1388,7 @@ public class ToggleTalkService extends Service {
     @Override
     public void onDestroy() {
         Log.d(TAG, "Service onDestroy");
+        mWatchdogHandler.removeCallbacks(mWatchdogRunnable);
         mIsRecordingAudio = false;
         mIsPlayingAudio = false;
         cleanupAudioTrack();

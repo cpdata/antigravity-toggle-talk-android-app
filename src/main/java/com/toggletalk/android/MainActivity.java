@@ -81,7 +81,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
     private ImageButton mBtnMic;
     private ProgressBar mPbThinking;
     private View mLayoutThinkingContainer;
-    private View mBtnTerminate;
+    private ImageButton mBtnTerminate;
     private View mBtnUpload;
     private final java.util.Map<Integer, android.text.Spanned> mRenderedTextCache = new java.util.HashMap<>();
     private final java.util.Map<Integer, android.text.Spanned> mRenderedCodeCache = new java.util.HashMap<>();
@@ -535,6 +535,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         mBtnTerminate = findViewById(R.id.btn_terminate);
         if (mBtnTerminate != null) {
             mBtnTerminate.setOnClickListener(v -> {
+                Log.d("MainActivity", "Terminate button clicked for session: " + mSelectedSessionId);
                 Intent intent = new Intent(MainActivity.this, ToggleTalkService.class);
                 intent.setAction("com.toggletalk.android.ACTION_TERMINATE_SESSION");
                 intent.putExtra("session_id", mSelectedSessionId);
@@ -1501,7 +1502,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         return sb.toString().trim();
     }
 
-    private int mCurrentDisplayLimit = 50;
+    private int mCurrentDisplayLimit = 250;
 
     private void displayMessages(final org.json.JSONArray array, boolean showAll) {
         mShowAllEarlierMessages = showAll;
@@ -2114,7 +2115,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         float density = getResources().getDisplayMetrics().density;
         
         final TextView tv = new TextView(this);
-        tv.setText("... (" + count + " earlier messages omitted. Tap to load 50 more) ...");
+        tv.setText("... (" + count + " earlier messages omitted. Tap to load 250 more) ...");
         tv.setTextColor(Color.parseColor("#60FFFFFF"));
         tv.setTextSize(12);
         tv.setPadding((int)(8 * density), (int)(5 * density), (int)(8 * density), (int)(5 * density));
@@ -2146,7 +2147,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
             tv.setVisibility(View.GONE);
             pb.setVisibility(View.VISIBLE);
             new android.os.Handler().postDelayed(() -> {
-                mCurrentDisplayLimit += 50;
+                mCurrentDisplayLimit += 250;
                 displayMessages(array, false);
             }, 400);
         });
