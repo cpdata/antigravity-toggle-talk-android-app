@@ -64,7 +64,8 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
     private View mBtnArtifactsClose;
     private View mArtifactsDimBackground;
     private android.widget.LinearLayout mLayoutArtifactsList;
-    private TextView mBtnArtifacts;
+    private ImageButton mBtnArtifacts;
+    private View mBtnFlush;
 
     private View mSettingsPopupRoot;
     private TextView mBtnSettings;
@@ -308,6 +309,11 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                 if (state != null) {
                     onStateChanged(state, text != null ? text : "");
                 }
+                
+                boolean ttsQueueEmpty = intent.getBooleanExtra("tts_queue_empty", true);
+                if (mBtnFlush != null) {
+                    mBtnFlush.setVisibility(ttsQueueEmpty ? View.GONE : View.VISIBLE);
+                }
             }
         }
     };
@@ -500,6 +506,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         });
 
         View btnFlush = findViewById(R.id.btn_flush);
+        mBtnFlush = btnFlush;
         if (btnFlush != null) {
             btnFlush.setOnClickListener(v -> {
                 Intent intent = new Intent("com.toggletalk.android.ACTION_TERMINATE_TTS");

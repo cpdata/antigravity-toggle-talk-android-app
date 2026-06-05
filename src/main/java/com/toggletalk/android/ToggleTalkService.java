@@ -1119,6 +1119,13 @@ public class ToggleTalkService extends Service {
         intent.putExtra("continue_session", mContinueSession);
         intent.putExtra("bypass_antigravity", mBypassAntigravity);
         intent.putExtra(EXTRA_DIRECTORY, mTargetDirectory);
+        
+        boolean queueEmpty = true;
+        synchronized (mTtsQueue) {
+            queueEmpty = mTtsQueue.isEmpty() && !mIsTtsPlaying;
+        }
+        intent.putExtra("tts_queue_empty", queueEmpty);
+        
         sendBroadcast(intent);
     }
 
