@@ -6,6 +6,39 @@ TARGET_DIR="${2:-$HOME}"
 CONTINUE_SESSION="${3:-false}"
 SESSION_ID="$4"
 
+# PID Process Tracking for active session termination
+if [ -n "$SESSION_ID" ]; then
+    PID_FILE="$HOME/.gemini/antigravity-cli/brain/$SESSION_ID/.system_generated/logs/run.pid"
+    mkdir -p "$(dirname "$PID_FILE")"
+    echo "$$" > "$PID_FILE"
+else
+    # Capture initial directories to detect the new session folder when it is created
+    INITIAL_DIRS=$(ls -d "$HOME/.gemini/antigravity-cli/brain"/*/ 2>/dev/null)
+    (
+        # Wait in background up to 30 seconds for the new session directory to appear
+        for i in $(seq 1 150); do
+            CURRENT_DIRS=$(ls -d "$HOME/.gemini/antigravity-cli/brain"/*/ 2>/dev/null)
+            NEW_DIR=""
+            for d in $CURRENT_DIRS; do
+                if ! echo "$INITIAL_DIRS" | grep -qF "$d"; then
+                    NEW_DIR="$d"
+                    break
+                fi
+            done
+            if [ -n "$NEW_DIR" ]; then
+                SESS_ID=$(basename "$NEW_DIR")
+                PID_FILE="$HOME/.gemini/antigravity-cli/brain/$SESS_ID/.system_generated/logs/run.pid"
+                mkdir -p "$(dirname "$PID_FILE")"
+                echo "$PPID" > "$PID_FILE"
+                break
+            fi
+            sleep 0.2
+        done
+    ) &
+fi
+
+trap 'rm -f "$HOME/.gemini/antigravity-cli/brain/$SESSION_ID/.system_generated/logs/run.pid"' EXIT
+
 LOG_FILE="$HOME/.toggle_talk_antigravity.log"
 ERR_FILE="$HOME/.toggle_talk_antigravity.err"
 

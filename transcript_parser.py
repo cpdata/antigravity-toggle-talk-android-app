@@ -15,6 +15,30 @@ def parse_transcript_steps(raw_steps):
     messages = []
     num_steps = len(raw_steps)
 
+    # Segment the raw steps list into logical turn blocks.
+    user_input_indices = [i for i, step in enumerate(raw_steps) if step.get("type") == "USER_INPUT"]
+    blocks = []
+    if not user_input_indices:
+        blocks.append((0, num_steps))
+    else:
+        if user_input_indices[0] > 0:
+            blocks.append((0, user_input_indices[0]))
+        for i in range(len(user_input_indices)):
+            start = user_input_indices[i]
+            end = user_input_indices[i+1] if i + 1 < len(user_input_indices) else num_steps
+            blocks.append((start, end))
+
+    # Identify the last planner response of each block.
+    final_planner_response_indices = set()
+    for start, end in blocks:
+        last_pr_idx = -1
+        for idx in range(start, end):
+            step = raw_steps[idx]
+            if step.get("type") == "PLANNER_RESPONSE" and step.get("source") == "MODEL":
+                last_pr_idx = idx
+        if last_pr_idx != -1:
+            final_planner_response_indices.add(last_pr_idx)
+
     for idx, obj in enumerate(raw_steps):
         msg_type = obj.get("type", "")
         source = obj.get("source", "")
@@ -35,50 +59,16 @@ def parse_transcript_steps(raw_steps):
                 messages.append({"role": "user", "text": text})
 
         elif msg_type == "PLANNER_RESPONSE" and source == "MODEL":
-            # Check if this is the final agent response of a turn.
-            # It is final if:
-            # 1. It has no tool calls AND
-            # 2. There are no subsequent steps before the next USER_INPUT or the end of the file.
-            is_final = False
-            if not tool_calls:
-                is_final = True
-                for next_idx in range(idx + 1, num_steps):
-                    next_obj = raw_steps[next_idx]
-                    next_type = next_obj.get("type", "")
-                    if next_type == "USER_INPUT":
-                        break
-                    else:
-                        is_final = False
-                        break
+            # Only set is_final = True for the last planner response of the turn block
+            is_final = (idx in final_planner_response_indices)
 
             stripped_content = content.strip() if content else ""
             if stripped_content:
                 status = obj.get("status", "")
-                if "<tts" in stripped_content:
-                    parts = stripped_content.split("<tts>")
-                    thoughts = []
-                    agents = []
-                    if parts[0].strip():
-                        thoughts.append(parts[0].strip())
-                    for part in parts[1:]:
-                        subparts = part.split("</tts>")
-                        if subparts[0].strip():
-                            agents.append(subparts[0].strip())
-                        if len(subparts) > 1:
-                            for after in subparts[1:]:
-                                if after.strip():
-                                    thoughts.append(after.strip())
-                    thought_text = " ".join(thoughts).strip()
-                    agent_text = " ".join(agents).strip()
-                    if thought_text:
-                        messages.append({"role": "thought", "text": thought_text})
-                    if agent_text:
-                        messages.append({"role": "agent", "text": agent_text})
+                if is_final and status == "DONE":
+                    messages.append({"role": "agent", "text": stripped_content})
                 else:
-                    if is_final and status == "DONE":
-                        messages.append({"role": "agent", "text": stripped_content})
-                    else:
-                        messages.append({"role": "thought", "text": stripped_content})
+                    messages.append({"role": "thought", "text": stripped_content})
 
             for tc in tool_calls:
                 tc_name = tc.get("name", "")
