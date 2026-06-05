@@ -112,18 +112,20 @@ public class MainActivity extends Activity {
         }
     }
     
-    private static class ToolResultHolder {
+    private static class CollapsibleBubbleHolder {
         final android.widget.LinearLayout layout;
         final TextView headerTv;
         final TextView contentTv;
         final String headerText;
+        final int index;
         boolean expanded = false;
 
-        ToolResultHolder(android.widget.LinearLayout layout, TextView headerTv, TextView contentTv, String headerText) {
+        CollapsibleBubbleHolder(android.widget.LinearLayout layout, TextView headerTv, TextView contentTv, String headerText, int index) {
             this.layout = layout;
             this.headerTv = headerTv;
             this.contentTv = contentTv;
             this.headerText = headerText;
+            this.index = index;
         }
 
         void setExpanded(boolean exp) {
@@ -134,7 +136,8 @@ public class MainActivity extends Activity {
     }
     
     private final List<SessionItem> mSessionsList = new ArrayList<>();
-    private final List<ToolResultHolder> mToolResultHolders = new ArrayList<>();
+    private final List<CollapsibleBubbleHolder> mCollapsibleBubbleHolders = new ArrayList<>();
+    private final java.util.Set<Integer> mExpandedIndices = new java.util.HashSet<>();
     private ArrayAdapter<SessionItem> mSessionsAdapter;
 
     private static final String ACTION_SESSIONS_LIST = "com.toggletalk.android.ACTION_SESSIONS_LIST";
@@ -154,30 +157,21 @@ public class MainActivity extends Activity {
     private boolean mShowAllEarlierMessages = false;
     private org.json.JSONArray mCurrentSessionHistory = new org.json.JSONArray();
 
-    // Tracks collapsible thought/tool_call blocks for in-place expand/collapse
-    private static class CollapsibleBlockHolder {
-        final android.widget.LinearLayout childrenContainer;
-        final TextView headerTv;
-        final int thoughtsCount;
-        final int toolCallsCount;
-        boolean expanded;
+    private final android.os.Handler mStreamHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private String mBufferedSessionId = "";
+    private String mBufferedMessagesJson = "";
+    private String mBufferedFilePath = "";
+    private boolean mStreamUpdatePending = false;
+    private long mLastStreamUpdateTime = 0;
 
-        CollapsibleBlockHolder(android.widget.LinearLayout childrenContainer, TextView headerTv,
-                               int thoughtsCount, int toolCallsCount, boolean expanded) {
-            this.childrenContainer = childrenContainer;
-            this.headerTv = headerTv;
-            this.thoughtsCount = thoughtsCount;
-            this.toolCallsCount = toolCallsCount;
-            this.expanded = expanded;
+    private final Runnable mStreamUpdateRunnable = new Runnable() {
+        @Override
+        public void run() {
+            mStreamUpdatePending = false;
+            mLastStreamUpdateTime = System.currentTimeMillis();
+            performStreamedDisplay(mBufferedSessionId, mBufferedMessagesJson, mBufferedFilePath);
         }
-
-        void setExpanded(boolean exp) {
-            this.expanded = exp;
-            childrenContainer.setVisibility(exp ? View.VISIBLE : View.GONE);
-            headerTv.setText((exp ? "▼ " : "▶ ") + "[" + thoughtsCount + "] thoughts, [" + toolCallsCount + "] tool calls");
-        }
-    }
-    private final List<CollapsibleBlockHolder> mCollapsibleBlockHolders = new ArrayList<>();
+    };
     private View mNewChatStartedBubble = null;
     private String mLastStreamedAgentText = "";
 
@@ -358,8 +352,7 @@ public class MainActivity extends Activity {
             mBtnExpandAll.setOnClickListener(v -> {
                 mShowThoughtsAndToolCalls = !mShowThoughtsAndToolCalls;
                 mBtnExpandAll.setText(mShowThoughtsAndToolCalls ? "▼ Collapse All" : "▶ Expand All");
-                // Toggle collapsible blocks in-place without rebuilding the display
-                for (CollapsibleBlockHolder holder : mCollapsibleBlockHolders) {
+                for (CollapsibleBubbleHolder holder : mCollapsibleBubbleHolders) {
                     holder.setExpanded(mShowThoughtsAndToolCalls);
                 }
             });
@@ -630,6 +623,7 @@ public class MainActivity extends Activity {
         mCurrentSessionHistory = new org.json.JSONArray();
         mShowAllEarlierMessages = false;
         mLastStreamedAgentText = "";
+        mExpandedIndices.clear();
         mSessionsAdapter.notifyDataSetChanged();
 
         mNewChatStartedBubble = addSystemMessage("✦ New chat started. Type or speak your message.", "#00F2FE");
@@ -1018,6 +1012,7 @@ public class MainActivity extends Activity {
         mCurrentSessionHistory = new org.json.JSONArray();
         mShowAllEarlierMessages = false;
         mLastStreamedAgentText = "";
+        mExpandedIndices.clear();
 
         // Check if cached session history exists on the app side
         java.io.File cacheDir = new java.io.File(getCacheDir(), "session_history_cache");
@@ -1162,8 +1157,7 @@ public class MainActivity extends Activity {
     }
 
     private void displayMessagesInternal(final org.json.JSONArray array, int limitCount, boolean showAll) {
-        mToolResultHolders.clear();
-        mCollapsibleBlockHolders.clear();
+        mCollapsibleBubbleHolders.clear();
         updateBtnExpandAllText();
         boolean wasAtBottom = isScrolledToBottom();
         if (mChatContainer != null) mChatContainer.removeAllViews();
@@ -1176,7 +1170,6 @@ public class MainActivity extends Activity {
             addOmittedMessagesClickable(start, array);
         }
 
-        java.util.List<org.json.JSONObject> pendingCollapsible = new java.util.ArrayList<>();
         boolean hasAgentResponseAtEnd = false;
 
         for (int i = start; i < total; i++) {
@@ -1187,12 +1180,8 @@ public class MainActivity extends Activity {
                 if (text.isEmpty()) continue;
 
                 if ("thought".equals(role) || "tool_call".equals(role) || "tool_result".equals(role)) {
-                    pendingCollapsible.add(msg);
+                    addCollapsibleBubble(role, text, i);
                 } else {
-                    if (!pendingCollapsible.isEmpty()) {
-                        addCollapsibleBlock(pendingCollapsible);
-                        pendingCollapsible.clear();
-                    }
                     if ("user".equals(role)) {
                         addUserBubble(text);
                         hasAgentResponseAtEnd = false;
@@ -1207,11 +1196,6 @@ public class MainActivity extends Activity {
             }
         }
 
-        if (!pendingCollapsible.isEmpty()) {
-            addCollapsibleBlock(pendingCollapsible);
-            pendingCollapsible.clear();
-        }
-
         if (mIsAgentActive && !hasAgentResponseAtEnd && mActiveAgentTextView == null) {
             addAgentBubble("...");
         }
@@ -1219,120 +1203,14 @@ public class MainActivity extends Activity {
         scrollToBottomIfNeeded(wasAtBottom);
     }
 
-    private void addCollapsibleBlock(final java.util.List<org.json.JSONObject> messages) {
-        if (mChatContainer == null || messages.isEmpty()) return;
+    private void addCollapsibleBubble(String role, String text, int index) {
+        if (mChatContainer == null || text == null || text.isEmpty()) return;
 
         float density = getResources().getDisplayMetrics().density;
 
-        // Separate tool_result messages from thoughts/tool_calls
-        java.util.List<org.json.JSONObject> thoughtsAndCalls = new java.util.ArrayList<>();
-        java.util.List<org.json.JSONObject> toolResults = new java.util.ArrayList<>();
-        for (org.json.JSONObject msg : messages) {
-            String role = msg.optString("role", "");
-            if ("tool_result".equals(role)) {
-                toolResults.add(msg);
-            } else {
-                thoughtsAndCalls.add(msg);
-            }
-        }
-
-        // --- Thoughts & tool_call collapsible block (respects Expand/Collapse All) ---
-        if (!thoughtsAndCalls.isEmpty()) {
-            int thoughtsCount = 0;
-            int toolCallsCount = 0;
-            for (org.json.JSONObject msg : thoughtsAndCalls) {
-                String role = msg.optString("role", "");
-                if ("thought".equals(role)) thoughtsCount++;
-                else if ("tool_call".equals(role)) toolCallsCount++;
-            }
-
-            final android.widget.LinearLayout blockLayout = new android.widget.LinearLayout(this);
-            blockLayout.setOrientation(android.widget.LinearLayout.VERTICAL);
-            android.widget.LinearLayout.LayoutParams blockLp = new android.widget.LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            blockLp.setMargins(0, (int)(4 * density), 0, (int)(4 * density));
-            blockLayout.setLayoutParams(blockLp);
-
-            final TextView headerTv = new TextView(this);
-            headerTv.setTextColor(Color.parseColor("#00F2FE"));
-            headerTv.setTextSize(12);
-            headerTv.setPadding((int)(12 * density), (int)(6 * density), (int)(12 * density), (int)(6 * density));
-            headerTv.setClickable(true);
-            headerTv.setFocusable(true);
-
-            android.graphics.drawable.GradientDrawable headerGd = new android.graphics.drawable.GradientDrawable();
-            headerGd.setColor(Color.parseColor("#1A00F2FE"));
-            headerGd.setCornerRadius(density * 8);
-            headerGd.setStroke((int)density, Color.parseColor("#3300F2FE"));
-            headerTv.setBackground(headerGd);
-
-            android.widget.LinearLayout.LayoutParams headerLp = new android.widget.LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            headerLp.setMargins((int)(8 * density), 0, (int)(8 * density), 0);
-            headerTv.setLayoutParams(headerLp);
-            blockLayout.addView(headerTv);
-
-            final android.widget.LinearLayout childrenContainer = new android.widget.LinearLayout(this);
-            childrenContainer.setOrientation(android.widget.LinearLayout.VERTICAL);
-            android.widget.LinearLayout.LayoutParams childrenLp = new android.widget.LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            childrenLp.setMargins((int)(12 * density), (int)(4 * density), (int)(12 * density), 0);
-            childrenContainer.setLayoutParams(childrenLp);
-
-            for (org.json.JSONObject msg : thoughtsAndCalls) {
-                String role = msg.optString("role", "");
-                String text = msg.optString("text", "");
-                if (text.isEmpty()) continue;
-
-                TextView tv = new TextView(this);
-                tv.setText(renderMarkdown(text));
-                tv.setTextSize(11);
-                tv.setPadding((int)(8 * density), (int)(5 * density), (int)(8 * density), (int)(5 * density));
-                tv.setTextIsSelectable(true);
-
-                android.graphics.drawable.GradientDrawable childGd = new android.graphics.drawable.GradientDrawable();
-                if ("thought".equals(role)) {
-                    tv.setTextColor(Color.parseColor("#D0FFFFFF"));
-                    childGd.setColor(Color.parseColor("#1AFFFFFF"));
-                    childGd.setStroke((int)density, Color.parseColor("#1AFFFFFF"));
-                } else {
-                    tv.setTextColor(Color.parseColor("#A0E6FF"));
-                    tv.setTypeface(android.graphics.Typeface.MONOSPACE);
-                    childGd.setColor(Color.parseColor("#1000F2FE"));
-                    childGd.setStroke((int)density, Color.parseColor("#2000F2FE"));
-                }
-                childGd.setCornerRadius(density * 6);
-                tv.setBackground(childGd);
-
-                android.widget.LinearLayout.LayoutParams tvLp = new android.widget.LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-                tvLp.setMargins(0, 0, 0, (int)(4 * density));
-                tv.setLayoutParams(tvLp);
-                childrenContainer.addView(tv);
-            }
-
-            blockLayout.addView(childrenContainer);
-
-            final CollapsibleBlockHolder blockHolder = new CollapsibleBlockHolder(
-                    childrenContainer, headerTv, thoughtsCount, toolCallsCount, mShowThoughtsAndToolCalls);
-            mCollapsibleBlockHolders.add(blockHolder);
-            blockHolder.setExpanded(mShowThoughtsAndToolCalls);
-
-            headerTv.setOnClickListener(v -> {
-                blockHolder.setExpanded(!blockHolder.expanded);
-            });
-
-            mChatContainer.addView(blockLayout);
-        }
-
-        // --- Tool result bubbles (always collapsed, independent of Expand/Collapse All) ---
-        for (org.json.JSONObject msg : toolResults) {
-            String text = msg.optString("text", "");
-            if (text.isEmpty()) continue;
-
-            // Parse header (first line) and content (rest)
-            String header;
-            String content;
+        String header;
+        String content;
+        if ("tool_result".equals(role)) {
             int firstNewline = text.indexOf('\n');
             if (firstNewline != -1) {
                 header = text.substring(0, firstNewline).trim();
@@ -1341,37 +1219,64 @@ public class MainActivity extends Activity {
                 header = text.trim();
                 content = "";
             }
+        } else if ("thought".equals(role)) {
+            header = "Thought";
+            content = text;
+        } else { // tool_call
+            header = "Tool Call";
+            content = text;
+        }
 
-            final android.widget.LinearLayout toolLayout = new android.widget.LinearLayout(this);
-            toolLayout.setOrientation(android.widget.LinearLayout.VERTICAL);
-            toolLayout.setPadding((int)(8 * density), (int)(5 * density), (int)(8 * density), (int)(5 * density));
-            toolLayout.setClickable(true);
-            toolLayout.setFocusable(true);
+        final android.widget.LinearLayout bubbleLayout = new android.widget.LinearLayout(this);
+        bubbleLayout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        bubbleLayout.setPadding((int)(8 * density), (int)(6 * density), (int)(8 * density), (int)(6 * density));
+        bubbleLayout.setClickable(true);
+        bubbleLayout.setFocusable(true);
 
-            android.graphics.drawable.GradientDrawable toolGd = new android.graphics.drawable.GradientDrawable();
-            toolGd.setColor(Color.parseColor("#0D00F2FE"));
-            toolGd.setStroke((int)density, Color.parseColor("#2600F2FE"));
-            toolGd.setCornerRadius(density * 6);
-            toolLayout.setBackground(toolGd);
+        android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
+        gd.setCornerRadius(density * 8);
 
-            android.widget.LinearLayout.LayoutParams toolLp = new android.widget.LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            toolLp.setMargins((int)(8 * density), (int)(2 * density), (int)(8 * density), (int)(2 * density));
-            toolLayout.setLayoutParams(toolLp);
+        if ("thought".equals(role)) {
+            gd.setColor(Color.parseColor("#10FFFFFF"));
+            gd.setStroke((int)density, Color.parseColor("#1AFFFFFF"));
+        } else if ("tool_call".equals(role)) {
+            gd.setColor(Color.parseColor("#0D00F2FE"));
+            gd.setStroke((int)density, Color.parseColor("#2000F2FE"));
+        } else { // tool_result
+            gd.setColor(Color.parseColor("#0800F2FE"));
+            gd.setStroke((int)density, Color.parseColor("#1A00F2FE"));
+        }
+        bubbleLayout.setBackground(gd);
 
-            // Header label
-            final TextView toolHeaderTv = new TextView(this);
-            toolHeaderTv.setTextSize(11);
-            toolHeaderTv.setTextColor(Color.parseColor("#00F2FE"));
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMargins((int)(8 * density), (int)(3 * density), (int)(8 * density), (int)(3 * density));
+        bubbleLayout.setLayoutParams(lp);
 
-            // Content view - don't use setTextColor so HTML <font color> tags work for syntax highlighting
-            final TextView contentTv = new TextView(this);
-            contentTv.setTextSize(10);
+        // Header TextView
+        final TextView headerTv = new TextView(this);
+        headerTv.setTextSize(11);
+        if ("thought".equals(role)) {
+            headerTv.setTextColor(Color.parseColor("#D0FFFFFF"));
+        } else {
+            headerTv.setTextColor(Color.parseColor("#00F2FE"));
+        }
+
+        // Content TextView
+        final TextView contentTv = new TextView(this);
+        contentTv.setTextSize(10);
+        contentTv.setTextIsSelectable(true);
+        contentTv.setPadding(0, (int)(4 * density), 0, 0);
+
+        if ("thought".equals(role)) {
+            contentTv.setTextColor(Color.parseColor("#D0FFFFFF"));
+            contentTv.setText(renderMarkdown(content));
+        } else if ("tool_call".equals(role)) {
+            contentTv.setTextColor(Color.parseColor("#A0E6FF"));
             contentTv.setTypeface(android.graphics.Typeface.MONOSPACE);
-            contentTv.setTextIsSelectable(true);
-            contentTv.setPadding(0, (int)(4 * density), 0, 0);
-
-            // Render content with syntax highlighting or plain monospace
+            contentTv.setText(renderMarkdown(content));
+        } else { // tool_result
+            contentTv.setTypeface(android.graphics.Typeface.MONOSPACE);
             if (!content.isEmpty()) {
                 String lang = detectLanguage(content, header);
                 String htmlContent;
@@ -1386,30 +1291,45 @@ public class MainActivity extends Activity {
                     contentTv.setText(android.text.Html.fromHtml(htmlContent));
                 }
             }
-
-            toolLayout.addView(toolHeaderTv);
-            toolLayout.addView(contentTv);
-
-            final ToolResultHolder holder = new ToolResultHolder(toolLayout, toolHeaderTv, contentTv, header);
-            mToolResultHolders.add(holder);
-            holder.setExpanded(false); // Always start collapsed
-
-            View.OnClickListener clickListener = v -> toggleToolResult(holder);
-            toolLayout.setOnClickListener(clickListener);
-            toolHeaderTv.setOnClickListener(clickListener);
-
-            mChatContainer.addView(toolLayout);
         }
+
+        bubbleLayout.addView(headerTv);
+        bubbleLayout.addView(contentTv);
+
+        final CollapsibleBubbleHolder holder = new CollapsibleBubbleHolder(bubbleLayout, headerTv, contentTv, header, index);
+        mCollapsibleBubbleHolders.add(holder);
+
+        // Determine if it should be expanded initially
+        boolean shouldExpand = mShowThoughtsAndToolCalls || mExpandedIndices.contains(index);
+        holder.setExpanded(shouldExpand);
+
+        View.OnClickListener clickListener = v -> toggleCollapsibleBubble(holder);
+        bubbleLayout.setOnClickListener(clickListener);
+        headerTv.setOnClickListener(clickListener);
+
+        mChatContainer.addView(bubbleLayout);
     }
 
-    private void toggleToolResult(ToolResultHolder clickedHolder) {
+    private void toggleCollapsibleBubble(CollapsibleBubbleHolder clickedHolder) {
         boolean targetState = !clickedHolder.expanded;
-        // Collapse all others when expanding
-        if (targetState) {
-            for (ToolResultHolder holder : mToolResultHolders) {
-                if (holder != clickedHolder && holder.expanded) {
-                    holder.setExpanded(false);
+        if (!mShowThoughtsAndToolCalls) {
+            // Expand All is NOT toggled -> collapse all others when expanding
+            if (targetState) {
+                mExpandedIndices.clear();
+                mExpandedIndices.add(clickedHolder.index);
+                for (CollapsibleBubbleHolder holder : mCollapsibleBubbleHolders) {
+                    if (holder != clickedHolder && holder.expanded) {
+                        holder.setExpanded(false);
+                    }
                 }
+            } else {
+                mExpandedIndices.remove(clickedHolder.index);
+            }
+        } else {
+            if (targetState) {
+                mExpandedIndices.add(clickedHolder.index);
+            } else {
+                mExpandedIndices.remove(clickedHolder.index);
             }
         }
         clickedHolder.setExpanded(targetState);
@@ -1445,6 +1365,24 @@ public class MainActivity extends Activity {
     }
 
     private void handleStreamedDisplay(String sessionId, String messagesJson, String filePath) {
+        mBufferedSessionId = sessionId;
+        mBufferedMessagesJson = messagesJson;
+        mBufferedFilePath = filePath;
+
+        long now = System.currentTimeMillis();
+        long timeSinceLastUpdate = now - mLastStreamUpdateTime;
+        long delay = 150 - timeSinceLastUpdate;
+
+        if (delay <= 0) {
+            mStreamHandler.removeCallbacks(mStreamUpdateRunnable);
+            mStreamUpdateRunnable.run();
+        } else if (!mStreamUpdatePending) {
+            mStreamUpdatePending = true;
+            mStreamHandler.postDelayed(mStreamUpdateRunnable, delay);
+        }
+    }
+
+    private void performStreamedDisplay(String sessionId, String messagesJson, String filePath) {
         try {
             String jsonContent = messagesJson;
             if ((jsonContent == null || jsonContent.isEmpty()) && filePath != null && !filePath.isEmpty()) {
@@ -1480,7 +1418,7 @@ public class MainActivity extends Activity {
                 displayMessages(mCurrentSessionHistory, mShowAllEarlierMessages);
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error handling streamed display", e);
+            Log.e(TAG, "Error performing streamed display", e);
         }
     }
 
@@ -1631,25 +1569,9 @@ public class MainActivity extends Activity {
             mTypeHandler.removeCallbacks(mTypeRunnable);
         }
         
-        final int[] index = {0};
-        mTypeRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (index[0] <= fullText.length()) {
-                    String part = fullText.substring(0, index[0]);
-                    boolean wasAtBottom = isScrolledToBottom();
-                    mActiveAgentTextView.setText(renderMarkdown(part));
-                    scrollToBottomIfNeeded(wasAtBottom);
-                    index[0] += 8;
-                    mTypeHandler.postDelayed(this, 15);
-                } else {
-                    boolean wasAtBottom = isScrolledToBottom();
-                    mActiveAgentTextView.setText(renderMarkdown(fullText));
-                    scrollToBottomIfNeeded(wasAtBottom);
-                }
-            }
-        };
-        mTypeHandler.post(mTypeRunnable);
+        boolean wasAtBottom = isScrolledToBottom();
+        mActiveAgentTextView.setText(renderMarkdown(fullText));
+        scrollToBottomIfNeeded(wasAtBottom);
     }
 
     private boolean isScrolledToBottom() {
@@ -1881,14 +1803,14 @@ public class MainActivity extends Activity {
         String highlighted = highlightCode(escaped, lang);
         String formatted = replaceSpacesOutsideTags(highlighted)
                                       .replace("\n", "<br/>");
-        return "<br/><font face=\"monospace\" color=\"#A0E6FF\"><tt>" + formatted + "</tt></font><br/>";
+        return "<br/><font face=\"monospace\"><tt>" + formatted + "</tt></font><br/>";
     }
 
     private static String renderPlainMonospace(String text) {
         String escaped = escapeHtml(text);
         String formatted = replaceSpacesOutsideTags(escaped)
                                       .replace("\n", "<br/>");
-        return "<font face=\"monospace\" color=\"#A0E6FF\"><tt>" + formatted + "</tt></font>";
+        return "<font face=\"monospace\"><tt>" + formatted + "</tt></font>";
     }
 
     private static android.text.Spanned renderMarkdown(String markdown) {
