@@ -1,0 +1,19 @@
+{
+  "id": "ztcco2",
+  "title": "Part 1: Turn Parsing and PID Process Tracking",
+  "description": "Implement turn parsing in Python and PID tracking in run_antigravity.sh. Ref: work_reports/tasks_subdivision/1_turn_parsing_and_pid_tracking.md",
+  "status": "pending",
+  "priority": 0.1,
+  "assignedTo": "main-agent",
+  "dependencies": [],
+  "payload": {},
+  "metadata": {
+    "createdAt": "2026-06-05T10:09:17.137Z",
+    "updatedAt": "2026-06-05T10:09:17.137Z",
+    "createdBy": "main-agent",
+    "tags": [],
+    "requiredCapabilities": [],
+    "maxRetries": 3,
+    "retryCount": 0
+  }
+}
