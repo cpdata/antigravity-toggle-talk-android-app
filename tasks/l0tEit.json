@@ -1,0 +1,22 @@
+{
+  "id": "l0tEit",
+  "title": "Add Approve / Deny request UI elements",
+  "description": "Add buttons that display at the bottom of the conversation view when the agent needs to request permission from user. Also create a option selector UI for when the agent presents options. ",
+  "status": "pending",
+  "priority": 0.3,
+  "assignedTo": "main-agent",
+  "dependencies": [],
+  "payload": {},
+  "metadata": {
+    "createdAt": "2026-06-05T14:09:20.345Z",
+    "updatedAt": "2026-06-05T14:09:20.345Z",
+    "createdBy": "main-agent",
+    "tags": [
+      "feature",
+      "ui"
+    ],
+    "requiredCapabilities": [],
+    "maxRetries": 3,
+    "retryCount": 0
+  }
+}
