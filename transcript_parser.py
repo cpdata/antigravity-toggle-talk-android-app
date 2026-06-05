@@ -53,10 +53,32 @@ def parse_transcript_steps(raw_steps):
 
             stripped_content = content.strip() if content else ""
             if stripped_content:
-                if is_final:
-                    messages.append({"role": "agent", "text": stripped_content})
+                status = obj.get("status", "")
+                if "<tts" in stripped_content:
+                    parts = stripped_content.split("<tts>")
+                    thoughts = []
+                    agents = []
+                    if parts[0].strip():
+                        thoughts.append(parts[0].strip())
+                    for part in parts[1:]:
+                        subparts = part.split("</tts>")
+                        if subparts[0].strip():
+                            agents.append(subparts[0].strip())
+                        if len(subparts) > 1:
+                            for after in subparts[1:]:
+                                if after.strip():
+                                    thoughts.append(after.strip())
+                    thought_text = " ".join(thoughts).strip()
+                    agent_text = " ".join(agents).strip()
+                    if thought_text:
+                        messages.append({"role": "thought", "text": thought_text})
+                    if agent_text:
+                        messages.append({"role": "agent", "text": agent_text})
                 else:
-                    messages.append({"role": "thought", "text": stripped_content})
+                    if is_final and status == "DONE":
+                        messages.append({"role": "agent", "text": stripped_content})
+                    else:
+                        messages.append({"role": "thought", "text": stripped_content})
 
             for tc in tool_calls:
                 tc_name = tc.get("name", "")
