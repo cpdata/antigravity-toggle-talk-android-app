@@ -133,43 +133,47 @@
                     android:scaleType="fitCenter"
                     android:elevation="4dp"
                     android:contentDescription="Scroll to bottom" />
-            </FrameLayout>
 
-            <!-- Thinking spinner & Terminate button container -->
-            <LinearLayout
-                android:id="@+id/layout_thinking_container"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_gravity="center_horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginTop="4dp"
-                android:layout_marginBottom="4dp"
-                android:visibility="gone">
-
-                <ProgressBar
-                    android:id="@+id/pb_thinking"
+                <!-- Thinking spinner & Terminate button container (OVERLAY) -->
+                <LinearLayout
+                    android:id="@+id/layout_thinking_container"
                     android:layout_width="wrap_content"
-                    android:layout_height="24dp"
-                    android:indeterminate="true"
-                    android:indeterminateTintMode="src_atop"
-                    android:indeterminateTint="#00F2FE" />
-
-                <!-- Red X Terminate Button -->
-                <ImageButton
-                    android:id="@+id/btn_terminate"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:layout_marginStart="8dp"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_gravity="bottom|center_horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="8dp"
                     android:background="@drawable/card_glass"
-                    android:src="@android:drawable/ic_menu_close_clear_cancel"
-                    android:tint="#FF3B30"
-                    android:padding="8dp"
-                    android:scaleType="fitCenter"
-                    android:contentDescription="Terminate session execution"
+                    android:padding="6dp"
+                    android:elevation="8dp"
+                    android:visibility="gone"
                     android:clickable="true"
-                    android:focusable="true" />
-            </LinearLayout>
+                    android:focusable="true">
+
+                    <ProgressBar
+                        android:id="@+id/pb_thinking"
+                        android:layout_width="wrap_content"
+                        android:layout_height="24dp"
+                        android:indeterminate="true"
+                        android:indeterminateTintMode="src_atop"
+                        android:indeterminateTint="#00F2FE" />
+
+                    <!-- Red X Terminate Button -->
+                    <ImageButton
+                        android:id="@+id/btn_terminate"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:layout_marginStart="8dp"
+                        android:background="@drawable/card_glass"
+                        android:src="@android:drawable/ic_menu_close_clear_cancel"
+                        android:tint="#FF3B30"
+                        android:padding="8dp"
+                        android:scaleType="fitCenter"
+                        android:contentDescription="Terminate session execution"
+                        android:clickable="true"
+                        android:focusable="true" />
+                </LinearLayout>
+            </FrameLayout>
 
             <!-- Prompt Queue Container Layout -->
             <LinearLayout

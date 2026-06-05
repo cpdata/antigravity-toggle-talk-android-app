@@ -536,6 +536,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         if (mBtnTerminate != null) {
             mBtnTerminate.setOnClickListener(v -> {
                 Log.d("MainActivity", "Terminate button clicked for session: " + mSelectedSessionId);
+                Toast.makeText(MainActivity.this, "Terminating session...", Toast.LENGTH_SHORT).show();
                 Intent intent = new Intent(MainActivity.this, ToggleTalkService.class);
                 intent.setAction("com.toggletalk.android.ACTION_TERMINATE_SESSION");
                 intent.putExtra("session_id", mSelectedSessionId);
