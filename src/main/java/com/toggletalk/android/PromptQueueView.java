@@ -120,13 +120,13 @@ public class PromptQueueView {
                 LinearLayout row = new LinearLayout(context);
                 row.setOrientation(LinearLayout.HORIZONTAL);
                 row.setGravity(Gravity.CENTER_VERTICAL);
-                row.setPadding((int) (4 * density), (int) (6 * density), (int) (4 * density), (int) (6 * density));
+                row.setPadding((int) (2 * density), (int) (4 * density), (int) (2 * density), (int) (4 * density));
                 
                 TextView tv = new TextView(context);
                 LinearLayout.LayoutParams tvParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
                 tv.setLayoutParams(tvParams);
                 tv.setTextColor(Color.parseColor("#E6E6FA"));
-                tv.setTextSize(11);
+                tv.setTextSize(10);
                 tv.setText(promptText);
 
                 if (size == 1) {
