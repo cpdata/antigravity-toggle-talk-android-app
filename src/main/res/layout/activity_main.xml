@@ -113,6 +113,61 @@
                     android:padding="2dp" />
             </ScrollView>
 
+            <!-- Prompt Queue Container Layout -->
+            <LinearLayout
+                android:id="@+id/layout_queue_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="6dp"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="4dp"
+                android:visibility="gone"
+                android:background="@drawable/card_glass">
+
+                <!-- Collapsed Layout -->
+                <LinearLayout
+                    android:id="@+id/layout_queue_collapsed"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+                    <TextView
+                        android:id="@+id/tv_queue_badge"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:gravity="center"
+                        android:textColor="#FFFFFF"
+                        android:textSize="10sp"
+                        android:textStyle="bold"
+                        android:background="@drawable/bg_badge" />
+                    <TextView
+                        android:id="@+id/tv_queue_collapsed_text"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="8dp"
+                        android:textColor="#E6E6FA"
+                        android:textSize="11sp"
+                        android:ellipsize="end"
+                        android:singleLine="true" />
+                </LinearLayout>
+
+                <!-- Expanded Scrollable Layout -->
+                <ScrollView
+                    android:id="@+id/scroll_queue_expanded"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone">
+                    <LinearLayout
+                        android:id="@+id/layout_queue_expanded_list"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical" />
+                </ScrollView>
+            </LinearLayout>
+
+
             <!-- Thinking Spinner Progress Bar -->
             <ProgressBar
                 android:id="@+id/pb_thinking"

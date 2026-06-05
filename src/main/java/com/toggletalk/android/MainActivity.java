@@ -35,7 +35,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class MainActivity extends Activity {
+public class MainActivity extends Activity implements PromptQueueView.OnPromptActionListener {
     private static final String TAG = "MainActivity";
     private static final String ACTION_DIRECTORIES_LIST = "com.toggletalk.android.ACTION_DIRECTORIES_LIST";
     private static final String ACTION_COPY_ARTIFACT = "com.toggletalk.android.ACTION_COPY_ARTIFACT";
@@ -50,6 +50,10 @@ public class MainActivity extends Activity {
     private CheckBox mCbMockMode;
     private CheckBox mCbWakeLock;
     private boolean mWakeLockEnabled = false;
+
+    private PromptQueueView mPromptQueueView;
+    private final List<String> mPromptQueue = new ArrayList<>();
+    private boolean mIsQueueExpanded = false;
 
     // Artifacts popup views
     private View mArtifactsPopupRoot;
@@ -230,6 +234,22 @@ public class MainActivity extends Activity {
             } else if ("com.toggletalk.android.ACTION_REFRESH_HISTORY".equals(action)) {
                 if (mSelectedSessionId != null && !mSelectedSessionId.isEmpty()) {
                     loadSessionHistory(mSelectedSessionId);
+                }
+            }
+        }
+    };
+
+    private final BroadcastReceiver mQueueReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (ToggleTalkService.ACTION_QUEUE_CHANGED.equals(intent.getAction())) {
+                ArrayList<String> queue = intent.getStringArrayListExtra("queue");
+                if (queue != null) {
+                    mPromptQueue.clear();
+                    mPromptQueue.addAll(queue);
+                    if (mPromptQueueView != null) {
+                        mPromptQueueView.render(mPromptQueue, mIsQueueExpanded);
+                    }
                 }
             }
         }
@@ -464,6 +484,12 @@ public class MainActivity extends Activity {
         mRingMiddle = findViewById(R.id.ring_middle);
         mRingOuter = findViewById(R.id.ring_outer);
 
+        // Initialize Prompt Queue View
+        View queueContainer = findViewById(R.id.layout_queue_container);
+        if (queueContainer != null) {
+            mPromptQueueView = new PromptQueueView(queueContainer, this);
+        }
+
         // Bind Drawer UIs
         mDrawerRoot = findViewById(R.id.drawer_root);
         mDrawerContent = findViewById(R.id.drawer_content);
@@ -598,6 +624,9 @@ public class MainActivity extends Activity {
         streamFilter.addAction("com.toggletalk.android.ACTION_REFRESH_HISTORY");
         registerReceiver(mStreamDisplayReceiver, streamFilter);
 
+        // Register Queue Receiver
+        registerReceiver(mQueueReceiver, new IntentFilter(ToggleTalkService.ACTION_QUEUE_CHANGED));
+
         // Check Permissions
         checkPermissionsAndPreferences();
 
@@ -622,6 +651,7 @@ public class MainActivity extends Activity {
         try { unregisterReceiver(mSessionHistoryReceiver); } catch (Exception ignored) {}
         try { unregisterReceiver(mCopyArtifactReceiver); } catch (Exception ignored) {}
         try { unregisterReceiver(mStreamDisplayReceiver); } catch (Exception ignored) {}
+        try { unregisterReceiver(mQueueReceiver); } catch (Exception ignored) {}
         clearAllAnimations();
     }
 
@@ -1506,6 +1536,35 @@ public class MainActivity extends Activity {
     private void updateBtnExpandAllText() {
         if (mBtnExpandAll != null) {
             mBtnExpandAll.setText(mShowThoughtsAndToolCalls ? "▼ Collapse All" : "▶ Expand All");
+        }
+    }
+
+    @Override
+    public void onPromptClick(int index, String text) {
+        // For now, just Toast. Later this will open the edit popup.
+        Toast.makeText(this, "Edit prompt: " + text, Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void onPromptDelete(int index) {
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("Delete Prompt")
+            .setMessage("Are you sure you want to delete this queued prompt?")
+            .setPositiveButton("Delete", (dialog, which) -> {
+                Intent intent = new Intent(this, ToggleTalkService.class);
+                intent.setAction("com.toggletalk.android.ACTION_DELETE_PROMPT");
+                intent.putExtra("index", index);
+                startService(intent);
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    @Override
+    public void onExpansionToggled(boolean isExpanded) {
+        mIsQueueExpanded = isExpanded;
+        if (mPromptQueueView != null) {
+            mPromptQueueView.render(mPromptQueue, mIsQueueExpanded);
         }
     }
 

@@ -42,6 +42,7 @@ public class ToggleTalkService extends Service {
     public static final String ACTION_SET_DIRECTORY = "com.toggletalk.android.ACTION_SET_DIRECTORY";
     public static final String ACTION_ANTIGRAVITY_RESPONSE = "com.toggletalk.android.ACTION_ANTIGRAVITY_RESPONSE";
     public static final String ACTION_STOP = "com.toggletalk.android.ACTION_STOP";
+    public static final String ACTION_QUEUE_CHANGED = "com.toggletalk.android.ACTION_QUEUE_CHANGED";
 
     public static final String EXTRA_STATE = "state";
     public static final String EXTRA_TEXT = "text";
@@ -59,6 +60,9 @@ public class ToggleTalkService extends Service {
     private volatile boolean mStopRequested = false;
     private volatile boolean mIsTranscribing = false;
     private boolean mIsStreamingActive = false;
+
+    private final java.util.Map<String, java.util.List<String>> mSessionQueues = new java.util.HashMap<>();
+    
     private static class TtsItem {
         String sessionId;
         String text;
@@ -213,15 +217,39 @@ public class ToggleTalkService extends Service {
                 boolean continueIntent = intent.getBooleanExtra("continue_session", false);
                 mContinueSession = continueIntent || (mSelectedSessionId != null && !mSelectedSessionId.isEmpty());
                 boolean bypass = intent.getBooleanExtra("bypass_antigravity", mBypassAntigravity);
+                
                 if (prompt != null && !prompt.trim().isEmpty()) {
-                    mStopRequested = false; // reset stop flag for new request
-                    updateState("THINKING", prompt);
-                    if (bypass || prompt.toLowerCase().startsWith("mock:") || prompt.toLowerCase().startsWith("/mock")) {
-                        runMockReasoning(prompt);
+                    if (!"IDLE".equals(mCurrentState)) {
+                        // Queue the prompt
+                        java.util.List<String> queue = mSessionQueues.get(mSelectedSessionId);
+                        if (queue == null) {
+                            queue = new java.util.ArrayList<>();
+                            mSessionQueues.put(mSelectedSessionId, queue);
+                        }
+                        queue.add(prompt);
+                        broadcastQueueChanged();
                     } else {
-                        new Thread(() -> runAntigravityReasoning(prompt)).start();
+                        mStopRequested = false; // reset stop flag for new request
+                        updateState("THINKING", prompt);
+                        if (bypass || prompt.toLowerCase().startsWith("mock:") || prompt.toLowerCase().startsWith("/mock")) {
+                            runMockReasoning(prompt);
+                        } else {
+                            new Thread(() -> runAntigravityReasoning(prompt)).start();
+                        }
                     }
                 }
+            } else if ("com.toggletalk.android.ACTION_DELETE_PROMPT".equals(action)) {
+                int index = intent.getIntExtra("index", -1);
+                if (index >= 0) {
+                    java.util.List<String> queue = mSessionQueues.get(mSelectedSessionId);
+                    if (queue != null && index < queue.size()) {
+                        queue.remove(index);
+                        broadcastQueueChanged();
+                    }
+                }
+            } else if ("com.toggletalk.android.ACTION_GET_STATE".equals(action)) {
+                broadcastStateToApp();
+                broadcastQueueChanged();
             } else if ("com.toggletalk.android.ACTION_SET_CONTINUE".equals(action)) {
                 mContinueSession = intent.getBooleanExtra("continue_session", false);
             } else if ("com.toggletalk.android.ACTION_SET_BYPASS_ANTIGRAVITY".equals(action)) {
@@ -243,11 +271,36 @@ public class ToggleTalkService extends Service {
                     getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putString("selected_session_id", sessionId).apply();
                     Log.d(TAG, "Session ID updated to: " + sessionId + ", continue: " + mContinueSession);
                 }
-            } else if ("com.toggletalk.android.ACTION_GET_STATE".equals(action)) {
-                broadcastStateToApp();
             }
         }
         return START_STICKY;
+    }
+
+    private void broadcastQueueChanged() {
+        java.util.List<String> queue = mSessionQueues.get(mSelectedSessionId);
+        Intent intent = new Intent(ACTION_QUEUE_CHANGED);
+        if (queue != null) {
+            intent.putStringArrayListExtra("queue", new java.util.ArrayList<>(queue));
+        } else {
+            intent.putStringArrayListExtra("queue", new java.util.ArrayList<>());
+        }
+        sendBroadcast(intent);
+    }
+
+    private void checkAndRunNextInQueue() {
+        java.util.List<String> queue = mSessionQueues.get(mSelectedSessionId);
+        if (queue != null && !queue.isEmpty() && "IDLE".equals(mCurrentState)) {
+            String nextPrompt = queue.remove(0);
+            broadcastQueueChanged();
+            
+            mStopRequested = false;
+            updateState("THINKING", nextPrompt);
+            if (mBypassAntigravity || nextPrompt.toLowerCase().startsWith("mock:") || nextPrompt.toLowerCase().startsWith("/mock")) {
+                runMockReasoning(nextPrompt);
+            } else {
+                new Thread(() -> runAntigravityReasoning(nextPrompt)).start();
+            }
+        }
     }
 
     private void handleToggle() {
@@ -1009,6 +1062,12 @@ public class ToggleTalkService extends Service {
 
         if ("IDLE".equals(state)) {
             releaseWakeLocks();
+            // Check queue after a small delay to allow TTS to settle if it was speaking
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                if ("IDLE".equals(mCurrentState)) {
+                    checkAndRunNextInQueue();
+                }
+            }, 500);
         } else {
             acquireWakeLocks();
         }
