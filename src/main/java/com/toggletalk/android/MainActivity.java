@@ -304,6 +304,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         public void onReceive(Context context, Intent intent) {
             if (ToggleTalkService.ACTION_QUEUE_CHANGED.equals(intent.getAction())) {
                 ArrayList<String> queue = intent.getStringArrayListExtra("queue");
+                Log.d(TAG, "Queue changed receiver. New size: " + (queue != null ? queue.size() : 0));
                 if (queue != null) {
                     mPromptQueue.clear();
                     mPromptQueue.addAll(queue);
@@ -312,6 +313,11 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                     }
                     if (mUnresolvedQueueManager != null) {
                         mUnresolvedQueueManager.onStateOrQueueChanged(mCurrentState, mPromptQueue);
+                    }
+                    
+                    // Re-enforce thinking container visibility if in THINKING state
+                    if ("THINKING".equals(mCurrentState) && mLayoutThinkingContainer != null) {
+                        mLayoutThinkingContainer.setVisibility(View.VISIBLE);
                     }
                 }
             }
@@ -3447,6 +3453,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
 
         switch (state) {
             case "RECORDING":
+                Log.d(TAG, "onStateChanged: RECORDING");
                 mIsResuming = false;
                 mIsAgentActive = false;
                 mTvStatus.setText("LISTENING...");
@@ -3466,6 +3473,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                 break;
 
             case "THINKING":
+                Log.d(TAG, "onStateChanged: THINKING");
                 mIsResuming = false;
                 mIsAgentActive = true;
                 if ("Transcribing...".equals(text)) {
@@ -3506,6 +3514,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                 break;
 
             case "SPEAKING":
+                Log.d(TAG, "onStateChanged: SPEAKING");
                 mIsAgentActive = true;
                 mTvStatus.setText("SPEAKING...");
                 mTvStatus.setTextColor(Color.parseColor("#4CD964"));
@@ -3538,6 +3547,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                 break;
 
             case "FINISHED":
+                Log.d(TAG, "onStateChanged: FINISHED");
                 mIsResuming = false;
                 mIsAgentActive = false;
                 mTvStatus.setText("FINISHED");
@@ -3550,6 +3560,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
 
             case "IDLE":
             default:
+                Log.d(TAG, "onStateChanged: IDLE/DEFAULT");
                 mIsResuming = false;
                 mIsAgentActive = false;
                 mTvStatus.setText("IDLE");
