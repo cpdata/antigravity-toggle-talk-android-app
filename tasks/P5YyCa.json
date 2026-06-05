@@ -1,0 +1,22 @@
+{
+  "id": "P5YyCa",
+  "title": "Add scroll to bottom button",
+  "description": "Add scroll to bottom button for conversation view that only shows when not at the bottom",
+  "status": "ready",
+  "priority": 0.3,
+  "assignedTo": "main-agent",
+  "dependencies": [],
+  "payload": {},
+  "metadata": {
+    "createdAt": "2026-06-05T10:47:43.459Z",
+    "updatedAt": "2026-06-05T10:47:43.459Z",
+    "createdBy": "main-agent",
+    "tags": [
+      "ui",
+      "feature"
+    ],
+    "requiredCapabilities": [],
+    "maxRetries": 3,
+    "retryCount": 0
+  }
+}
