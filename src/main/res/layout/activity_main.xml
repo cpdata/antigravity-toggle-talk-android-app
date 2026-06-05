@@ -257,24 +257,6 @@
                     android:focusable="true"
                     android:contentDescription="Search conversation" />
 
-                <!-- Search Field (Initially Hidden) -->
-                <EditText
-                    android:id="@+id/et_search"
-                    android:layout_width="0dp"
-                    android:layout_height="32dp"
-                    android:layout_weight="1"
-                    android:hint="Search..."
-                    android:textColor="#FFFFFF"
-                    android:textColorHint="#80FFFFFF"
-                    android:background="@drawable/card_glass"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp"
-                    android:textSize="11sp"
-                    android:visibility="gone"
-                    android:layout_marginEnd="4dp"
-                    android:singleLine="true"
-                    android:imeOptions="actionSearch" />
-
                 <!-- Artifacts Button (Icon Only) -->
                 <ImageButton
                     android:id="@+id/btn_artifacts"
@@ -1014,6 +996,83 @@
                 <Button android:id="@+id/btn_edit_update" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Update" android:textColor="#00F2FE" style="?android:attr/buttonBarButtonStyle" />
                 <Button android:id="@+id/btn_edit_send" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Send" android:textColor="#4CD964" style="?android:attr/buttonBarButtonStyle" android:visibility="gone" />
             </LinearLayout>
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- Search Popup Overlay Container -->
+    <FrameLayout
+        android:id="@+id/search_popup_root"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true">
+        
+        <!-- Dim clickable background -->
+        <View
+            android:id="@+id/search_popup_dim_background"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#66000000" />
+            
+        <!-- Popup panel at the bottom -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:orientation="vertical"
+            android:background="#F00B0518"
+            android:padding="8dp"
+            android:layout_margin="8dp"
+            android:elevation="16dp">
+            
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="4dp">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="Search Conversation"
+                    android:textColor="#E6E6FA"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+                <ImageButton
+                    android:id="@+id/btn_search_close"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:src="@android:drawable/ic_menu_close_clear_cancel"
+                    android:tint="#E6E6FA"
+                    android:scaleType="fitCenter" />
+            </LinearLayout>
+                
+            <EditText
+                android:id="@+id/et_search_popup"
+                android:layout_width="match_parent"
+                android:layout_height="36dp"
+                android:hint="Search..."
+                android:textColor="#FFFFFF"
+                android:textColorHint="#80FFFFFF"
+                android:background="@drawable/card_glass"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:textSize="12sp"
+                android:singleLine="true"
+                android:imeOptions="actionSearch" />
+                
+            <!-- Search Results List -->
+            <ListView
+                android:id="@+id/lv_search_results"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:divider="#20FFFFFF"
+                android:dividerHeight="1dp"
+                android:maxHeight="180dp" />
         </LinearLayout>
     </FrameLayout>
 </FrameLayout>

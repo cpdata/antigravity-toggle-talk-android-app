@@ -104,8 +104,11 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
 
     private ImageButton mBtnScrollBottom;
     private ImageButton mBtnSearch;
-    private android.widget.EditText mEtSearch;
-    private android.widget.ListPopupWindow mSearchResultPopup;
+    private View mSearchPopupRoot;
+    private android.widget.EditText mEtSearchPopup;
+    private android.widget.ListView mLvSearchResults;
+    private View mSearchDimBackground;
+    private View mBtnSearchClose;
     private List<SearchResult> mCurrentSearchResults = new ArrayList<>();
 
     private static class SearchResult {
@@ -118,7 +121,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         @Override
         public String toString() {
             String preview = text.replace("\n", " ").trim();
-            if (preview.length() > 40) preview = preview.substring(0, 37) + "...";
+            if (preview.length() > 60) preview = preview.substring(0, 57) + "...";
             return preview;
         }
     }
@@ -544,35 +547,54 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
 
         // Search Components
         mBtnSearch = findViewById(R.id.btn_search);
-        mEtSearch = findViewById(R.id.et_search);
-        if (mBtnSearch != null && mEtSearch != null) {
+        mSearchPopupRoot = findViewById(R.id.search_popup_root);
+        mEtSearchPopup = findViewById(R.id.et_search_popup);
+        mLvSearchResults = findViewById(R.id.lv_search_results);
+        mSearchDimBackground = findViewById(R.id.search_popup_dim_background);
+        mBtnSearchClose = findViewById(R.id.btn_search_close);
+
+        if (mBtnSearch != null && mSearchPopupRoot != null) {
             mBtnSearch.setOnClickListener(v -> {
-                if (mEtSearch.getVisibility() == View.GONE) {
-                    mEtSearch.setVisibility(View.VISIBLE);
-                    mEtSearch.requestFocus();
+                mSearchPopupRoot.setVisibility(View.VISIBLE);
+                if (mEtSearchPopup != null) {
+                    mEtSearchPopup.requestFocus();
                     android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-                    imm.showSoftInput(mEtSearch, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
-                } else {
-                    mEtSearch.setVisibility(View.GONE);
-                    if (mSearchResultPopup != null) mSearchResultPopup.dismiss();
+                    imm.showSoftInput(mEtSearchPopup, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
                 }
             });
 
-            mEtSearch.addTextChangedListener(new android.text.TextWatcher() {
-                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    performSearch(s.toString());
-                }
-                @Override public void afterTextChanged(android.text.Editable s) {}
-            });
+            if (mSearchDimBackground != null) {
+                mSearchDimBackground.setOnClickListener(v -> mSearchPopupRoot.setVisibility(View.GONE));
+            }
+            if (mBtnSearchClose != null) {
+                mBtnSearchClose.setOnClickListener(v -> mSearchPopupRoot.setVisibility(View.GONE));
+            }
 
-            mEtSearch.setOnEditorActionListener((v, actionId, event) -> {
-                if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
-                    performSearch(mEtSearch.getText().toString());
-                    return true;
-                }
-                return false;
-            });
+            if (mEtSearchPopup != null) {
+                mEtSearchPopup.addTextChangedListener(new android.text.TextWatcher() {
+                    @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                    @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                        performSearch(s.toString());
+                    }
+                    @Override public void afterTextChanged(android.text.Editable s) {}
+                });
+
+                mEtSearchPopup.setOnEditorActionListener((v, actionId, event) -> {
+                    if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                        performSearch(mEtSearchPopup.getText().toString());
+                        return true;
+                    }
+                    return false;
+                });
+            }
+
+            if (mLvSearchResults != null) {
+                mLvSearchResults.setOnItemClickListener((parent, view, position, id) -> {
+                    SearchResult result = mCurrentSearchResults.get(position);
+                    scrollToView(result.view);
+                    mSearchPopupRoot.setVisibility(View.GONE);
+                });
+            }
         }
 
         // Initialize Prompt Edit Popup
@@ -1890,7 +1912,8 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
 
     private void performSearch(String query) {
         if (query == null || query.trim().isEmpty()) {
-            if (mSearchResultPopup != null) mSearchResultPopup.dismiss();
+            mCurrentSearchResults.clear();
+            showSearchResults();
             return;
         }
         
@@ -1910,11 +1933,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
             }
         }
         
-        if (mCurrentSearchResults.isEmpty()) {
-            if (mSearchResultPopup != null) mSearchResultPopup.dismiss();
-        } else {
-            showSearchResults();
-        }
+        showSearchResults();
     }
 
     private TextView findTextView(View v) {
@@ -1930,23 +1949,20 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
     }
 
     private void showSearchResults() {
-        if (mSearchResultPopup == null) {
-            mSearchResultPopup = new android.widget.ListPopupWindow(this);
-            mSearchResultPopup.setAnchorView(mEtSearch);
-            mSearchResultPopup.setWidth(600);
-            mSearchResultPopup.setHeight(android.widget.ListPopupWindow.WRAP_CONTENT);
-            mSearchResultPopup.setModal(false);
-            mSearchResultPopup.setOnItemClickListener((parent, view, position, id) -> {
-                SearchResult result = mCurrentSearchResults.get(position);
-                scrollToView(result.view);
-                mSearchResultPopup.dismiss();
-            });
-        }
+        if (mLvSearchResults == null) return;
         
-        android.widget.ArrayAdapter<SearchResult> adapter = new android.widget.ArrayAdapter<>(
-                this, android.R.layout.simple_list_item_1, mCurrentSearchResults);
-        mSearchResultPopup.setAdapter(adapter);
-        mSearchResultPopup.show();
+        android.widget.ArrayAdapter<SearchResult> adapter = new android.widget.ArrayAdapter<SearchResult>(
+                this, android.R.layout.simple_list_item_1, mCurrentSearchResults) {
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                TextView text = (TextView) view.findViewById(android.R.id.text1);
+                text.setTextColor(0xFFE6E6FA);
+                text.setTextSize(12);
+                return view;
+            }
+        };
+        mLvSearchResults.setAdapter(adapter);
     }
 
     private void scrollToView(View view) {
