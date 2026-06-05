@@ -1,0 +1,19 @@
+{
+  "id": "kN1C1m",
+  "title": "Part 2: TTS Playback Control, Pause/Resume, & Flushing",
+  "description": "Implement the TtsItem metadata queue, mic interrupt pause/resume chunk repeat, and TTS flush action in ToggleTalkService.java. Ref: work_reports/tasks_subdivision/2_tts_queue_and_playback_control.md",
+  "status": "pending",
+  "priority": 0.2,
+  "assignedTo": "main-agent",
+  "dependencies": [],
+  "payload": {},
+  "metadata": {
+    "createdAt": "2026-06-05T10:09:29.157Z",
+    "updatedAt": "2026-06-05T10:09:29.157Z",
+    "createdBy": "main-agent",
+    "tags": [],
+    "requiredCapabilities": [],
+    "maxRetries": 3,
+    "retryCount": 0
+  }
+}
