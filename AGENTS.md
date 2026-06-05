@@ -19,6 +19,12 @@ This file outlines the environment details and integration configurations for th
 - **Termux Bridge**: The app coordinates the interaction loop and calls Termux asynchronously via the `com.termux.RUN_COMMAND` intent only for invoking the Antigravity agent reasoning CLI (`run_antigravity.sh`).
 - **Termux Storage**: Configured (`termux-setup-storage` has been run) allowing access to shared device storage at `~/storage/` (Access the SDCard at `/sdcard/` but don't write scripts that write temporary files to the SD card, we want to avoid causing repeated filesystem writes to the SD card).
 
+## Work Process & Build Tagging
+- **Build Numbering**: A script `increment_build.sh` is used to maintain a build counter in `build_number.txt`.
+- **Work Reports**: For each significant update, a report is created in `work_reports/WORK_REPORT_[X].md` where [X] is the build number.
+- **Commit Tagging**: Every completed task that results in a build should be committed and tagged with the build number (numeric only).
+- **TTS Progress Updates**: Use `tts_notification` to keep the user informed during long-running tasks.
+
 ## Response Formatting & Text-to-Speech (TTS)
 - **CRITICAL**: You MUST wrap any text that should be spoken out loud by the Text-to-Speech (TTS) system inside `<tts>...</tts>` tags in your final response output meant for the user.
 - **Rules**:

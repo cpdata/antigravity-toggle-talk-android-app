@@ -49,7 +49,11 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
     private TextView mTvActiveSessionTop;
     private CheckBox mCbMockMode;
     private CheckBox mCbWakeLock;
+    private CheckBox mCbCollapseTools;
+    private CheckBox mCbCollapseThoughts;
     private boolean mWakeLockEnabled = false;
+    private boolean mCollapseTools = false;
+    private boolean mCollapseThoughts = false;
 
     private PromptQueueView mPromptQueueView;
     private final List<String> mPromptQueue = new ArrayList<>();
@@ -197,7 +201,16 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
 
         void setExpanded(boolean exp) {
             this.expanded = exp;
-            contentTv.setVisibility(exp ? View.VISIBLE : View.GONE);
+            if (exp) {
+                contentTv.setMaxLines(Integer.MAX_VALUE);
+                contentTv.setEllipsize(null);
+                contentTv.setVisibility(View.VISIBLE);
+            } else {
+                contentTv.setMaxLines(1);
+                contentTv.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                // Hide if content is empty (e.g. tool_result header only)
+                contentTv.setVisibility(contentTv.getText().length() > 0 ? View.VISIBLE : View.GONE);
+            }
             headerTv.setText((exp ? "▼ " : "▶ ") + headerText);
         }
     }
@@ -205,6 +218,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
     private final List<SessionItem> mSessionsList = new ArrayList<>();
     private final List<CollapsibleBubbleHolder> mCollapsibleBubbleHolders = new ArrayList<>();
     private final java.util.Set<Integer> mExpandedIndices = new java.util.HashSet<>();
+    private final java.util.Set<Integer> mExpandedSummaryIndices = new java.util.HashSet<>();
     private ArrayAdapter<SessionItem> mSessionsAdapter;
 
     private static final String ACTION_SESSIONS_LIST = "com.toggletalk.android.ACTION_SESSIONS_LIST";
@@ -441,11 +455,16 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         mBtnExpandAll = findViewById(R.id.btn_expand_all);
         if (mBtnExpandAll != null) {
             mBtnExpandAll.setOnClickListener(v -> {
-                mShowThoughtsAndToolCalls = !mShowThoughtsAndToolCalls;
-                mBtnExpandAll.setText(mShowThoughtsAndToolCalls ? "▼ Collapse All" : "▶ Expand All");
-                for (CollapsibleBubbleHolder holder : mCollapsibleBubbleHolders) {
-                    holder.setExpanded(mShowThoughtsAndToolCalls);
+                boolean anyExpanded = mShowThoughtsAndToolCalls || !mExpandedSummaryIndices.isEmpty() || !mExpandedIndices.isEmpty();
+                if (anyExpanded) {
+                    mShowThoughtsAndToolCalls = false;
+                    mExpandedIndices.clear();
+                    mExpandedSummaryIndices.clear();
+                } else {
+                    mShowThoughtsAndToolCalls = true;
                 }
+                updateBtnExpandAllText();
+                displayMessages(mCurrentSessionHistory, mShowAllEarlierMessages);
             });
         }
         mBtnSettingsClose = findViewById(R.id.btn_settings_close);
@@ -743,6 +762,30 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
             });
         }
         applyWakeLockSetting(mWakeLockEnabled);
+
+        // Load and setup Collapse Tools settings
+        mCollapseTools = getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).getBoolean("collapse_tools", false);
+        mCbCollapseTools = findViewById(R.id.cb_collapse_tools);
+        if (mCbCollapseTools != null) {
+            mCbCollapseTools.setChecked(mCollapseTools);
+            mCbCollapseTools.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                mCollapseTools = isChecked;
+                getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putBoolean("collapse_tools", isChecked).apply();
+                displayMessages(mCurrentSessionHistory, mShowAllEarlierMessages);
+            });
+        }
+
+        // Load and setup Collapse Thoughts settings
+        mCollapseThoughts = getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).getBoolean("collapse_thoughts", false);
+        mCbCollapseThoughts = findViewById(R.id.cb_collapse_thoughts);
+        if (mCbCollapseThoughts != null) {
+            mCbCollapseThoughts.setChecked(mCollapseThoughts);
+            mCbCollapseThoughts.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                mCollapseThoughts = isChecked;
+                getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putBoolean("collapse_thoughts", isChecked).apply();
+                displayMessages(mCurrentSessionHistory, mShowAllEarlierMessages);
+            });
+        }
 
         // Initialize state visually
         onStateChanged("IDLE", "");
@@ -1420,8 +1463,13 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         return sb.toString().trim();
     }
 
+    private int mCurrentDisplayLimit = 50;
+
     private void displayMessages(final org.json.JSONArray array, boolean showAll) {
         mShowAllEarlierMessages = showAll;
+        if (showAll) {
+            mCurrentDisplayLimit = array.length();
+        }
         displayMessagesInternal(array, array.length(), showAll);
     }
 
@@ -1438,7 +1486,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         mActiveAgentTextView = null;
 
         int total = Math.min(array.length(), limitCount);
-        int start = showAll ? 0 : Math.max(0, total - 50);
+        int start = showAll ? 0 : Math.max(0, total - mCurrentDisplayLimit);
 
         if (start > 0) {
             addOmittedMessagesClickable(start, array);
@@ -1453,7 +1501,30 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                 String text = msg.optString("text", "");
                 if (text.isEmpty()) continue;
 
-                if ("thought".equals(role) || "tool_call".equals(role) || "tool_result".equals(role)) {
+                if (isCollapsible(role)) {
+                    if (shouldGroup(role)) {
+                        // Gather consecutive collapsible messages to group
+                        int j = i;
+                        int thoughts = 0;
+                        int toolCalls = 0;
+                        int toolResults = 0;
+                        while (j < total) {
+                            org.json.JSONObject nextMsg = array.getJSONObject(j);
+                            String nextRole = nextMsg.optString("role", "");
+                            if (!isCollapsible(nextRole) || !shouldGroup(nextRole)) break;
+                            
+                            if ("thought".equals(nextRole)) thoughts++;
+                            else if ("tool_call".equals(nextRole)) toolCalls++;
+                            else if ("tool_result".equals(nextRole)) toolResults++;
+                            j++;
+                        }
+                        
+                        if ((thoughts + toolCalls + toolResults) > 1 && !mExpandedSummaryIndices.contains(i) && !mShowThoughtsAndToolCalls) {
+                            addSummaryBubble(thoughts, toolCalls, toolResults, i, array);
+                            i = j - 1;
+                            continue;
+                        }
+                    }
                     addCollapsibleBubble(role, text, i);
                 } else {
                     if ("user".equals(role)) {
@@ -1475,6 +1546,45 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         }
 
         scrollToBottomIfNeeded(wasAtBottom);
+    }
+
+    private boolean isCollapsible(String role) {
+        return "thought".equals(role) || "tool_call".equals(role) || "tool_result".equals(role);
+    }
+
+    private boolean shouldGroup(String role) {
+        if ("thought".equals(role)) return mCollapseThoughts;
+        if ("tool_call".equals(role) || "tool_result".equals(role)) return mCollapseTools;
+        return false;
+    }
+
+    private void addSummaryBubble(int thoughts, int toolCalls, int toolResults, final int startIndex, final org.json.JSONArray array) {
+        StringBuilder sb = new StringBuilder();
+        if (thoughts > 0) sb.append("Thoughts [").append(thoughts).append("]");
+        if (toolCalls > 0) {
+            if (sb.length() > 0) sb.append(", ");
+            sb.append("Tool Calls [").append(toolCalls).append("]");
+        }
+        if (toolResults > 0) {
+            if (sb.length() > 0) sb.append(", ");
+            sb.append("Tool Results [").append(toolResults).append("]");
+        }
+        
+        String summaryText = sb.toString();
+        final TextView tv = addSystemMessage("▶ " + summaryText, "#00F2FE");
+        tv.setClickable(true);
+        tv.setFocusable(true);
+        tv.setBackgroundResource(R.drawable.card_glass);
+        float density = getResources().getDisplayMetrics().density;
+        tv.setPadding((int)(12*density), (int)(8*density), (int)(12*density), (int)(8*density));
+        
+        tv.setOnClickListener(v -> {
+            if (!mShowThoughtsAndToolCalls) {
+                mExpandedSummaryIndices.clear();
+            }
+            mExpandedSummaryIndices.add(startIndex);
+            displayMessages(array, mShowAllEarlierMessages);
+        });
     }
 
     private void addCollapsibleBubble(String role, String text, int index) {
@@ -1610,14 +1720,15 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
             }
         }
         clickedHolder.setExpanded(targetState);
+        updateBtnExpandAllText();
     }
 
     private void addOmittedMessagesClickable(final int count, final org.json.JSONArray array) {
         if (mChatContainer == null) return;
         float density = getResources().getDisplayMetrics().density;
         
-        TextView tv = new TextView(this);
-        tv.setText("... (" + count + " earlier messages omitted. Tap to show all) ...");
+        final TextView tv = new TextView(this);
+        tv.setText("... (" + count + " earlier messages omitted. Tap to load 50 more) ...");
         tv.setTextColor(Color.parseColor("#60FFFFFF"));
         tv.setTextSize(12);
         tv.setPadding((int)(8 * density), (int)(5 * density), (int)(8 * density), (int)(5 * density));
@@ -1636,9 +1747,26 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         lp.setMargins(0, (int)(4 * density), 0, (int)(4 * density));
         tv.setLayoutParams(lp);
 
-        tv.setOnClickListener(v -> displayMessages(array, true));
+        final ProgressBar pb = new ProgressBar(this, null, android.R.attr.progressBarStyleSmall);
+        pb.setVisibility(View.GONE);
+        pb.setIndeterminateTintList(ColorStateList.valueOf(Color.parseColor("#00F2FE")));
+        android.widget.LinearLayout.LayoutParams lpPb = new android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lpPb.gravity = android.view.Gravity.CENTER;
+        lpPb.setMargins(0, (int)(4 * density), 0, (int)(4 * density));
+        pb.setLayoutParams(lpPb);
+
+        tv.setOnClickListener(v -> {
+            tv.setVisibility(View.GONE);
+            pb.setVisibility(View.VISIBLE);
+            new android.os.Handler().postDelayed(() -> {
+                mCurrentDisplayLimit += 50;
+                displayMessages(array, false);
+            }, 400);
+        });
         
         mChatContainer.addView(tv);
+        mChatContainer.addView(pb);
     }
 
     private void handleStreamedDisplay(String sessionId, String messagesJson, String filePath) {
@@ -1701,7 +1829,8 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
 
     private void updateBtnExpandAllText() {
         if (mBtnExpandAll != null) {
-            mBtnExpandAll.setText(mShowThoughtsAndToolCalls ? "▼ Collapse All" : "▶ Expand All");
+            boolean anyExpanded = mShowThoughtsAndToolCalls || !mExpandedSummaryIndices.isEmpty() || !mExpandedIndices.isEmpty();
+            mBtnExpandAll.setText(anyExpanded ? "▼ Collapse" : "▶ Expand");
         }
     }
 
@@ -3012,6 +3141,15 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                 mRingMiddle.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#4CD964")));
                 startBreatheAnimation(mRingInner, 1.0f, 1.25f, 0.2f, 0.6f, 1000);
                 startBreatheAnimation(mRingMiddle, 1.0f, 1.4f, 0.1f, 0.4f, 1000);
+                break;
+
+            case "FINISHED":
+                mIsResuming = false;
+                mIsAgentActive = false;
+                mTvStatus.setText("FINISHED");
+                mTvStatus.setTextColor(Color.parseColor("#4CD964"));
+                mPbThinking.setVisibility(View.GONE);
+                getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                 break;
 
             case "IDLE":

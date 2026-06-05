@@ -761,7 +761,7 @@ public class ToggleTalkService extends Service {
                     try { Thread.sleep(500); } catch (Exception ignored) {}
                     synchronized (mTtsQueue) {
                         if (mTtsQueue.isEmpty() && !mIsTtsPlaying) {
-                            updateState("IDLE", "");
+                            updateState("FINISHED", "");
                         }
                     }
                 }
@@ -793,7 +793,7 @@ public class ToggleTalkService extends Service {
         if (textToSpeak != null && !textToSpeak.trim().isEmpty()) {
             queueTtsText(mSelectedSessionId, textToSpeak);
         } else {
-            updateState("IDLE", "");
+            updateState("FINISHED", "");
         }
     }
 
@@ -964,7 +964,7 @@ public class ToggleTalkService extends Service {
                             new Thread(() -> startTtsPlaybackIfNeeded()).start();
                         } else {
                             if ("SPEAKING".equals(mCurrentState) && !mIsTtsPaused) {
-                                updateState("IDLE", "");
+                                updateState("FINISHED", "");
                             }
                         }
                     }
@@ -1088,14 +1088,16 @@ public class ToggleTalkService extends Service {
         mCurrentState = state;
         mCurrentText = text;
 
+        if ("FINISHED".equals(state)) {
+            checkAndRunNextInQueue();
+            if ("FINISHED".equals(mCurrentState)) {
+                updateState("IDLE", "");
+            }
+            return;
+        }
+
         if ("IDLE".equals(state)) {
             releaseWakeLocks();
-            // Check queue after a small delay to allow TTS to settle if it was speaking
-            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                if ("IDLE".equals(mCurrentState)) {
-                    checkAndRunNextInQueue();
-                }
-            }, 500);
         } else {
             acquireWakeLocks();
         }

@@ -842,6 +842,32 @@
                         android:layout_marginBottom="12dp"
                         android:checked="false" />
 
+                    <!-- Collapse Tool Messages Checkbox -->
+                    <CheckBox
+                        android:id="@+id/cb_collapse_tools"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Collapse Tool Messages"
+                        android:textColor="#E6E6FA"
+                        android:textSize="14sp"
+                        android:buttonTint="#9D50BB"
+                        android:paddingStart="8dp"
+                        android:layout_marginBottom="12dp"
+                        android:checked="false" />
+
+                    <!-- Collapse Thoughts Checkbox -->
+                    <CheckBox
+                        android:id="@+id/cb_collapse_thoughts"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Collapse Thoughts"
+                        android:textColor="#E6E6FA"
+                        android:textSize="14sp"
+                        android:buttonTint="#9D50BB"
+                        android:paddingStart="8dp"
+                        android:layout_marginBottom="12dp"
+                        android:checked="false" />
+
                     <!-- Clear Session History Cache Button -->
                     <TextView
                         android:id="@+id/btn_clear_session_cache"
