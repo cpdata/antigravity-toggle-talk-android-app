@@ -1,6 +1,6 @@
 {
   "id": "ngxpSV",
-  "title": "Support configurable terminal editors (nano/vim/micro) for file links",
+  "title": "Support configurable terminal editors (nano/glow/vim/micro) for file links",
   "description": "Add a setting to let the user select their preferred terminal editor (nano, vim, micro, etc.) to launch when clicking local file paths in messages.",
   "status": "pending",
   "priority": 0.3,
@@ -9,7 +9,7 @@
   "payload": {},
   "metadata": {
     "createdAt": "2026-06-05T03:49:34.671Z",
-    "updatedAt": "2026-06-05T03:49:34.671Z",
+    "updatedAt": "2026-06-05T05:24:01.837Z",
     "createdBy": "main-agent",
     "tags": [],
     "requiredCapabilities": [],
