@@ -43,6 +43,7 @@ public class ToggleTalkService extends Service {
     public static final String ACTION_ANTIGRAVITY_RESPONSE = "com.toggletalk.android.ACTION_ANTIGRAVITY_RESPONSE";
     public static final String ACTION_STOP = "com.toggletalk.android.ACTION_STOP";
     public static final String ACTION_QUEUE_CHANGED = "com.toggletalk.android.ACTION_QUEUE_CHANGED";
+    public static final String ACTION_UPDATE_PROMPT = "com.toggletalk.android.ACTION_UPDATE_PROMPT";
 
     public static final String EXTRA_STATE = "state";
     public static final String EXTRA_TEXT = "text";
@@ -236,6 +237,16 @@ public class ToggleTalkService extends Service {
                         } else {
                             new Thread(() -> runAntigravityReasoning(prompt)).start();
                         }
+                    }
+                }
+            } else if (ACTION_UPDATE_PROMPT.equals(action)) {
+                int index = intent.getIntExtra("index", -1);
+                String text = intent.getStringExtra("text");
+                if (index >= 0 && text != null && !text.trim().isEmpty()) {
+                    java.util.List<String> queue = mSessionQueues.get(mSelectedSessionId);
+                    if (queue != null && index < queue.size()) {
+                        queue.set(index, text);
+                        broadcastQueueChanged();
                     }
                 }
             } else if ("com.toggletalk.android.ACTION_DELETE_PROMPT".equals(action)) {

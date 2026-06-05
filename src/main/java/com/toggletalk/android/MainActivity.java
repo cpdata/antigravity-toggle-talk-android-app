@@ -55,6 +55,9 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
     private final List<String> mPromptQueue = new ArrayList<>();
     private boolean mIsQueueExpanded = false;
 
+    private PromptEditPopup mPromptEditPopup;
+    private int mEditingPromptIndex = -1;
+
     // Artifacts popup views
     private View mArtifactsPopupRoot;
     private View mBtnArtifactsClose;
@@ -488,6 +491,50 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         View queueContainer = findViewById(R.id.layout_queue_container);
         if (queueContainer != null) {
             mPromptQueueView = new PromptQueueView(queueContainer, this);
+        }
+
+        // Initialize Prompt Edit Popup
+        View editPopupRoot = findViewById(R.id.prompt_edit_popup_root);
+        if (editPopupRoot != null) {
+            mPromptEditPopup = new PromptEditPopup(editPopupRoot, new PromptEditPopup.OnEditActionListener() {
+                @Override
+                public void onUpdate(String text) {
+                    if (mEditingPromptIndex != -1) {
+                        Intent intent = new Intent(MainActivity.this, ToggleTalkService.class);
+                        intent.setAction("com.toggletalk.android.ACTION_UPDATE_PROMPT");
+                        intent.putExtra("index", mEditingPromptIndex);
+                        intent.putExtra("text", text);
+                        startService(intent);
+                    }
+                }
+
+                @Override
+                public void onDelete() {
+                    if (mEditingPromptIndex != -1) {
+                        Intent intent = new Intent(MainActivity.this, ToggleTalkService.class);
+                        intent.setAction("com.toggletalk.android.ACTION_DELETE_PROMPT");
+                        intent.putExtra("index", mEditingPromptIndex);
+                        startService(intent);
+                    }
+                }
+
+                @Override
+                public void onSend(String text) {
+                    // This is used for "Combine" or similar if we ever use it
+                    Intent intent = new Intent(MainActivity.this, ToggleTalkService.class);
+                    intent.setAction("com.toggletalk.android.ACTION_SEND_PROMPT");
+                    intent.putExtra("prompt", text);
+                    intent.putExtra("continue_session", mContinueSession);
+                    intent.putExtra("session_id", mSelectedSessionId);
+                    intent.putExtra("bypass_antigravity", mBypassAntigravity);
+                    startService(intent);
+                }
+
+                @Override
+                public void onCancel() {
+                    mEditingPromptIndex = -1;
+                }
+            });
         }
 
         // Bind Drawer UIs
@@ -1541,8 +1588,10 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
 
     @Override
     public void onPromptClick(int index, String text) {
-        // For now, just Toast. Later this will open the edit popup.
-        Toast.makeText(this, "Edit prompt: " + text, Toast.LENGTH_SHORT).show();
+        mEditingPromptIndex = index;
+        if (mPromptEditPopup != null) {
+            mPromptEditPopup.show(text, false);
+        }
     }
 
     @Override
