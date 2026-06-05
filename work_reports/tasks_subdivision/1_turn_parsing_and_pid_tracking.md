@@ -13,33 +13,46 @@ This task details the parsing logic fixes in Python and process PID tracking in 
 
 ---
 
-## 2. Research & Context
-- Transcript logs are saved as JSON lines in `~/.gemini/antigravity-cli/brain/<session_id>/.system_generated/logs/transcript_full.jsonl`.
-- `transcript_parser.py` parses these steps to extract user inputs, planner responses, thoughts, and tool executions.
-- `run_antigravity.sh` invokes the background streaming parser (`stream_session.py`) and runs the `agy` compiler.
+## 2. Context & Background Research
+
+### Why is `is_final` Tracked?
+In our system, transcript logs under `~/.gemini/antigravity-cli/brain/<session_id>/.system_generated/logs/transcript_full.jsonl` record every step during a conversation. Each step is represented as a JSON line. Both intermediate reasoning steps (thoughts/tool calls) and the final response of a turn are written as `PLANNER_RESPONSE` steps.
+- **Intermediate steps**: Should be collapsed in the chat UI under expandable bubbles so they don't clutter the view.
+- **Final steps**: Should be rendered as normal, non-collapsible chat bubbles.
+
+To differentiate these, the transcript parser tracks `is_final`. If `is_final` is true and the step is complete (`status == "DONE"`), it is parsed as `role: "agent"`. If `is_final` is false, it is parsed as `role: "thought"`. 
+
+The current implementation checks if the *immediate next* step in the log is `USER_INPUT`. However, if background cron/task logs occur right after a response, the immediate next step is not `USER_INPUT`, causing `is_final` to evaluate as `false` and hiding the final response in a collapsed block.
+
+### Component Locations
+- `transcript_parser.py`: `/data/data/com.termux/files/home/ToggleTalkAndroid/transcript_parser.py`
+- `run_antigravity.sh`: `/data/data/com.termux/files/home/ToggleTalkAndroid/run_antigravity.sh`
 
 ---
 
 ## 3. Implementation Steps
 
 ### A. Turn-Based Parsing Logic in `transcript_parser.py`
-To prevent final messages from disappearing when the conversation continues, modify `parse_transcript_steps(raw_steps)`:
-1. Scan the list to find all indices of steps with `"type": "USER_INPUT"`.
-2. Segment the step array into turn blocks. Each block starts at a `USER_INPUT` step and ends before the next `USER_INPUT` (or end of file).
-3. Within each turn block, find the last `PLANNER_RESPONSE` step where `source == "MODEL"`.
-4. Only mark this specific step as `is_final = True` (if `status == "DONE"` or containing `<tts>` tags).
-5. Ensure all other `PLANNER_RESPONSE` steps are parsed as thoughts (`role: "thought"`), while the final one is parsed as agent response (`role: "agent"`).
+Modify `parse_transcript_steps(raw_steps)` to correctly identify the final response of each turn:
+1. Scan the list of steps and extract the indices of all steps with `"type": "USER_INPUT"`.
+2. Segment the raw steps list into logical turn blocks. Each block starts at a `USER_INPUT` step and spans up to (but excluding) the next `USER_INPUT` step (or the end of the file).
+3. Within each turn block, identify the last step of type `PLANNER_RESPONSE` where `source == "MODEL"`.
+4. Only set `is_final = True` for this last planner response step of the turn (if `status == "DONE"` or it contains `<tts>` tags).
+5. All other planner response steps in the block must be parsed as thoughts (`role: "thought"`), while the final one is parsed as agent response (`role: "agent"`).
 
-### B. PID Tracking in `run_antigravity.sh`
-1. Define the PID file path based on the session ID:
+### B. PID Process Tracking in `run_antigravity.sh`
+To allow the Android service to terminate a running session immediately and cleanly:
+1. Define a session-specific PID file path:
    `PID_FILE="$HOME/.gemini/antigravity-cli/brain/$SESSION_ID/.system_generated/logs/run.pid"`
-2. Write the process ID (`$$`) to this file immediately after starting the script:
+2. Create the parent directories if they do not exist:
+   `mkdir -p "$(dirname "$PID_FILE")"`
+3. Write the PID of the running bash script (`$$`) to this file immediately after execution starts:
    `echo "$$" > "$PID_FILE"`
-3. Add a trap handler to clean up the PID file on exit:
+4. Set up an exit trap to ensure the PID file is deleted when the script exits:
    `trap 'rm -f "$PID_FILE"' EXIT`
 
 ---
 
-## 4. Verification Plan
-- Run `run_antigravity.sh` with a dummy prompt and verify `run.pid` is written to the correct folder.
-- Execute `transcript_parser.py` test cases with mock transcripts containing multiple turns and verify that previous turns' final responses still preserve `"role": "agent"`.
+## 4. Verification & Testing Plan
+- Run `run_antigravity.sh` with a dummy session ID and verify that `run.pid` containing the correct shell PID is written under the corresponding session logs folder.
+- Run `python3 -c "import transcript_parser; ..."` or execute unit tests to parse a multi-turn transcript and verify that final messages from earlier turns remain categorized as `"role": "agent"` even when followed by subsequent user turns or task updates.

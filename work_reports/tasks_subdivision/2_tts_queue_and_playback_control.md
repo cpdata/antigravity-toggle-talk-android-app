@@ -15,16 +15,25 @@ This task details changes to `ToggleTalkService.java` to support advanced text-t
 
 ---
 
-## 2. Research & Context
-- `ToggleTalkService` contains the TTS playback thread which polls `mTtsQueue` and writes floats to `AudioTrack`.
-- The current queue holds strings directly, which makes it impossible to know which session generated the audio.
+## 2. Context & Background Research
+
+### Components & File Path
+- `ToggleTalkService.java`: `/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/java/com/toggletalk/android/ToggleTalkService.java`
+
+### Audio Generation & Threading
+`ToggleTalkService` handles speech synthesis via Kokoro offline TTS. It manages a background thread (`mTtsThread`) that polls items from a queue (`mTtsQueue`), generates PCM samples (`mTts.generate()`), and streams them to an `AudioTrack`.
+Currently, `mTtsQueue` stores strings directly without session ID mappings, and when TTS is playing, it transitions global states. We need to modularize this queue to support:
+1. Identifying which session the playing speech belongs to.
+2. Pausing/resuming playback when microphone input interrupts speech without flushing the remaining queue.
+3. Repeating the interrupted chunk after resumption.
+4. Separate X button to flush the queue.
 
 ---
 
 ## 3. Implementation Steps
 
-### A. TTS Queue Metadata
-1. Define a helper class in `ToggleTalkService.java`:
+### A. Modularize the TTS Queue with `TtsItem`
+1. Define a nested helper class in `ToggleTalkService.java`:
    ```java
    class TtsItem {
        String sessionId;
@@ -35,36 +44,39 @@ This task details changes to `ToggleTalkService.java` to support advanced text-t
        }
    }
    ```
-2. Modify the queue declaration:
-   `private final Queue<TtsItem> mTtsQueue = new LinkedList<>();`
-3. Modify `queueTtsText(String sessionId, String text)` to insert `TtsItem` objects.
-
-### B. Mic Interrupt Pausing
-1. In `ToggleTalkService.java`, add variables:
+2. Modify the queue and tracking variables:
    ```java
+   private final Queue<TtsItem> mTtsQueue = new LinkedList<>();
    private TtsItem mCurrentlyPlayingItem = null;
    private String mCurrentPlayingChunk = null;
    private boolean mIsTtsPaused = false;
    ```
-2. In `handleToggle()`, if the current state is `SPEAKING`:
+3. Update `queueTtsText(String sessionId, String text)` to insert `TtsItem` objects.
+
+### B. Mic Interrupt Pausing
+When the user taps the mic button during playback:
+1. In `handleToggle()`, if the service state is `SPEAKING` (or the TTS engine is active):
    - Set `mIsTtsPaused = true`.
-   - Set `mIsPlayingAudio = false` to break the playback write loop.
-   - Stop and release the `AudioTrack` immediately.
-   - Do **NOT** clear `mTtsQueue`.
-3. In `stopNativeRecording()`, when the recording thread finishes joining:
-   - Clear `mIsTtsPaused = false`.
-   - Prepend `mCurrentPlayingChunk` to `mTtsQueue` so it plays first.
-   - Invoke `startTtsPlaybackIfNeeded()` to resume playback.
+   - Set `mIsPlayingAudio = false` (to break out of the AudioTrack sample-writing loop in the playback thread).
+   - Stop and release the current `AudioTrack` immediately.
+   - Do **NOT** clear `mTtsQueue` or reset variables. Save `mCurrentlyPlayingItem` and `mCurrentPlayingChunk`.
+2. In `stopNativeRecording()`, when the recording thread completes joining:
+   - Clear the pause flag: `mIsTtsPaused = false`.
+   - Prepend `mCurrentPlayingChunk` back to `mTtsQueue` so it plays first.
+   - Invoke `startTtsPlaybackIfNeeded()` to resume playing the interrupted chunk.
 
 ### C. TTS Stop & Flush Intent
-1. Add intent action `com.toggletalk.android.ACTION_TERMINATE_TTS` in `ToggleTalkService.java`.
-2. On receive:
+1. Register receiver for intent action `com.toggletalk.android.ACTION_TERMINATE_TTS` in the service.
+2. When received:
    - Call `stopAudioPlayback()`.
-   - Clear `mTtsQueue` fully.
+   - Synchronously clear `mTtsQueue`.
+   - Reset `mCurrentPlayingChunk` and `mCurrentlyPlayingItem`.
+   - Clear the pause flag: `mIsTtsPaused = false`.
    - Revert the session state to `IDLE` and broadcast it.
 
 ---
 
 ## 4. Verification Plan
-- Build and run. Verify that pressing the mic button during active speaking stops speech, starts recording, and resumes speaking the exact sentence chunk once released.
-- Send the `ACTION_TERMINATE_TTS` broadcast via ADB and verify that TTS flushes.
+- Play TTS audio from a session, tap the mic button to speak, verify speech pauses instantly.
+- Release the mic and verify that TTS resumes, repeating the exact sentence chunk that was playing when paused.
+- Trigger TTS, send `com.toggletalk.android.ACTION_TERMINATE_TTS` intent via ADB, verify playback stops immediately and the queue is flushed.

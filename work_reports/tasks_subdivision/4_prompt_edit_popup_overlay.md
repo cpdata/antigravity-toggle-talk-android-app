@@ -18,16 +18,26 @@ This task details the design and implementation of the bottom-aligned popup edit
 
 ---
 
-## 2. Research & Context
-- Pop-ups are handled via overlay layouts at the root level of `activity_main.xml`.
-- Individual row clicks inside `PromptQueueView` must trigger this popup editor.
+## 2. Context & Background Research
+
+### Files & Paths
+- `activity_main.xml`: `/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/res/layout/activity_main.xml`
+- `PromptEditPopup.java` [NEW]: `/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/java/com/toggletalk/android/PromptEditPopup.java`
+
+### Pop-up Behavior Specs
+To keep the main screen clean, the prompt edit popup must hug the bottom of the screen with narrow margins (e.g. `8dp`) and be dismissable if the user taps outside.
+When opened:
+1. It pre-populates with the prompt text and appends `\n` to place the cursor on a new line.
+2. It requests focus and forces the soft keyboard to open automatically.
+3. It intercepts keyboard return keys to ensure they write newlines instead of submitting.
+4. It must contain the actions: `Update`, `Cancel`, `Delete`. The `Send` button is only shown if the popup was triggered by the `Combine` button.
 
 ---
 
 ## 3. Implementation Steps
 
-### A. Layout Overlay Setup (`activity_main.xml`)
-Add the following layout overlay at the root level of the layout file:
+### A. Define Layout XML Overlay (`activity_main.xml`)
+Append the layout code to the root container of the layout file:
 ```xml
 <FrameLayout
     android:id="@+id/prompt_edit_popup_root"
@@ -36,11 +46,15 @@ Add the following layout overlay at the root level of the layout file:
     android:visibility="gone"
     android:clickable="true"
     android:focusable="true">
+    
+    <!-- Dim clickable background -->
     <View
         android:id="@+id/prompt_edit_popup_dim_background"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="#66000000" />
+        
+    <!-- Popup panel at the bottom -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -50,6 +64,7 @@ Add the following layout overlay at the root level of the layout file:
         android:padding="8dp"
         android:layout_margin="8dp"
         android:elevation="16dp">
+        
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -58,16 +73,19 @@ Add the following layout overlay at the root level of the layout file:
             android:textSize="12sp"
             android:textStyle="bold"
             android:layout_marginBottom="4dp" />
+            
         <EditText
             android:id="@+id/et_edit_prompt"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:minHeight="48dp"
             android:maxLines="6"
+            android:scrollbars="vertical"
             android:textColor="#FFFFFF"
             android:textSize="13sp"
             android:background="@drawable/card_glass"
             android:padding="8dp" />
+            
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -83,18 +101,27 @@ Add the following layout overlay at the root level of the layout file:
 </FrameLayout>
 ```
 
-### B. Modular helper class: `PromptEditPopup.java`
-- Manages visibility of the overlay.
-- Handles outside-click dismiss via `prompt_edit_popup_dim_background` click listener.
-- Prepopulates text, appends `\n`, focuses, moves cursor to the end, and triggers soft keyboard.
-- Disables Editor Action IME_ACTION_SEND to ensure Return key inserts a newline.
-- Implements empty/whitespace validation:
-  `if (text.trim().isEmpty()) return;`
-- Displays `AlertDialog` confirmation box for deletes: "Are you sure you want to delete this prompt?".
+### B. Implement `PromptEditPopup.java`
+Create this class to manage edit popup interactions:
+- Bind layout references (`prompt_edit_popup_root`, `prompt_edit_popup_dim_background`, `et_edit_prompt`, `btn_edit_delete`, `btn_edit_cancel`, `btn_edit_update`, `btn_edit_send`).
+- Implement `show(String promptText, boolean showSendOnly, OnEditActionListener listener)`:
+  - Configure button visibility:
+    - If `showSendOnly` is true: show `Send` and `Cancel`; hide `Delete` and `Update`.
+    - If `showSendOnly` is false: show `Update`, `Cancel`, and `Delete`; hide `Send`.
+  - Set text to `promptText + "\n"`.
+  - Call `et_edit_prompt.requestFocus()`.
+  - Position cursor at the end: `et_edit_prompt.setSelection(et_edit_prompt.getText().length())`.
+  - Force show the soft keyboard using `InputMethodManager`.
+  - Set key event listener or editor listener on `et_edit_prompt` to ensure Return/Enter key inserts a newline without triggering actions.
+- Add outside click dismissal: set click listener on `prompt_edit_popup_dim_background` to dismiss the popup without applying modifications.
+- Handle Validation: In the `Update` and `Send` click handlers, verify that `text.trim().isEmpty()` is false. If it is empty or only spaces, reject it (do not dismiss or trigger the listener).
+- Handle Delete: Clicking `Delete` must show an `AlertDialog` confirming: "Are you sure you want to delete this prompt?". Only remove the prompt if the user clicks "Yes".
 
 ---
 
-## 4. Verification Plan
-- Click a prompt. Verify popup shows at the bottom, focuses, shows keyboard, cursor is on a new line.
-- Edit prompt to be spaces-only and click Update; verify it is rejected.
-- Click Delete, verify confirmation alert is shown. Verify prompt remains intact if Cancel is selected.
+## 4. Verification & Testing Plan
+- Trigger the popup and check alignment at the bottom of the screen.
+- Verify focus and keyboard appearance.
+- Type spaces and click Update; verify it is blocked.
+- Press Enter key and verify it inserts a newline.
+- Click outside the container and verify popup is dismissed.
