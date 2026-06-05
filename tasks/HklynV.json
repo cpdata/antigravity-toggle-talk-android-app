@@ -2,15 +2,17 @@
   "id": "HklynV",
   "title": "Test",
   "description": "Test",
-  "status": "ready",
+  "status": "claimed",
   "priority": 0.2,
   "assignedTo": "main-agent",
   "dependencies": [],
   "payload": {},
   "metadata": {
     "createdAt": "2026-06-05T02:26:38.826Z",
-    "updatedAt": "2026-06-05T02:26:38.826Z",
+    "updatedAt": "2026-06-05T02:27:25.169Z",
     "createdBy": "main-agent",
+    "claimedAt": "2026-06-05T02:27:25.167Z",
+    "lastHeartbeatAt": "2026-06-05T02:27:25.167Z",
     "tags": [
       "delete"
     ],
