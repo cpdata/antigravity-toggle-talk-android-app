@@ -38,6 +38,7 @@ import java.util.List;
 public class MainActivity extends Activity {
     private static final String TAG = "MainActivity";
     private static final String ACTION_DIRECTORIES_LIST = "com.toggletalk.android.ACTION_DIRECTORIES_LIST";
+    private static final String ACTION_COPY_ARTIFACT = "com.toggletalk.android.ACTION_COPY_ARTIFACT";
 
     private TextView mTvStatus;
     private ScrollView mScrollLog;
@@ -47,6 +48,16 @@ public class MainActivity extends Activity {
     private TextView mBtnNewChatDrawer;
     private TextView mTvActiveSessionTop;
     private CheckBox mCbMockMode;
+    private CheckBox mCbWakeLock;
+    private boolean mWakeLockEnabled = false;
+
+    // Artifacts popup views
+    private View mArtifactsPopupRoot;
+    private View mBtnArtifactsClose;
+    private View mArtifactsDimBackground;
+    private android.widget.LinearLayout mLayoutArtifactsList;
+    private TextView mBtnArtifacts;
+
     private View mSettingsPopupRoot;
     private TextView mBtnSettings;
     private TextView mBtnExpandAll;
@@ -109,6 +120,29 @@ public class MainActivity extends Activity {
         SessionItem(String id, String title) {
             this.id = id;
             this.title = title;
+        }
+    }
+
+    private static class ArtifactItem {
+        final String label;
+        final String url;
+        
+        ArtifactItem(String label, String url) {
+            this.label = label;
+            this.url = url;
+        }
+        
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof ArtifactItem)) return false;
+            ArtifactItem that = (ArtifactItem) o;
+            return url.equals(that.url);
+        }
+        
+        @Override
+        public int hashCode() {
+            return url.hashCode();
         }
     }
     
@@ -361,6 +395,32 @@ public class MainActivity extends Activity {
         mSettingsDimBackground = findViewById(R.id.settings_popup_dim_background);
         mBtnClearSessionCache = findViewById(R.id.btn_clear_session_cache);
 
+        mCbWakeLock = findViewById(R.id.cb_wake_lock);
+        mArtifactsPopupRoot = findViewById(R.id.artifacts_popup_root);
+        mBtnArtifactsClose = findViewById(R.id.btn_artifacts_close);
+        mArtifactsDimBackground = findViewById(R.id.artifacts_popup_dim_background);
+        mLayoutArtifactsList = findViewById(R.id.layout_artifacts_list);
+        mBtnArtifacts = findViewById(R.id.btn_artifacts);
+
+        // Bypass strict mode file URI exposure detection
+        try {
+            java.lang.reflect.Method m = Class.forName("android.os.StrictMode")
+                    .getMethod("disableDeathOnFileUriExposure");
+            m.invoke(null);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to disable strict mode check", e);
+        }
+
+        if (mBtnArtifacts != null) {
+            mBtnArtifacts.setOnClickListener(v -> openArtifactsPopup());
+        }
+        if (mBtnArtifactsClose != null) {
+            mBtnArtifactsClose.setOnClickListener(v -> closeArtifactsPopup());
+        }
+        if (mArtifactsDimBackground != null) {
+            mArtifactsDimBackground.setOnClickListener(v -> closeArtifactsPopup());
+        }
+
         if (mBtnSettings != null) {
             mBtnSettings.setOnClickListener(v -> openSettings());
         }
@@ -475,6 +535,18 @@ public class MainActivity extends Activity {
             startService(intent);
         });
 
+        // Load and setup WakeLock settings
+        mWakeLockEnabled = getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).getBoolean("wake_lock_enabled", false);
+        if (mCbWakeLock != null) {
+            mCbWakeLock.setChecked(mWakeLockEnabled);
+            mCbWakeLock.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                mWakeLockEnabled = isChecked;
+                getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putBoolean("wake_lock_enabled", isChecked).apply();
+                applyWakeLockSetting(isChecked);
+            });
+        }
+        applyWakeLockSetting(mWakeLockEnabled);
+
         // Initialize state visually
         onStateChanged("IDLE", "");
 
@@ -489,6 +561,9 @@ public class MainActivity extends Activity {
         super.onResume();
         mIsResuming = true;
         
+        // Apply WakeLock setting
+        applyWakeLockSetting(mWakeLockEnabled);
+
         // Start Foreground Service
         Intent serviceIntent = new Intent(this, ToggleTalkService.class);
         startService(serviceIntent);
@@ -507,6 +582,9 @@ public class MainActivity extends Activity {
 
         // Register Session History Broadcast Callback
         registerReceiver(mSessionHistoryReceiver, new IntentFilter(ACTION_SESSION_HISTORY));
+
+        // Register Copy Artifact Callback
+        registerReceiver(mCopyArtifactReceiver, new IntentFilter(ACTION_COPY_ARTIFACT));
 
         // Register Stream Display Receiver
         IntentFilter streamFilter = new IntentFilter();
@@ -537,6 +615,7 @@ public class MainActivity extends Activity {
         try { unregisterReceiver(mTranscriptionReceiver); } catch (Exception ignored) {}
         try { unregisterReceiver(mSessionsReceiver); } catch (Exception ignored) {}
         try { unregisterReceiver(mSessionHistoryReceiver); } catch (Exception ignored) {}
+        try { unregisterReceiver(mCopyArtifactReceiver); } catch (Exception ignored) {}
         try { unregisterReceiver(mStreamDisplayReceiver); } catch (Exception ignored) {}
         clearAllAnimations();
     }
@@ -938,7 +1017,9 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (mSettingsPopupRoot != null && mSettingsPopupRoot.getVisibility() == View.VISIBLE) {
+        if (mArtifactsPopupRoot != null && mArtifactsPopupRoot.getVisibility() == View.VISIBLE) {
+            closeArtifactsPopup();
+        } else if (mSettingsPopupRoot != null && mSettingsPopupRoot.getVisibility() == View.VISIBLE) {
             closeSettings();
         } else if (mIsDrawerOpen) {
             closeDrawer();
@@ -1958,93 +2039,368 @@ public class MainActivity extends Activity {
     }
 
     private static void handleLinkClick(android.content.Context context, String url) {
-        if (url == null) return;
-        Log.d(TAG, "Clicked link: " + url);
+        openFileOrUrl(context, url);
+    }
+
+    private static void openFileOrUrl(android.content.Context context, String url) {
+        if (url == null || url.trim().isEmpty()) return;
+        Log.d(TAG, "openFileOrUrl: " + url);
         
+        // 1. Check if Chrome target
+        boolean isChromeTarget = false;
         if (url.startsWith("http://") || url.startsWith("https://")) {
-            try {
-                android.content.Intent intent = new android.content.Intent(
-                        android.content.Intent.ACTION_VIEW,
-                        android.net.Uri.parse(url)
-                );
-                if (!(context instanceof android.app.Activity)) {
-                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-                }
-                context.startActivity(intent);
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to open web URL: " + url, e);
-                Toast.makeText(context, "Error opening link", Toast.LENGTH_SHORT).show();
+            isChromeTarget = true;
+        } else {
+            String lower = url.toLowerCase();
+            int qIdx = lower.indexOf('?');
+            if (qIdx != -1) lower = lower.substring(0, qIdx);
+            int hIdx = lower.indexOf('#');
+            if (hIdx != -1) lower = lower.substring(0, hIdx);
+            
+            if (lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg") 
+                    || lower.endsWith(".gif") || lower.endsWith(".webp") || lower.endsWith(".bmp")
+                    || lower.endsWith(".pdf")) {
+                isChromeTarget = true;
             }
-            return;
         }
         
-        String filePath = url;
-        if (filePath.startsWith("file://")) {
-            filePath = filePath.substring(7);
-        }
-        
-        if (filePath.startsWith("/data/data/com.termux/files/")) {
+        if (isChromeTarget) {
+            if (url.startsWith("http://") || url.startsWith("https://")) {
+                try {
+                    android.content.Intent intent = new android.content.Intent(
+                            android.content.Intent.ACTION_VIEW,
+                            android.net.Uri.parse(url)
+                    );
+                    intent.setPackage("com.android.chrome");
+                    if (!(context instanceof android.app.Activity)) {
+                        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                    }
+                    context.startActivity(intent);
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to open web URL in Chrome: " + url, e);
+                    try {
+                        android.content.Intent intent = new android.content.Intent(
+                                android.content.Intent.ACTION_VIEW,
+                                android.net.Uri.parse(url)
+                        );
+                        if (!(context instanceof android.app.Activity)) {
+                            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                        }
+                        context.startActivity(intent);
+                    } catch (Exception ex) {
+                        Toast.makeText(context, "Error opening link", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            } else {
+                // Local file target (image/PDF) for Chrome
+                String filePath = url;
+                if (filePath.startsWith("file://")) {
+                    filePath = filePath.substring(7);
+                }
+                
+                int hashIdx = filePath.indexOf('#');
+                if (hashIdx != -1) {
+                    filePath = filePath.substring(0, hashIdx);
+                }
+                
+                final String finalFilePath = filePath;
+                final String filename = new java.io.File(filePath).getName();
+                
+                if (filePath.startsWith("/data/data/com.termux/files/")) {
+                    // It's in Termux private dir. Copy to /sdcard/Download/ToggleTalk/ first
+                    final String targetPath = "/sdcard/Download/ToggleTalk/" + filename;
+                    
+                    Intent runCommandIntent = new Intent();
+                    runCommandIntent.setClassName("com.termux", "com.termux.app.RunCommandService");
+                    runCommandIntent.setAction("com.termux.RUN_COMMAND");
+                    runCommandIntent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash");
+                    runCommandIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{
+                            "-c", "mkdir -p /sdcard/Download/ToggleTalk && cp '" + finalFilePath + "' /sdcard/Download/ToggleTalk/"
+                    });
+                    runCommandIntent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
+                    runCommandIntent.putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home");
+                    
+                    Intent callbackIntent = new Intent(ACTION_COPY_ARTIFACT);
+                    callbackIntent.putExtra("target_path", targetPath);
+                    int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        flags |= PendingIntent.FLAG_MUTABLE;
+                    }
+                    PendingIntent pendingIntent = PendingIntent.getBroadcast(context, 1001, callbackIntent, flags);
+                    runCommandIntent.putExtra("com.termux.RUN_COMMAND_PENDING_INTENT", pendingIntent);
+                    
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            context.startForegroundService(runCommandIntent);
+                        } else {
+                            context.startService(runCommandIntent);
+                        }
+                        Toast.makeText(context, "Copying and opening in Chrome...", Toast.LENGTH_SHORT).show();
+                    } catch (Exception e) {
+                        Log.e(TAG, "Failed to copy file via Termux", e);
+                        Toast.makeText(context, "Failed to copy file", Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    // Already public. Open directly in Chrome using FileProvider.
+                    try {
+                        java.io.File file = new java.io.File(filePath);
+                        android.net.Uri fileUri = androidx.core.content.FileProvider.getUriForFile(
+                                context,
+                                "com.toggletalk.android.fileprovider",
+                                file
+                        );
+                        android.content.Intent chromeIntent = new android.content.Intent(
+                                android.content.Intent.ACTION_VIEW
+                        );
+                        chromeIntent.setDataAndType(fileUri, getMimeType(filePath));
+                        chromeIntent.setPackage("com.android.chrome");
+                        chromeIntent.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        if (!(context instanceof android.app.Activity)) {
+                            chromeIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                        }
+                        context.startActivity(chromeIntent);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Failed to open in Chrome directly: " + filePath, e);
+                        Toast.makeText(context, "Failed to open in Chrome", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            }
+        } else {
+            // Termux target (markdown, text, and other text files)
+            String filePath = url;
+            if (filePath.startsWith("file://")) {
+                filePath = filePath.substring(7);
+            }
+            
             String cleanPath = filePath;
-            String lineNumber = null;
             int hashIdx = filePath.indexOf('#');
             if (hashIdx != -1) {
                 cleanPath = filePath.substring(0, hashIdx);
-                String fragment = filePath.substring(hashIdx + 1);
-                if (fragment.startsWith("L") || fragment.startsWith("l")) {
-                    fragment = fragment.substring(1);
-                }
-                int dashIdx = fragment.indexOf('-');
-                if (dashIdx != -1) {
-                    fragment = fragment.substring(0, dashIdx);
-                }
+            }
+            
+            if (cleanPath.startsWith("/data/data/com.termux/files/") || new java.io.File(cleanPath).isAbsolute()) {
+                Intent runCommandIntent = new Intent();
+                runCommandIntent.setClassName("com.termux", "com.termux.app.RunCommandService");
+                runCommandIntent.setAction("com.termux.RUN_COMMAND");
+                runCommandIntent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/glow");
+                runCommandIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{"-p", cleanPath});
+                runCommandIntent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", false);
+                runCommandIntent.putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home");
+                
                 try {
-                    Integer.parseInt(fragment);
-                    lineNumber = fragment;
-                } catch (NumberFormatException ignored) {}
-            }
-            
-            Intent runCommandIntent = new Intent();
-            runCommandIntent.setClassName("com.termux", "com.termux.app.RunCommandService");
-            runCommandIntent.setAction("com.termux.RUN_COMMAND");
-            runCommandIntent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/nano");
-            
-            String[] arguments;
-            if (lineNumber != null) {
-                arguments = new String[]{"+" + lineNumber, cleanPath};
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(runCommandIntent);
+                    } else {
+                        context.startService(runCommandIntent);
+                    }
+                    Toast.makeText(context, "Opening in glow...", Toast.LENGTH_SHORT).show();
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to launch glow in Termux", e);
+                    Toast.makeText(context, "Failed to launch glow in Termux", Toast.LENGTH_SHORT).show();
+                }
             } else {
-                arguments = new String[]{cleanPath};
-            }
-            runCommandIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arguments);
-            runCommandIntent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", false);
-            runCommandIntent.putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home");
-            
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(runCommandIntent);
-                } else {
-                    context.startService(runCommandIntent);
+                try {
+                    android.content.Intent intent = new android.content.Intent(
+                            android.content.Intent.ACTION_VIEW,
+                            android.net.Uri.parse(url)
+                    );
+                    if (!(context instanceof android.app.Activity)) {
+                        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                    }
+                    context.startActivity(intent);
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to open link: " + url, e);
+                    Toast.makeText(context, "No app found to open link", Toast.LENGTH_SHORT).show();
                 }
-                Toast.makeText(context, "Opening in nano...", Toast.LENGTH_SHORT).show();
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to launch nano in Termux", e);
-                Toast.makeText(context, "Failed to launch nano in Termux", Toast.LENGTH_SHORT).show();
-            }
-        } else {
-            try {
-                android.content.Intent intent = new android.content.Intent(
-                        android.content.Intent.ACTION_VIEW,
-                        android.net.Uri.parse(url)
-                );
-                if (!(context instanceof android.app.Activity)) {
-                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-                }
-                context.startActivity(intent);
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to open link: " + url, e);
-                Toast.makeText(context, "No app found to open link", Toast.LENGTH_SHORT).show();
             }
         }
     }
+
+    private static String getMimeType(String path) {
+        String type = "*/*";
+        String extension = android.webkit.MimeTypeMap.getFileExtensionFromUrl(path);
+        if (extension == null || extension.isEmpty()) {
+            int lastDot = path.lastIndexOf('.');
+            if (lastDot != -1) {
+                extension = path.substring(lastDot + 1);
+            }
+        }
+        if (extension != null) {
+            String mime = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension.toLowerCase());
+            if (mime != null) {
+                type = mime;
+            }
+        }
+        return type;
+    }
+
+    private void applyWakeLockSetting(boolean enabled) {
+        if (enabled) {
+            getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            Log.d(TAG, "FLAG_KEEP_SCREEN_ON added to window");
+        } else {
+            getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            Log.d(TAG, "FLAG_KEEP_SCREEN_ON cleared from window");
+        }
+    }
+
+    private void openArtifactsPopup() {
+        if (mArtifactsPopupRoot != null) {
+            mArtifactsPopupRoot.setVisibility(View.VISIBLE);
+            populateArtifactsList();
+        }
+    }
+
+    private void closeArtifactsPopup() {
+        if (mArtifactsPopupRoot != null) {
+            mArtifactsPopupRoot.setVisibility(View.GONE);
+        }
+    }
+
+    private void populateArtifactsList() {
+        if (mLayoutArtifactsList == null) return;
+        mLayoutArtifactsList.removeAllViews();
+
+        List<ArtifactItem> artifacts = extractArtifacts();
+        if (artifacts.isEmpty()) {
+            TextView emptyTv = new TextView(this);
+            emptyTv.setText("No artifacts found in this session.");
+            emptyTv.setTextColor(Color.parseColor("#80E6E6FA"));
+            emptyTv.setTextSize(14);
+            emptyTv.setGravity(android.view.Gravity.CENTER);
+            int padding = (int) (16 * getResources().getDisplayMetrics().density);
+            emptyTv.setPadding(padding, padding, padding, padding);
+            mLayoutArtifactsList.addView(emptyTv);
+            return;
+        }
+
+        float density = getResources().getDisplayMetrics().density;
+        int verticalPadding = (int) (12 * density);
+        int horizontalPadding = (int) (16 * density);
+
+        for (final ArtifactItem item : artifacts) {
+            final android.widget.LinearLayout itemLayout = new android.widget.LinearLayout(this);
+            itemLayout.setOrientation(android.widget.LinearLayout.VERTICAL);
+            itemLayout.setPadding(horizontalPadding, verticalPadding, horizontalPadding, verticalPadding);
+            itemLayout.setClickable(true);
+            itemLayout.setFocusable(true);
+
+            android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
+            gd.setColor(Color.parseColor("#12000000"));
+            gd.setCornerRadius(density * 8);
+            gd.setStroke((int) density, Color.parseColor("#1AE6E6FA"));
+            itemLayout.setBackground(gd);
+
+            android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.setMargins(0, 0, 0, (int) (10 * density));
+            itemLayout.setLayoutParams(lp);
+
+            TextView titleTv = new TextView(this);
+            titleTv.setText(item.label);
+            titleTv.setTextColor(Color.parseColor("#E6E6FA"));
+            titleTv.setTextSize(14);
+            titleTv.setTypeface(null, android.graphics.Typeface.BOLD);
+
+            TextView urlTv = new TextView(this);
+            String displayUrl = item.url;
+            if (displayUrl.startsWith("file://")) {
+                displayUrl = displayUrl.substring(7);
+            }
+            urlTv.setText(displayUrl);
+            urlTv.setTextColor(Color.parseColor("#80E6E6FA"));
+            urlTv.setTextSize(11);
+            urlTv.setPadding(0, (int) (4 * density), 0, 0);
+
+            itemLayout.addView(titleTv);
+            itemLayout.addView(urlTv);
+
+            itemLayout.setOnClickListener(v -> {
+                closeArtifactsPopup();
+                openFileOrUrl(MainActivity.this, item.url);
+            });
+
+            mLayoutArtifactsList.addView(itemLayout);
+        }
+    }
+
+    private List<ArtifactItem> extractArtifacts() {
+        List<ArtifactItem> artifacts = new ArrayList<>();
+        java.util.Set<String> seenUrls = new java.util.HashSet<>();
+        if (mCurrentSessionHistory == null) return artifacts;
+
+        for (int i = 0; i < mCurrentSessionHistory.length(); i++) {
+            try {
+                org.json.JSONObject msg = mCurrentSessionHistory.getJSONObject(i);
+                String role = msg.optString("role", "");
+                if ("agent".equals(role)) {
+                    String text = msg.optString("text", "");
+                    if (text == null || text.isEmpty()) continue;
+                    
+                    java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("\\[([^\\]]+)\\]\\(([^)]+)\\)").matcher(text);
+                    while (matcher.find()) {
+                        String label = matcher.group(1);
+                        String url = matcher.group(2);
+                        if (url != null && !seenUrls.contains(url)) {
+                            seenUrls.add(url);
+                            artifacts.add(new ArtifactItem(label, url));
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error extracting artifacts", e);
+            }
+        }
+        return artifacts;
+    }
+
+    private final BroadcastReceiver mCopyArtifactReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (ACTION_COPY_ARTIFACT.equals(intent.getAction())) {
+                String targetPath = intent.getStringExtra("target_path");
+                Log.d(TAG, "Copy artifact completed, launching Chrome for: " + targetPath);
+                try {
+                    java.io.File file = new java.io.File(targetPath);
+                    android.net.Uri fileUri = androidx.core.content.FileProvider.getUriForFile(
+                            context,
+                            "com.toggletalk.android.fileprovider",
+                            file
+                    );
+                    
+                    android.content.Intent chromeIntent = new android.content.Intent(
+                            android.content.Intent.ACTION_VIEW
+                    );
+                    
+                    chromeIntent.setDataAndType(fileUri, getMimeType(targetPath));
+                    chromeIntent.setPackage("com.android.chrome");
+                    chromeIntent.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    chromeIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                    
+                    context.startActivity(chromeIntent);
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to open in Chrome: " + targetPath, e);
+                    try {
+                        java.io.File file = new java.io.File(targetPath);
+                        android.net.Uri fileUri = androidx.core.content.FileProvider.getUriForFile(
+                                context,
+                                "com.toggletalk.android.fileprovider",
+                                file
+                        );
+                        android.content.Intent fallbackIntent = new android.content.Intent(
+                                android.content.Intent.ACTION_VIEW
+                        );
+                        fallbackIntent.setDataAndType(fileUri, getMimeType(targetPath));
+                        fallbackIntent.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        fallbackIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                        context.startActivity(fallbackIntent);
+                    } catch (Exception ex) {
+                        Toast.makeText(context, "Failed to open file in external app", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            }
+        }
+    };
 
     // --- Query Termux Antigravity Sessions list via RUN_COMMAND ---
 
