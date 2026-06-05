@@ -2333,7 +2333,7 @@ public class MainActivity extends Activity {
             try {
                 org.json.JSONObject msg = mCurrentSessionHistory.getJSONObject(i);
                 String role = msg.optString("role", "");
-                if ("agent".equals(role)) {
+                if (!"user".equals(role)) {
                     String text = msg.optString("text", "");
                     if (text == null || text.isEmpty()) continue;
                     
