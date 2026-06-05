@@ -80,6 +80,14 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
     private boolean mBypassAntigravity = false;
     private ImageButton mBtnMic;
     private ProgressBar mPbThinking;
+    private View mLayoutThinkingContainer;
+    private View mBtnTerminate;
+    private View mBtnUpload;
+    private final java.util.Map<Integer, android.text.Spanned> mRenderedTextCache = new java.util.HashMap<>();
+    private final java.util.Map<Integer, android.text.Spanned> mRenderedCodeCache = new java.util.HashMap<>();
+    private final java.util.Map<Integer, String> mCachedRawTexts = new java.util.HashMap<>();
+    private final java.util.Set<Integer> mCollapsedIndices = new java.util.HashSet<>();
+    private final java.util.Set<Integer> mExpandedSummaryIndices = new java.util.HashSet<>();
     private android.widget.EditText mEtMessage;
     private ImageButton mBtnSend;
     private boolean mIsAgentActive = false; // true when THINKING or SPEAKING
@@ -190,6 +198,8 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         final String headerText;
         final int index;
         boolean expanded = false;
+        CharSequence fullContent = "";
+        CharSequence collapsedContent = null;
 
         CollapsibleBubbleHolder(android.widget.LinearLayout layout, TextView headerTv, TextView contentTv, String headerText, int index) {
             this.layout = layout;
@@ -202,12 +212,20 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         void setExpanded(boolean exp) {
             this.expanded = exp;
             if (exp) {
+                contentTv.setText(fullContent);
                 contentTv.setMaxLines(Integer.MAX_VALUE);
                 contentTv.setEllipsize(null);
                 contentTv.setVisibility(View.VISIBLE);
             } else {
-                contentTv.setMaxLines(1);
-                contentTv.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                if (collapsedContent != null) {
+                    contentTv.setText(collapsedContent);
+                    contentTv.setMaxLines(Integer.MAX_VALUE);
+                    contentTv.setEllipsize(null);
+                } else {
+                    contentTv.setText(fullContent);
+                    contentTv.setMaxLines(1);
+                    contentTv.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                }
                 // Hide if content is empty (e.g. tool_result header only)
                 contentTv.setVisibility(contentTv.getText().length() > 0 ? View.VISIBLE : View.GONE);
             }
@@ -218,7 +236,6 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
     private final List<SessionItem> mSessionsList = new ArrayList<>();
     private final List<CollapsibleBubbleHolder> mCollapsibleBubbleHolders = new ArrayList<>();
     private final java.util.Set<Integer> mExpandedIndices = new java.util.HashSet<>();
-    private final java.util.Set<Integer> mExpandedSummaryIndices = new java.util.HashSet<>();
     private ArrayAdapter<SessionItem> mSessionsAdapter;
 
     private static final String ACTION_SESSIONS_LIST = "com.toggletalk.android.ACTION_SESSIONS_LIST";
@@ -514,6 +531,22 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         }
         mBtnMic = findViewById(R.id.btn_mic);
         mPbThinking = findViewById(R.id.pb_thinking);
+        mLayoutThinkingContainer = findViewById(R.id.layout_thinking_container);
+        mBtnTerminate = findViewById(R.id.btn_terminate);
+        if (mBtnTerminate != null) {
+            mBtnTerminate.setOnClickListener(v -> {
+                Intent intent = new Intent(MainActivity.this, ToggleTalkService.class);
+                intent.setAction("com.toggletalk.android.ACTION_TERMINATE_SESSION");
+                intent.putExtra("session_id", mSelectedSessionId);
+                startService(intent);
+            });
+        }
+        
+        mBtnUpload = findViewById(R.id.btn_upload);
+        if (mBtnUpload != null) {
+            mBtnUpload.setOnClickListener(v -> openFilePicker());
+        }
+        
         mEtMessage = findViewById(R.id.et_message);
         mBtnSend = findViewById(R.id.btn_send);
         mBtnSend.setOnClickListener(v -> {
@@ -1330,6 +1363,11 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         mShowAllEarlierMessages = false;
         mLastStreamedAgentText = "";
         mExpandedIndices.clear();
+        mCollapsedIndices.clear();
+        mExpandedSummaryIndices.clear();
+        mRenderedTextCache.clear();
+        mRenderedCodeCache.clear();
+        mCachedRawTexts.clear();
 
         // Check if cached session history exists on the app side
         java.io.File cacheDir = new java.io.File(getCacheDir(), "session_history_cache");
@@ -1478,18 +1516,51 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         displayMessagesInternal(mCurrentSessionHistory, limitCount, showAll);
     }
 
+    private int mViewIndex = 0;
+    private boolean mRecreateMode = false;
+
+    private void clearHoldersFromIndex(int startIndex) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            mCollapsibleBubbleHolders.removeIf(holder -> holder.index >= startIndex);
+        } else {
+            java.util.Iterator<CollapsibleBubbleHolder> it = mCollapsibleBubbleHolders.iterator();
+            while (it.hasNext()) {
+                if (it.next().index >= startIndex) {
+                    it.remove();
+                }
+            }
+        }
+    }
+
     private void displayMessagesInternal(final org.json.JSONArray array, int limitCount, boolean showAll) {
-        mCollapsibleBubbleHolders.clear();
         updateBtnExpandAllText();
         boolean wasAtBottom = isScrolledToBottom();
-        if (mChatContainer != null) mChatContainer.removeAllViews();
-        mActiveAgentTextView = null;
+        
+        mViewIndex = 0;
+        mRecreateMode = false;
 
         int total = Math.min(array.length(), limitCount);
         int start = showAll ? 0 : Math.max(0, total - mCurrentDisplayLimit);
 
         if (start > 0) {
-            addOmittedMessagesClickable(start, array);
+            BubbleTag expectedTag = new BubbleTag("omitted", start, "omitted_" + start);
+            if (!mRecreateMode && mViewIndex < mChatContainer.getChildCount()) {
+                View existingView = mChatContainer.getChildAt(mViewIndex);
+                Object tag = existingView.getTag();
+                if (tag instanceof BubbleTag && tag.equals(expectedTag)) {
+                    mViewIndex++;
+                } else {
+                    mRecreateMode = true;
+                    mChatContainer.removeViews(mViewIndex, mChatContainer.getChildCount() - mViewIndex);
+                    clearHoldersFromIndex(start);
+                }
+            }
+            if (mRecreateMode || mViewIndex >= mChatContainer.getChildCount()) {
+                addOmittedMessagesClickable(start, array);
+                View newView = mChatContainer.getChildAt(mChatContainer.getChildCount() - 1);
+                if (newView != null) newView.setTag(expectedTag);
+                mViewIndex = mChatContainer.getChildCount();
+            }
         }
 
         boolean hasAgentResponseAtEnd = false;
@@ -1519,19 +1590,143 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                             j++;
                         }
                         
-                        if ((thoughts + toolCalls + toolResults) > 1 && !mExpandedSummaryIndices.contains(i) && !mShowThoughtsAndToolCalls) {
-                            addSummaryBubble(thoughts, toolCalls, toolResults, i, array);
+                        int groupSize = thoughts + toolCalls + toolResults;
+                        if (groupSize > 1) {
+                            if (!mExpandedSummaryIndices.contains(i) && !mShowThoughtsAndToolCalls) {
+                                BubbleTag expectedTag = new BubbleTag("summary", i, thoughts + "_" + toolCalls + "_" + toolResults);
+                                if (!mRecreateMode && mViewIndex < mChatContainer.getChildCount()) {
+                                    View existingView = mChatContainer.getChildAt(mViewIndex);
+                                    Object tag = existingView.getTag();
+                                    if (tag instanceof BubbleTag && tag.equals(expectedTag)) {
+                                        mViewIndex++;
+                                    } else {
+                                        mRecreateMode = true;
+                                        mChatContainer.removeViews(mViewIndex, mChatContainer.getChildCount() - mViewIndex);
+                                        clearHoldersFromIndex(i);
+                                    }
+                                }
+                                if (mRecreateMode || mViewIndex >= mChatContainer.getChildCount()) {
+                                    addSummaryBubble(thoughts, toolCalls, toolResults, i, array);
+                                    View newView = mChatContainer.getChildAt(mChatContainer.getChildCount() - 1);
+                                    if (newView != null) newView.setTag(expectedTag);
+                                    mViewIndex = mChatContainer.getChildCount();
+                                }
+                            } else {
+                                // Group is expanded! Show expanded header & child bubbles
+                                BubbleTag expectedTag = new BubbleTag("summary_header", i, thoughts + "_" + toolCalls + "_" + toolResults);
+                                if (!mRecreateMode && mViewIndex < mChatContainer.getChildCount()) {
+                                    View existingView = mChatContainer.getChildAt(mViewIndex);
+                                    Object tag = existingView.getTag();
+                                    if (tag instanceof BubbleTag && tag.equals(expectedTag)) {
+                                        mViewIndex++;
+                                    } else {
+                                        mRecreateMode = true;
+                                        mChatContainer.removeViews(mViewIndex, mChatContainer.getChildCount() - mViewIndex);
+                                        clearHoldersFromIndex(i);
+                                    }
+                                }
+                                if (mRecreateMode || mViewIndex >= mChatContainer.getChildCount()) {
+                                    addExpandedSummaryHeader(thoughts, toolCalls, toolResults, i, array);
+                                    View newView = mChatContainer.getChildAt(mChatContainer.getChildCount() - 1);
+                                    if (newView != null) newView.setTag(expectedTag);
+                                    mViewIndex = mChatContainer.getChildCount();
+                                }
+
+                                for (int k = i; k < j; k++) {
+                                    org.json.JSONObject childMsg = array.getJSONObject(k);
+                                    String childRole = childMsg.optString("role", "");
+                                    String childText = childMsg.optString("text", "");
+                                    if (!childText.isEmpty()) {
+                                        boolean childShouldExpand = mShowThoughtsAndToolCalls || true || isBubbleExpanded(childRole, k);
+                                        BubbleTag childTag = new BubbleTag(childRole, k, childText + "_" + childShouldExpand);
+                                        if (!mRecreateMode && mViewIndex < mChatContainer.getChildCount()) {
+                                            View existingView = mChatContainer.getChildAt(mViewIndex);
+                                            Object tag = existingView.getTag();
+                                            if (tag instanceof BubbleTag && tag.equals(childTag)) {
+                                                mViewIndex++;
+                                            } else {
+                                                mRecreateMode = true;
+                                                mChatContainer.removeViews(mViewIndex, mChatContainer.getChildCount() - mViewIndex);
+                                                clearHoldersFromIndex(k);
+                                            }
+                                        }
+                                        if (mRecreateMode || mViewIndex >= mChatContainer.getChildCount()) {
+                                            addCollapsibleBubble(childRole, childText, k, true);
+                                            View newView = mChatContainer.getChildAt(mChatContainer.getChildCount() - 1);
+                                            if (newView != null) newView.setTag(childTag);
+                                            mViewIndex = mChatContainer.getChildCount();
+                                        }
+                                    }
+                                }
+                            }
                             i = j - 1;
                             continue;
                         }
                     }
-                    addCollapsibleBubble(role, text, i);
+                    
+                    boolean shouldExpand = mShowThoughtsAndToolCalls || false || isBubbleExpanded(role, i);
+                    BubbleTag expectedTag = new BubbleTag(role, i, text + "_" + shouldExpand);
+                    if (!mRecreateMode && mViewIndex < mChatContainer.getChildCount()) {
+                        View existingView = mChatContainer.getChildAt(mViewIndex);
+                        Object tag = existingView.getTag();
+                        if (tag instanceof BubbleTag && tag.equals(expectedTag)) {
+                            mViewIndex++;
+                        } else {
+                            mRecreateMode = true;
+                            mChatContainer.removeViews(mViewIndex, mChatContainer.getChildCount() - mViewIndex);
+                            clearHoldersFromIndex(i);
+                        }
+                    }
+                    if (mRecreateMode || mViewIndex >= mChatContainer.getChildCount()) {
+                        addCollapsibleBubble(role, text, i, false);
+                        View newView = mChatContainer.getChildAt(mChatContainer.getChildCount() - 1);
+                        if (newView != null) newView.setTag(expectedTag);
+                        mViewIndex = mChatContainer.getChildCount();
+                    }
                 } else {
                     if ("user".equals(role)) {
-                        addUserBubble(text);
+                        BubbleTag expectedTag = new BubbleTag("user", i, text);
+                        if (!mRecreateMode && mViewIndex < mChatContainer.getChildCount()) {
+                            View existingView = mChatContainer.getChildAt(mViewIndex);
+                            Object tag = existingView.getTag();
+                            if (tag instanceof BubbleTag && tag.equals(expectedTag)) {
+                                mViewIndex++;
+                            } else {
+                                mRecreateMode = true;
+                                mChatContainer.removeViews(mViewIndex, mChatContainer.getChildCount() - mViewIndex);
+                                clearHoldersFromIndex(i);
+                            }
+                        }
+                        if (mRecreateMode || mViewIndex >= mChatContainer.getChildCount()) {
+                            addUserBubble(text);
+                            View newView = mChatContainer.getChildAt(mChatContainer.getChildCount() - 1);
+                            if (newView != null) newView.setTag(expectedTag);
+                            mViewIndex = mChatContainer.getChildCount();
+                        }
                         hasAgentResponseAtEnd = false;
                     } else if ("agent".equals(role)) {
-                        addAgentBubble(text);
+                        BubbleTag expectedTag = new BubbleTag("agent", i, text);
+                        if (!mRecreateMode && mViewIndex < mChatContainer.getChildCount()) {
+                            View existingView = mChatContainer.getChildAt(mViewIndex);
+                            Object tag = existingView.getTag();
+                            if (tag instanceof BubbleTag && tag.equals(expectedTag)) {
+                                mViewIndex++;
+                                if (i == total - 1) {
+                                    android.widget.LinearLayout layout = (android.widget.LinearLayout) existingView;
+                                    mActiveAgentTextView = (TextView) layout.getChildAt(0);
+                                }
+                            } else {
+                                mRecreateMode = true;
+                                mChatContainer.removeViews(mViewIndex, mChatContainer.getChildCount() - mViewIndex);
+                                clearHoldersFromIndex(i);
+                            }
+                        }
+                        if (mRecreateMode || mViewIndex >= mChatContainer.getChildCount()) {
+                            addAgentBubble(text);
+                            View newView = mChatContainer.getChildAt(mChatContainer.getChildCount() - 1);
+                            if (newView != null) newView.setTag(expectedTag);
+                            mViewIndex = mChatContainer.getChildCount();
+                        }
                         mActiveAgentTextView = null;
                         hasAgentResponseAtEnd = true;
                     }
@@ -1542,10 +1737,64 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         }
 
         if (mIsAgentActive && !hasAgentResponseAtEnd && mActiveAgentTextView == null) {
-            addAgentBubble("...");
+            BubbleTag expectedTag = new BubbleTag("agent_active", -1, "...");
+            if (!mRecreateMode && mViewIndex < mChatContainer.getChildCount()) {
+                View existingView = mChatContainer.getChildAt(mViewIndex);
+                Object tag = existingView.getTag();
+                if (tag instanceof BubbleTag && tag.equals(expectedTag)) {
+                    mViewIndex++;
+                    android.widget.LinearLayout layout = (android.widget.LinearLayout) existingView;
+                    mActiveAgentTextView = (TextView) layout.getChildAt(0);
+                } else {
+                    mRecreateMode = true;
+                    mChatContainer.removeViews(mViewIndex, mChatContainer.getChildCount() - mViewIndex);
+                    clearHoldersFromIndex(total);
+                }
+            }
+            if (mRecreateMode || mViewIndex >= mChatContainer.getChildCount()) {
+                addAgentBubble("...");
+                View newView = mChatContainer.getChildAt(mChatContainer.getChildCount() - 1);
+                if (newView != null) newView.setTag(expectedTag);
+                mViewIndex = mChatContainer.getChildCount();
+            }
+        }
+
+        if (mViewIndex < mChatContainer.getChildCount()) {
+            mChatContainer.removeViews(mViewIndex, mChatContainer.getChildCount() - mViewIndex);
+            clearHoldersFromIndex(total);
         }
 
         scrollToBottomIfNeeded(wasAtBottom);
+    }
+
+    private static class BubbleTag {
+        final String type;
+        final int index;
+        final String hash;
+
+        BubbleTag(String type, int index, String hash) {
+            this.type = type;
+            this.index = index;
+            this.hash = hash;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            BubbleTag bubbleTag = (BubbleTag) o;
+            return index == bubbleTag.index &&
+                    type.equals(bubbleTag.type) &&
+                    hash.equals(bubbleTag.hash);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = type.hashCode();
+            result = 31 * result + index;
+            result = 31 * result + hash.hashCode();
+            return result;
+        }
     }
 
     private boolean isCollapsible(String role) {
@@ -1587,7 +1836,51 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         });
     }
 
-    private void addCollapsibleBubble(String role, String text, int index) {
+    private void addExpandedSummaryHeader(int thoughts, int toolCalls, int toolResults, final int startIndex, final org.json.JSONArray array) {
+        StringBuilder sb = new StringBuilder();
+        if (thoughts > 0) sb.append("Thoughts [").append(thoughts).append("]");
+        if (toolCalls > 0) {
+            if (sb.length() > 0) sb.append(", ");
+            sb.append("Tool Calls [").append(toolCalls).append("]");
+        }
+        if (toolResults > 0) {
+            if (sb.length() > 0) sb.append(", ");
+            sb.append("Tool Results [").append(toolResults).append("]");
+        }
+        
+        String summaryText = sb.toString();
+        final TextView tv = addSystemMessage("▼ " + summaryText, "#00F2FE");
+        tv.setClickable(true);
+        tv.setFocusable(true);
+        tv.setBackgroundResource(R.drawable.card_glass);
+        float density = getResources().getDisplayMetrics().density;
+        tv.setPadding((int)(12*density), (int)(8*density), (int)(12*density), (int)(8*density));
+        
+        tv.setOnClickListener(v -> {
+            mExpandedSummaryIndices.remove(startIndex);
+            displayMessages(array, mShowAllEarlierMessages);
+        });
+    }
+
+    private boolean isBubbleExpanded(String role, int index) {
+        if (mShowThoughtsAndToolCalls) {
+            return true;
+        }
+        boolean defaultExpanded = false;
+        if ("thought".equals(role)) {
+            defaultExpanded = !mCollapseThoughts;
+        } else if ("tool_call".equals(role) || "tool_result".equals(role)) {
+            defaultExpanded = !mCollapseTools;
+        }
+        
+        if (defaultExpanded) {
+            return !mCollapsedIndices.contains(index);
+        } else {
+            return mExpandedIndices.contains(index);
+        }
+    }
+
+    private void addCollapsibleBubble(String role, String text, int index, boolean forceExpand) {
         if (mChatContainer == null || text == null || text.isEmpty()) return;
 
         float density = getResources().getDisplayMetrics().density;
@@ -1653,70 +1946,163 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         contentTv.setPadding(0, (int)(4 * density), 0, 0);
         contentTv.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
 
+        CharSequence fullSpanned = "";
+        CharSequence collapsedSpanned = null;
+        String filePath = null;
+
         if ("thought".equals(role)) {
             contentTv.setTextColor(Color.parseColor("#D0FFFFFF"));
-            contentTv.setText(renderMarkdown(content));
+            String cachedRaw = mCachedRawTexts.get(index);
+            android.text.Spanned cached = mRenderedTextCache.get(index);
+            if (cached == null || !content.equals(cachedRaw)) {
+                cached = renderMarkdown(content);
+                mRenderedTextCache.put(index, cached);
+                mCachedRawTexts.put(index, content);
+            }
+            fullSpanned = cached;
         } else if ("tool_call".equals(role)) {
             contentTv.setTextColor(Color.parseColor("#A0E6FF"));
             contentTv.setTypeface(android.graphics.Typeface.MONOSPACE);
-            contentTv.setText(renderMarkdown(content));
+            String cachedRaw = mCachedRawTexts.get(index);
+            android.text.Spanned cached = mRenderedTextCache.get(index);
+            if (cached == null || !content.equals(cachedRaw)) {
+                cached = renderMarkdown(content);
+                mRenderedTextCache.put(index, cached);
+                mCachedRawTexts.put(index, content);
+            }
+            fullSpanned = cached;
+
+            if (content.contains("view_file")) {
+                java.util.regex.Matcher m = java.util.regex.Pattern.compile("AbsolutePath\\s*=\\s*([^,\\)]+)").matcher(content);
+                if (m.find()) {
+                    filePath = m.group(1).trim();
+                }
+            }
         } else { // tool_result
             contentTv.setTypeface(android.graphics.Typeface.MONOSPACE);
             if (!content.isEmpty()) {
-                String lang = detectLanguage(content, header);
-                String htmlContent;
-                if (!lang.isEmpty() || looksLikeCode(content)) {
-                    htmlContent = renderAndHighlightCodeBlock(content, lang);
-                } else {
-                    htmlContent = renderPlainMonospace(content);
+                if (header.startsWith("View File")) {
+                    java.util.regex.Matcher m = java.util.regex.Pattern.compile("File Path:\\s*`?(file://[^`\\n]+)`?").matcher(content);
+                    if (m.find()) {
+                        filePath = m.group(1).trim();
+                    } else {
+                        m = java.util.regex.Pattern.compile("File Path:\\s*`?([^`\\n]+)`?").matcher(content);
+                        if (m.find()) {
+                            filePath = m.group(1).trim();
+                        }
+                    }
                 }
-                android.text.Spanned spanned;
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    spanned = android.text.Html.fromHtml(htmlContent, android.text.Html.FROM_HTML_MODE_LEGACY);
-                } else {
-                    spanned = android.text.Html.fromHtml(htmlContent);
+
+                String cachedRaw = mCachedRawTexts.get(index);
+                android.text.Spanned spanned = mRenderedCodeCache.get(index);
+                if (spanned == null || !content.equals(cachedRaw)) {
+                    String lang = detectLanguage(content, header);
+                    String htmlContent;
+                    if (!lang.isEmpty() || looksLikeCode(content)) {
+                        htmlContent = renderAndHighlightCodeBlock(content, lang);
+                    } else {
+                        htmlContent = renderPlainMonospace(content);
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        spanned = android.text.Html.fromHtml(htmlContent, android.text.Html.FROM_HTML_MODE_LEGACY);
+                    } else {
+                        spanned = android.text.Html.fromHtml(htmlContent);
+                    }
+                    spanned = makeSpansInterceptable(spanned);
+                    mRenderedCodeCache.put(index, spanned);
+                    mCachedRawTexts.put(index, content);
                 }
-                contentTv.setText(makeSpansInterceptable(spanned));
+                fullSpanned = spanned;
             }
+        }
+
+        if (filePath != null) {
+            String fileName = filePath;
+            if (fileName.contains("/")) {
+                fileName = fileName.substring(fileName.lastIndexOf("/") + 1);
+            }
+            String linkUrl = filePath;
+            if (!linkUrl.startsWith("file://")) {
+                if (linkUrl.startsWith("/")) {
+                    linkUrl = "file://" + linkUrl;
+                } else {
+                    linkUrl = "file:///data/data/com.termux/files/home/" + linkUrl;
+                }
+            }
+            String mdLink = "[" + fileName + "](" + linkUrl + ")";
+            collapsedSpanned = renderMarkdown(mdLink);
         }
 
         bubbleLayout.addView(headerTv);
         bubbleLayout.addView(contentTv);
 
         final CollapsibleBubbleHolder holder = new CollapsibleBubbleHolder(bubbleLayout, headerTv, contentTv, header, index);
+        holder.fullContent = fullSpanned;
+        holder.collapsedContent = collapsedSpanned;
         mCollapsibleBubbleHolders.add(holder);
 
         // Determine if it should be expanded initially
-        boolean shouldExpand = mShowThoughtsAndToolCalls || mExpandedIndices.contains(index);
+        boolean shouldExpand = mShowThoughtsAndToolCalls || forceExpand || isBubbleExpanded(role, index);
         holder.setExpanded(shouldExpand);
 
-        View.OnClickListener clickListener = v -> toggleCollapsibleBubble(holder);
+        View.OnClickListener clickListener = v -> toggleCollapsibleBubble(holder, role);
         bubbleLayout.setOnClickListener(clickListener);
         headerTv.setOnClickListener(clickListener);
 
         mChatContainer.addView(bubbleLayout);
     }
 
-    private void toggleCollapsibleBubble(CollapsibleBubbleHolder clickedHolder) {
+    private void toggleCollapsibleBubble(CollapsibleBubbleHolder clickedHolder, String role) {
         boolean targetState = !clickedHolder.expanded;
+        int index = clickedHolder.index;
+        
+        boolean defaultExpanded = false;
+        if ("thought".equals(role)) {
+            defaultExpanded = !mCollapseThoughts;
+        } else if ("tool_call".equals(role) || "tool_result".equals(role)) {
+            defaultExpanded = !mCollapseTools;
+        }
+        
         if (!mShowThoughtsAndToolCalls) {
-            // Expand All is NOT toggled -> collapse all others when expanding
             if (targetState) {
                 mExpandedIndices.clear();
-                mExpandedIndices.add(clickedHolder.index);
+                mCollapsedIndices.clear();
+                mExpandedIndices.add(index);
                 for (CollapsibleBubbleHolder holder : mCollapsibleBubbleHolders) {
                     if (holder != clickedHolder && holder.expanded) {
+                        String otherRole = "tool_result";
+                        if (holder.headerText.equals("Thought")) otherRole = "thought";
+                        else if (holder.headerText.equals("Tool Call")) otherRole = "tool_call";
+                        
+                        boolean otherDefaultExpanded = false;
+                        if ("thought".equals(otherRole)) {
+                            otherDefaultExpanded = !mCollapseThoughts;
+                        } else if ("tool_call".equals(otherRole) || "tool_result".equals(otherRole)) {
+                            otherDefaultExpanded = !mCollapseTools;
+                        }
+                        
+                        if (otherDefaultExpanded) {
+                            mCollapsedIndices.add(holder.index);
+                        } else {
+                            mExpandedIndices.remove(holder.index);
+                        }
                         holder.setExpanded(false);
                     }
                 }
             } else {
-                mExpandedIndices.remove(clickedHolder.index);
+                if (defaultExpanded) {
+                    mCollapsedIndices.add(index);
+                } else {
+                    mExpandedIndices.remove(index);
+                }
             }
         } else {
             if (targetState) {
-                mExpandedIndices.add(clickedHolder.index);
+                mCollapsedIndices.remove(index);
+                mExpandedIndices.add(index);
             } else {
-                mExpandedIndices.remove(clickedHolder.index);
+                mCollapsedIndices.add(index);
+                mExpandedIndices.remove(index);
             }
         }
         clickedHolder.setExpanded(targetState);
@@ -3065,7 +3451,9 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                 mTvStatus.setTextColor(Color.parseColor("#FF2D55"));
                 mBtnMic.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#FF2D55")));
                 mBtnMic.setImageTintList(ColorStateList.valueOf(Color.parseColor("#FFFFFF")));
-                mPbThinking.setVisibility(View.GONE);
+                if (mLayoutThinkingContainer != null) {
+                    mLayoutThinkingContainer.setVisibility(View.GONE);
+                }
                 
                 // Keep screen on
                 getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -3086,7 +3474,9 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                 mTvStatus.setTextColor(Color.parseColor("#00F2FE"));
                 mBtnMic.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#0D1A2E")));
                 mBtnMic.setImageTintList(ColorStateList.valueOf(Color.parseColor("#00F2FE")));
-                mPbThinking.setVisibility(View.VISIBLE);
+                if (mLayoutThinkingContainer != null) {
+                    mLayoutThinkingContainer.setVisibility(View.VISIBLE);
+                }
                 
                 // Keep screen on
                 getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -3119,7 +3509,9 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                 mTvStatus.setTextColor(Color.parseColor("#4CD964"));
                 mBtnMic.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#4CD964")));
                 mBtnMic.setImageTintList(ColorStateList.valueOf(Color.parseColor("#FFFFFF")));
-                mPbThinking.setVisibility(View.GONE);
+                if (mLayoutThinkingContainer != null) {
+                    mLayoutThinkingContainer.setVisibility(View.GONE);
+                }
                 
                 // Keep screen on
                 getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -3148,7 +3540,9 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                 mIsAgentActive = false;
                 mTvStatus.setText("FINISHED");
                 mTvStatus.setTextColor(Color.parseColor("#4CD964"));
-                mPbThinking.setVisibility(View.GONE);
+                if (mLayoutThinkingContainer != null) {
+                    mLayoutThinkingContainer.setVisibility(View.GONE);
+                }
                 getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                 break;
 
@@ -3160,7 +3554,9 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                 mTvStatus.setTextColor(Color.parseColor("#8A8A8F"));
                 mBtnMic.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#2D1F54")));
                 mBtnMic.setImageTintList(ColorStateList.valueOf(Color.parseColor("#E6E6FA")));
-                mPbThinking.setVisibility(View.GONE);
+                if (mLayoutThinkingContainer != null) {
+                    mLayoutThinkingContainer.setVisibility(View.GONE);
+                }
                 
                 // Clear keep screen on
                 getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -3346,6 +3742,111 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
             mDisplayedStepKeys.clear();
             mCurrentSessionHistory = new org.json.JSONArray();
             mLastStreamedAgentText = "";
+            mExpandedIndices.clear();
+            mCollapsedIndices.clear();
+            mExpandedSummaryIndices.clear();
+            mRenderedTextCache.clear();
+            mRenderedCodeCache.clear();
+            mCachedRawTexts.clear();
         }
+    }
+
+    private static final int PICK_FILE_REQUEST = 2002;
+
+    private void openFilePicker() {
+        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+        intent.setType("*/*");
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        try {
+            startActivityForResult(Intent.createChooser(intent, "Select File to Upload"), PICK_FILE_REQUEST);
+        } catch (android.content.ActivityNotFoundException ex) {
+            Toast.makeText(this, "Please install a File Manager.", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == PICK_FILE_REQUEST && resultCode == RESULT_OK && data != null && data.getData() != null) {
+            android.net.Uri uri = data.getData();
+            handleSelectedFile(uri);
+        }
+    }
+
+    private void handleSelectedFile(android.net.Uri uri) {
+        try {
+            String fileName = getFileName(uri);
+            if (fileName == null) {
+                fileName = "uploaded_file_" + System.currentTimeMillis();
+            }
+            
+            String destDirStr = "/data/data/com.termux/files/home";
+            if (mTargetDirectory != null && !mTargetDirectory.isEmpty() && !"Home".equals(mTargetDirectory)) {
+                if (mTargetDirectory.startsWith("/")) {
+                    destDirStr = mTargetDirectory;
+                } else {
+                    destDirStr = "/data/data/com.termux/files/home/" + mTargetDirectory;
+                }
+            }
+            
+            java.io.File destDir = new java.io.File(destDirStr);
+            if (!destDir.exists()) {
+                destDir.mkdirs();
+            }
+            
+            java.io.File destFile = new java.io.File(destDir, fileName);
+            
+            java.io.InputStream is = getContentResolver().openInputStream(uri);
+            java.io.OutputStream os = new java.io.FileOutputStream(destFile);
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = is.read(buffer)) != -1) {
+                os.write(buffer, 0, bytesRead);
+            }
+            is.close();
+            os.close();
+            
+            Toast.makeText(this, "Uploaded " + fileName + " to " + mTargetDirectory, Toast.LENGTH_LONG).show();
+            
+            String currentText = mEtMessage.getText().toString();
+            String fileRef = "Passed file: [" + fileName + "](file://" + destFile.getAbsolutePath() + ")";
+            if (currentText.isEmpty()) {
+                mEtMessage.setText(fileRef + "\n");
+            } else {
+                mEtMessage.setText(currentText + "\n" + fileRef + "\n");
+            }
+            mEtMessage.setSelection(mEtMessage.getText().length());
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error uploading file", e);
+            Toast.makeText(this, "Upload failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private String getFileName(android.net.Uri uri) {
+        String result = null;
+        if (uri.getScheme().equals("content")) {
+            android.database.Cursor cursor = getContentResolver().query(uri, null, null, null, null);
+            try {
+                if (cursor != null && cursor.moveToFirst()) {
+                    int idx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME);
+                    if (idx != -1) {
+                        result = cursor.getString(idx);
+                    }
+                }
+            } finally {
+                if (cursor != null) {
+                    cursor.close();
+                }
+            }
+        }
+        if (result == null) {
+            result = uri.getPath();
+            int cut = result.lastIndexOf('/');
+            if (cut != -1) {
+                result = result.substring(cut + 1);
+            }
+        }
+        return result;
     }
 }

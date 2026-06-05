@@ -135,6 +135,42 @@
                     android:contentDescription="Scroll to bottom" />
             </FrameLayout>
 
+            <!-- Thinking spinner & Terminate button container -->
+            <LinearLayout
+                android:id="@+id/layout_thinking_container"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_gravity="center_horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="4dp"
+                android:visibility="gone">
+
+                <ProgressBar
+                    android:id="@+id/pb_thinking"
+                    android:layout_width="wrap_content"
+                    android:layout_height="24dp"
+                    android:indeterminate="true"
+                    android:indeterminateTintMode="src_atop"
+                    android:indeterminateTint="#00F2FE" />
+
+                <!-- Red X Terminate Button -->
+                <ImageButton
+                    android:id="@+id/btn_terminate"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_marginStart="12dp"
+                    android:background="@drawable/card_glass"
+                    android:src="@android:drawable/ic_menu_close_clear_cancel"
+                    android:tint="#FF3B30"
+                    android:padding="4dp"
+                    android:scaleType="fitCenter"
+                    android:contentDescription="Terminate session execution"
+                    android:clickable="true"
+                    android:focusable="true" />
+            </LinearLayout>
+
             <!-- Prompt Queue Container Layout -->
             <LinearLayout
                 android:id="@+id/layout_queue_container"
@@ -188,20 +224,6 @@
                         android:orientation="vertical" />
                 </ScrollView>
             </LinearLayout>
-
-
-            <!-- Thinking Spinner Progress Bar -->
-            <ProgressBar
-                android:id="@+id/pb_thinking"
-                android:layout_width="wrap_content"
-                android:layout_height="24dp"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginTop="4dp"
-                android:layout_marginBottom="4dp"
-                android:indeterminate="true"
-                android:visibility="gone"
-                android:indeterminateTintMode="src_atop"
-                android:indeterminateTint="#00F2FE" />
         </LinearLayout>
 
         <!-- Bottom Settings (Continue session & Setup info) -->
@@ -309,11 +331,28 @@
 
             <!-- Input Bar Layout -->
             <LinearLayout
+                android:id="@+id/input_bar_layout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
                 android:layout_marginBottom="6dp">
+
+                <!-- File Upload Button -->
+                <ImageButton
+                    android:id="@+id/btn_upload"
+                    android:layout_width="42dp"
+                    android:layout_height="42dp"
+                    android:background="@drawable/card_glass"
+                    android:src="@drawable/ic_folder"
+                    android:tint="#00F2FE"
+                    android:padding="8dp"
+                    android:scaleType="fitCenter"
+                    android:contentDescription="Upload file or screenshot"
+                    android:layout_marginEnd="5dp"
+                    android:elevation="6dp"
+                    android:clickable="true"
+                    android:focusable="true" />
 
                 <!-- Sleek glassmorphic text input box -->
                 <EditText

@@ -44,6 +44,7 @@ public class ToggleTalkService extends Service {
     public static final String ACTION_STOP = "com.toggletalk.android.ACTION_STOP";
     public static final String ACTION_QUEUE_CHANGED = "com.toggletalk.android.ACTION_QUEUE_CHANGED";
     public static final String ACTION_UPDATE_PROMPT = "com.toggletalk.android.ACTION_UPDATE_PROMPT";
+    public static final String ACTION_TERMINATE_SESSION = "com.toggletalk.android.ACTION_TERMINATE_SESSION";
 
     public static final String EXTRA_STATE = "state";
     public static final String EXTRA_TEXT = "text";
@@ -63,6 +64,8 @@ public class ToggleTalkService extends Service {
     private boolean mIsStreamingActive = false;
 
     private final java.util.Map<String, java.util.List<String>> mSessionQueues = new java.util.HashMap<>();
+    private final java.util.Map<String, String> mSessionStates = new java.util.HashMap<>();
+    private final java.util.Map<String, String> mSessionTexts = new java.util.HashMap<>();
     
     private static class TtsItem {
         String sessionId;
@@ -106,10 +109,14 @@ public class ToggleTalkService extends Service {
                 String state = intent.getStringExtra("state");
                 String text = intent.getStringExtra("text");
                 if (state != null) {
-                    updateState(state, text != null ? text : "");
+                    updateState(mSelectedSessionId, state, text != null ? text : "");
                 }
             } else if (ACTION_ANTIGRAVITY_RESPONSE.equals(action)) {
                 Log.d(TAG, "Received Antigravity response callback from Termux");
+                String callbackSessionId = intent.getStringExtra("session_id");
+                if (callbackSessionId == null || callbackSessionId.isEmpty()) {
+                    callbackSessionId = mSelectedSessionId;
+                }
                 // If stop was requested, discard the result
                 if (mStopRequested) {
                     Log.d(TAG, "Stop requested: discarding Antigravity response");
@@ -125,21 +132,21 @@ public class ToggleTalkService extends Service {
                     
                     if (exitCode != 0) {
                         Log.e(TAG, "Antigravity failed with exit code: " + exitCode + ". Error: " + errmsg);
-                        updateState("IDLE", "Error: " + (errmsg != null && !errmsg.isEmpty() ? errmsg : "Process exited with code " + exitCode));
+                        updateState(callbackSessionId, "IDLE", "Error: " + (errmsg != null && !errmsg.isEmpty() ? errmsg : "Process exited with code " + exitCode));
                         Intent refreshIntent = new Intent("com.toggletalk.android.ACTION_REFRESH_HISTORY");
                         sendBroadcast(refreshIntent);
                         return;
                     }
                     
                     if (stdout != null && !stdout.trim().isEmpty()) {
-                        handleAntigravityResponse(stdout);
+                        handleAntigravityResponse(callbackSessionId, stdout);
                     } else {
                         Log.e(TAG, "Empty output from Antigravity. Error: " + errmsg);
-                        updateState("IDLE", "Error: " + (errmsg != null ? errmsg : "Empty output"));
+                        updateState(callbackSessionId, "IDLE", "Error: " + (errmsg != null ? errmsg : "Empty output"));
                     }
                 } else {
                     Log.e(TAG, "No result bundle received from Termux");
-                    updateState("IDLE", "Error: No command output received");
+                    updateState(callbackSessionId, "IDLE", "Error: No command output received");
                 }
             } else if ("com.toggletalk.android.ACTION_STREAM_UPDATE".equals(action)) {
                 String sessionId = intent.getStringExtra("session_id");
@@ -156,7 +163,14 @@ public class ToggleTalkService extends Service {
                 mCurrentlyPlayingItem = null;
                 mCurrentPlayingChunk = null;
                 mIsTtsPaused = false;
-                updateState("IDLE", "");
+                mIsTtsPlaying = false;
+                updateState(mSelectedSessionId, "IDLE", "");
+            } else if (ACTION_TERMINATE_SESSION.equals(action)) {
+                String sessionId = intent.getStringExtra("session_id");
+                if (sessionId == null || sessionId.isEmpty()) {
+                    sessionId = mSelectedSessionId;
+                }
+                terminateSession(sessionId);
             }
         }
     };
@@ -181,6 +195,7 @@ public class ToggleTalkService extends Service {
         filter.addAction(ACTION_ANTIGRAVITY_RESPONSE);
         filter.addAction("com.toggletalk.android.ACTION_STREAM_UPDATE");
         filter.addAction("com.toggletalk.android.ACTION_TERMINATE_TTS");
+        filter.addAction(ACTION_TERMINATE_SESSION);
         registerReceiver(mTermuxReceiver, filter);
         
         // Lazily initialize speech models in background thread so service creation is instant
@@ -220,7 +235,8 @@ public class ToggleTalkService extends Service {
                 boolean bypass = intent.getBooleanExtra("bypass_antigravity", mBypassAntigravity);
                 
                 if (prompt != null && !prompt.trim().isEmpty()) {
-                    if (!"IDLE".equals(mCurrentState)) {
+                    String currentSessState = mSessionStates.getOrDefault(mSelectedSessionId, "IDLE");
+                    if (!"IDLE".equals(currentSessState)) {
                         // Queue the prompt
                         java.util.List<String> queue = mSessionQueues.get(mSelectedSessionId);
                         if (queue == null) {
@@ -228,14 +244,15 @@ public class ToggleTalkService extends Service {
                             mSessionQueues.put(mSelectedSessionId, queue);
                         }
                         queue.add(prompt);
-                        broadcastQueueChanged();
+                        broadcastQueueChanged(mSelectedSessionId);
                     } else {
                         mStopRequested = false; // reset stop flag for new request
-                        updateState("THINKING", prompt);
+                        updateState(mSelectedSessionId, "THINKING", prompt);
                         if (bypass || prompt.toLowerCase().startsWith("mock:") || prompt.toLowerCase().startsWith("/mock")) {
-                            runMockReasoning(prompt);
+                            runMockReasoning(mSelectedSessionId, prompt);
                         } else {
-                            new Thread(() -> runAntigravityReasoning(prompt)).start();
+                            final String runSessionId = mSelectedSessionId;
+                            new Thread(() -> runAntigravityReasoning(runSessionId, prompt)).start();
                         }
                     }
                 }
@@ -248,7 +265,7 @@ public class ToggleTalkService extends Service {
                         mSessionQueues.put(mSelectedSessionId, queue);
                     }
                     queue.add(prompt);
-                    broadcastQueueChanged();
+                    broadcastQueueChanged(mSelectedSessionId);
                 }
             } else if (ACTION_UPDATE_PROMPT.equals(action)) {
                 int index = intent.getIntExtra("index", -1);
@@ -257,7 +274,7 @@ public class ToggleTalkService extends Service {
                     java.util.List<String> queue = mSessionQueues.get(mSelectedSessionId);
                     if (queue != null && index < queue.size()) {
                         queue.set(index, text);
-                        broadcastQueueChanged();
+                        broadcastQueueChanged(mSelectedSessionId);
                     }
                 }
             } else if ("com.toggletalk.android.ACTION_DELETE_PROMPT".equals(action)) {
@@ -266,18 +283,18 @@ public class ToggleTalkService extends Service {
                     java.util.List<String> queue = mSessionQueues.get(mSelectedSessionId);
                     if (queue != null && index < queue.size()) {
                         queue.remove(index);
-                        broadcastQueueChanged();
+                        broadcastQueueChanged(mSelectedSessionId);
                     }
                 }
             } else if ("com.toggletalk.android.ACTION_CLEAR_QUEUE".equals(action)) {
                 java.util.List<String> queue = mSessionQueues.get(mSelectedSessionId);
                 if (queue != null) {
                     queue.clear();
-                    broadcastQueueChanged();
+                    broadcastQueueChanged(mSelectedSessionId);
                 }
             } else if ("com.toggletalk.android.ACTION_GET_STATE".equals(action)) {
                 broadcastStateToApp();
-                broadcastQueueChanged();
+                broadcastQueueChanged(mSelectedSessionId);
             } else if ("com.toggletalk.android.ACTION_SET_CONTINUE".equals(action)) {
                 mContinueSession = intent.getBooleanExtra("continue_session", false);
             } else if ("com.toggletalk.android.ACTION_SET_BYPASS_ANTIGRAVITY".equals(action)) {
@@ -298,6 +315,10 @@ public class ToggleTalkService extends Service {
                     mContinueSession = !sessionId.isEmpty();
                     getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putString("selected_session_id", sessionId).apply();
                     Log.d(TAG, "Session ID updated to: " + sessionId + ", continue: " + mContinueSession);
+                    mCurrentState = mSessionStates.getOrDefault(mSelectedSessionId, "IDLE");
+                    mCurrentText = mSessionTexts.getOrDefault(mSelectedSessionId, "");
+                    broadcastStateToApp();
+                    broadcastQueueChanged(mSelectedSessionId);
                 }
             }
         }
@@ -305,8 +326,14 @@ public class ToggleTalkService extends Service {
     }
 
     private void broadcastQueueChanged() {
-        java.util.List<String> queue = mSessionQueues.get(mSelectedSessionId);
+        broadcastQueueChanged(mSelectedSessionId);
+    }
+
+    private void broadcastQueueChanged(String sessionId) {
+        if (sessionId == null || sessionId.isEmpty()) return;
+        java.util.List<String> queue = mSessionQueues.get(sessionId);
         Intent intent = new Intent(ACTION_QUEUE_CHANGED);
+        intent.putExtra("session_id", sessionId);
         if (queue != null) {
             intent.putStringArrayListExtra("queue", new java.util.ArrayList<>(queue));
         } else {
@@ -316,17 +343,23 @@ public class ToggleTalkService extends Service {
     }
 
     private void checkAndRunNextInQueue() {
-        java.util.List<String> queue = mSessionQueues.get(mSelectedSessionId);
-        if (queue != null && !queue.isEmpty() && "IDLE".equals(mCurrentState)) {
+        checkAndRunNextInQueue(mSelectedSessionId);
+    }
+
+    private void checkAndRunNextInQueue(String sessionId) {
+        if (sessionId == null || sessionId.isEmpty()) return;
+        java.util.List<String> queue = mSessionQueues.get(sessionId);
+        String currentSessState = mSessionStates.getOrDefault(sessionId, "IDLE");
+        if (queue != null && !queue.isEmpty() && "IDLE".equals(currentSessState)) {
             String nextPrompt = queue.remove(0);
-            broadcastQueueChanged();
+            broadcastQueueChanged(sessionId);
             
             mStopRequested = false;
-            updateState("THINKING", nextPrompt);
+            updateState(sessionId, "THINKING", nextPrompt);
             if (mBypassAntigravity || nextPrompt.toLowerCase().startsWith("mock:") || nextPrompt.toLowerCase().startsWith("/mock")) {
-                runMockReasoning(nextPrompt);
+                runMockReasoning(sessionId, nextPrompt);
             } else {
-                new Thread(() -> runAntigravityReasoning(nextPrompt)).start();
+                new Thread(() -> runAntigravityReasoning(sessionId, nextPrompt)).start();
             }
         }
     }
@@ -337,33 +370,34 @@ public class ToggleTalkService extends Service {
             vibrator.vibrate(80);
         }
 
-        Log.d(TAG, "handleToggle current state: " + mCurrentState);
+        String currentState = mSessionStates.getOrDefault(mSelectedSessionId, "IDLE");
+        Log.d(TAG, "handleToggle current state for " + mSelectedSessionId + ": " + currentState);
 
-        if ("IDLE".equals(mCurrentState)) {
-            updateState("RECORDING", "Listening...");
+        if ("IDLE".equals(currentState)) {
+            updateState(mSelectedSessionId, "RECORDING", "Listening...");
             startNativeRecording();
-        } else if ("RECORDING".equals(mCurrentState)) {
+        } else if ("RECORDING".equals(currentState)) {
             if (mIsTranscribing) {
                 Log.d(TAG, "Already transcribing, ignoring toggle");
                 return;
             }
             mIsTranscribing = true;
-            updateState("THINKING", "Transcribing...");
+            updateState(mSelectedSessionId, "THINKING", "Transcribing...");
             float[] samples = stopNativeRecording();
             runNativeTranscription(samples);
-        } else if ("THINKING".equals(mCurrentState) || "SPEAKING".equals(mCurrentState)) {
-            if ("SPEAKING".equals(mCurrentState) || mIsTtsPlaying) {
+        } else if ("THINKING".equals(currentState) || "SPEAKING".equals(currentState)) {
+            if ("SPEAKING".equals(currentState) || mIsTtsPlaying) {
                 mIsTtsPaused = true;
             }
             stopAudioPlayback();
             stopNativeRecording();
-            updateState("RECORDING", "Listening...");
+            updateState(mSelectedSessionId, "RECORDING", "Listening...");
             startNativeRecording();
         }
     }
 
     private void handleStop() {
-        Log.d(TAG, "handleStop: stopping agent and TTS");
+        Log.d(TAG, "handleStop: stopping agent and TTS for active session: " + mSelectedSessionId);
         mStopRequested = true;
         stopAudioPlayback();
         mCurrentlyPlayingItem = null;
@@ -374,8 +408,9 @@ public class ToggleTalkService extends Service {
             mTtsQueue.clear();
         }
         mIsTtsPlaying = false;
-        if (!"IDLE".equals(mCurrentState)) {
-            updateState("IDLE", "");
+        String currentState = mSessionStates.getOrDefault(mSelectedSessionId, "IDLE");
+        if (!"IDLE".equals(currentState)) {
+            updateState(mSelectedSessionId, "IDLE", "");
         }
     }
 
@@ -498,7 +533,7 @@ public class ToggleTalkService extends Service {
                     initSpeechEngines();
                     if (mRecognizer == null) {
                         Log.e(TAG, "OfflineRecognizer is null, cannot transcribe");
-                        updateState("IDLE", "ASR engine initialization failed. Ensure models are placed in /sdcard/ToggleTalkModels/");
+                        updateState(mSelectedSessionId, "IDLE", "ASR engine initialization failed. Ensure models are placed in /sdcard/ToggleTalkModels/");
                         return;
                     }
                     
@@ -513,7 +548,7 @@ public class ToggleTalkService extends Service {
                     Log.d(TAG, "Whisper ASR Transcript: " + text);
                     if (text == null || text.trim().isEmpty()) {
                         Log.i(TAG, "Transcript empty, resetting to IDLE");
-                        updateState("IDLE", "");
+                        updateState(mSelectedSessionId, "IDLE", "");
                         return;
                     }
                     
@@ -523,10 +558,10 @@ public class ToggleTalkService extends Service {
                     sendBroadcast(intent);
 
                     // Reset state to IDLE
-                    updateState("IDLE", "");
+                    updateState(mSelectedSessionId, "IDLE", "");
                 } catch (Exception e) {
                     Log.e(TAG, "ASR transcription failed", e);
-                    updateState("IDLE", "Transcription failed: " + e.getMessage());
+                    updateState(mSelectedSessionId, "IDLE", "Transcription failed: " + e.getMessage());
                 } finally {
                     mIsTranscribing = false;
                 }
@@ -534,7 +569,7 @@ public class ToggleTalkService extends Service {
         }).start();
     }
 
-    private void runMockReasoning(final String prompt) {
+    private void runMockReasoning(final String sessionId, final String prompt) {
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -569,35 +604,40 @@ public class ToggleTalkService extends Service {
                         "<tts>Echoing your prompt. You said: " + queryText + "</tts>";
                 }
 
-                if (mSelectedSessionId == null || mSelectedSessionId.isEmpty()) {
-                    String mockSessionId = "mock_session_" + (System.currentTimeMillis() / 1000);
-                    mSelectedSessionId = mockSessionId;
-                    mContinueSession = true;
-                    getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putString("selected_session_id", mockSessionId).apply();
-                    Log.d(TAG, "Adopted new mock session ID: " + mockSessionId);
-                    
-                    Intent sessionIntent = new Intent("com.toggletalk.android.ACTION_NEW_SESSION_ADOPTED");
-                    sessionIntent.putExtra("session_id", mockSessionId);
-                    sendBroadcast(sessionIntent);
+                String activeSessionId = sessionId;
+                if (activeSessionId == null || activeSessionId.isEmpty()) {
+                    activeSessionId = "mock_session_" + (System.currentTimeMillis() / 1000);
+                    if (mSelectedSessionId == null || mSelectedSessionId.isEmpty()) {
+                        mSelectedSessionId = activeSessionId;
+                        mContinueSession = true;
+                        getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putString("selected_session_id", activeSessionId).apply();
+                        Log.d(TAG, "Adopted new mock session ID: " + activeSessionId);
+                        
+                        Intent sessionIntent = new Intent("com.toggletalk.android.ACTION_NEW_SESSION_ADOPTED");
+                        sessionIntent.putExtra("session_id", activeSessionId);
+                        sendBroadcast(sessionIntent);
+                    }
                 }
 
                 try {
                     org.json.JSONObject obj = new org.json.JSONObject();
                     obj.put("latest_response", responseText);
                     obj.put("sanitized_tts", responseText);
+                    obj.put("session_id", activeSessionId);
                     final String jsonStr = obj.toString();
                     
                     android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
-                    handler.post(() -> handleAntigravityResponse(jsonStr));
+                    final String finalSess = activeSessionId;
+                    handler.post(() -> handleAntigravityResponse(finalSess, jsonStr));
                 } catch (Exception e) {
                     Log.e(TAG, "Mock JSON creation failed", e);
-                    updateState("IDLE", "Mock failed: " + e.getMessage());
+                    updateState(activeSessionId, "IDLE", "Mock failed: " + e.getMessage());
                 }
             }
         }).start();
     }
 
-    private void runAntigravityReasoning(String transcript) {
+    private void runAntigravityReasoning(String sessionId, String transcript) {
         mIsStreamingActive = true;
         // Construct the RUN_COMMAND Intent to invoke run_antigravity.sh in Termux
         Intent runCommandIntent = new Intent();
@@ -624,9 +664,10 @@ public class ToggleTalkService extends Service {
         }
         argList.add(absoluteTargetDir);
         
-        argList.add(String.valueOf(mContinueSession));
-        if (mContinueSession && mSelectedSessionId != null && !mSelectedSessionId.isEmpty()) {
-            argList.add(mSelectedSessionId);
+        boolean continueSess = (sessionId != null && !sessionId.isEmpty());
+        argList.add(String.valueOf(continueSess));
+        if (continueSess) {
+            argList.add(sessionId);
         } else {
             argList.add("");
         }
@@ -640,6 +681,9 @@ public class ToggleTalkService extends Service {
 
         // Create PendingIntent for command result callback
         Intent callbackIntent = new Intent(ACTION_ANTIGRAVITY_RESPONSE);
+        callbackIntent.putExtra("session_id", sessionId);
+        callbackIntent.setData(android.net.Uri.parse("session://" + (sessionId != null ? sessionId : "new")));
+        
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             flags |= PendingIntent.FLAG_MUTABLE;
@@ -647,7 +691,7 @@ public class ToggleTalkService extends Service {
         PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 1001, callbackIntent, flags);
         runCommandIntent.putExtra("com.termux.RUN_COMMAND_PENDING_INTENT", pendingIntent);
 
-        Log.d(TAG, "Sending RUN_COMMAND to Termux: transcript=" + transcript + ", continue_session=" + mContinueSession);
+        Log.d(TAG, "Sending RUN_COMMAND to Termux for session " + sessionId + ": transcript=" + transcript);
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -657,11 +701,11 @@ public class ToggleTalkService extends Service {
             }
         } catch (Exception e) {
             Log.e(TAG, "Failed to send RUN_COMMAND intent", e);
-            updateState("IDLE", "Termux invocation failed");
+            updateState(sessionId, "IDLE", "Termux invocation failed");
         }
     }
 
-    private void handleAntigravityResponse(String jsonString) {
+    private void handleAntigravityResponse(String callbackSessionId, String jsonString) {
         try {
             // Find start of JSON object in case of extra output lines
             int startIdx = jsonString.indexOf("{");
@@ -669,7 +713,7 @@ public class ToggleTalkService extends Service {
             if (startIdx == -1 || endIdx == -1 || endIdx < startIdx) {
                 Log.e(TAG, "Failed to locate JSON object in stdout: " + jsonString);
                 // Fallback: use raw stdout
-                processTTSOutput(jsonString, jsonString);
+                processTTSOutput(callbackSessionId, jsonString, jsonString);
                 return;
             }
             
@@ -678,6 +722,10 @@ public class ToggleTalkService extends Service {
             String latestResponse = obj.optString("latest_response", "");
             String sanitizedTts = obj.optString("sanitized_tts", "");
             String sessionId = obj.optString("session_id", "");
+            
+            if (sessionId == null || sessionId.isEmpty()) {
+                sessionId = callbackSessionId;
+            }
             
             if (mSelectedSessionId == null || mSelectedSessionId.isEmpty()) {
                 if (sessionId != null && !sessionId.isEmpty()) {
@@ -699,11 +747,11 @@ public class ToggleTalkService extends Service {
                 sanitizedTts = latestResponse;
             }
             
-            processTTSOutput(latestResponse, sanitizedTts);
+            processTTSOutput(sessionId, latestResponse, sanitizedTts);
         } catch (Exception e) {
             Log.e(TAG, "Error parsing Antigravity JSON output", e);
             // Fallback: use raw stdout
-            processTTSOutput(jsonString, jsonString);
+            processTTSOutput(callbackSessionId, jsonString, jsonString);
         }
     }
 
@@ -751,17 +799,17 @@ public class ToggleTalkService extends Service {
         return text.trim();
     }
 
-    private void processTTSOutput(final String latestResponse, final String sanitizedTts) {
+    private void processTTSOutput(final String sessionId, final String latestResponse, final String sanitizedTts) {
         if (mIsStreamingActive) {
             mIsStreamingActive = false;
-            updateState("SPEAKING", latestResponse);
+            updateState(sessionId, "SPEAKING", latestResponse);
             new Thread(new Runnable() {
                 @Override
                 public void run() {
                     try { Thread.sleep(500); } catch (Exception ignored) {}
                     synchronized (mTtsQueue) {
                         if (mTtsQueue.isEmpty() && !mIsTtsPlaying) {
-                            updateState("FINISHED", "");
+                            updateState(sessionId, "FINISHED", "");
                         }
                     }
                 }
@@ -769,7 +817,7 @@ public class ToggleTalkService extends Service {
             return;
         }
 
-        updateState("SPEAKING", latestResponse);
+        updateState(sessionId, "SPEAKING", latestResponse);
         
         // Parse <tts>...</tts> tags in latestResponse
         java.util.List<String> ttsSegments = new java.util.ArrayList<>();
@@ -791,9 +839,9 @@ public class ToggleTalkService extends Service {
         }
         
         if (textToSpeak != null && !textToSpeak.trim().isEmpty()) {
-            queueTtsText(mSelectedSessionId, textToSpeak);
+            queueTtsText(sessionId, textToSpeak);
         } else {
-            updateState("FINISHED", "");
+            updateState(sessionId, "FINISHED", "");
         }
     }
 
@@ -808,6 +856,8 @@ public class ToggleTalkService extends Service {
             sessionIntent.putExtra("session_id", sessionId);
             sendBroadcast(sessionIntent);
         }
+
+        updateState(sessionId, "THINKING", "Streaming updates...");
 
         if (!mSelectedSessionId.equals(sessionId)) {
             Log.d(TAG, "Ignoring streamed update: sessionId mismatch. expected=" + mSelectedSessionId + ", got=" + sessionId);
@@ -847,11 +897,17 @@ public class ToggleTalkService extends Service {
         }
         
         mIsTtsPlaying = true;
-        updateState("SPEAKING", "Speaking...");
+        TtsItem nextItem = null;
+        synchronized (mTtsQueue) {
+            nextItem = mTtsQueue.peek();
+        }
+        final String ttsSessionId = nextItem != null ? nextItem.sessionId : mSelectedSessionId;
+        updateState(ttsSessionId, "SPEAKING", "Speaking...");
         
         mTtsThread = new Thread(new Runnable() {
             @Override
             public void run() {
+                TtsItem currentItem = null;
                 initSpeechEngines();
                 if (mTts == null) {
                     Log.e(TAG, "OfflineTts is null, cannot speak");
@@ -859,7 +915,7 @@ public class ToggleTalkService extends Service {
                         mTtsQueue.clear();
                     }
                     mIsTtsPlaying = false;
-                    updateState("IDLE", "TTS engine initialization failed");
+                    updateState(ttsSessionId, "IDLE", "TTS engine initialization failed");
                     return;
                 }
                 
@@ -875,9 +931,11 @@ public class ToggleTalkService extends Service {
                             }
                             item = mTtsQueue.poll();
                         }
+                        currentItem = item;
                         
                         if (item.sessionId != null && !item.sessionId.equals(mSelectedSessionId)) {
                             Log.d(TAG, "Discarding TTS item from inactive session: " + item.sessionId + " (active: " + mSelectedSessionId + ")");
+                            updateState(item.sessionId, "FINISHED", "");
                             continue;
                         }
                         
@@ -959,12 +1017,14 @@ public class ToggleTalkService extends Service {
                         mCurrentPlayingChunk = null;
                     }
                     
+                    final String finalSessionId = currentItem != null ? currentItem.sessionId : ttsSessionId;
                     synchronized (mTtsQueue) {
                         if (!mTtsQueue.isEmpty() && !mIsTtsPaused) {
                             new Thread(() -> startTtsPlaybackIfNeeded()).start();
                         } else {
-                            if ("SPEAKING".equals(mCurrentState) && !mIsTtsPaused) {
-                                updateState("FINISHED", "");
+                            String currentState = mSessionStates.getOrDefault(finalSessionId, "IDLE");
+                            if ("SPEAKING".equals(currentState) && !mIsTtsPaused) {
+                                updateState(finalSessionId, "FINISHED", "");
                             }
                         }
                     }
@@ -1084,40 +1144,51 @@ public class ToggleTalkService extends Service {
     }
 
     private void updateState(String state, String text) {
-        Log.d(TAG, "updateState: " + state + ", text: " + text);
-        mCurrentState = state;
-        mCurrentText = text;
+        updateState(mSelectedSessionId, state, text);
+    }
+
+    private void updateState(String sessionId, String state, String text) {
+        if (sessionId == null || sessionId.isEmpty()) {
+            sessionId = mSelectedSessionId;
+        }
+        Log.d(TAG, "updateState for " + sessionId + ": " + state + ", text: " + text);
+        mSessionStates.put(sessionId, state);
+        mSessionTexts.put(sessionId, text);
 
         if ("FINISHED".equals(state)) {
-            checkAndRunNextInQueue();
-            if ("FINISHED".equals(mCurrentState)) {
-                updateState("IDLE", "");
+            checkAndRunNextInQueue(sessionId);
+            if ("FINISHED".equals(mSessionStates.getOrDefault(sessionId, "IDLE"))) {
+                updateState(sessionId, "IDLE", "");
             }
             return;
         }
 
-        if ("IDLE".equals(state)) {
-            releaseWakeLocks();
-        } else {
-            acquireWakeLocks();
+        if (sessionId.equals(mSelectedSessionId)) {
+            mCurrentState = state;
+            mCurrentText = text;
+
+            if ("IDLE".equals(state)) {
+                releaseWakeLocks();
+            } else {
+                acquireWakeLocks();
+            }
+
+            // Update foreground notification
+            NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (notificationManager != null) {
+                notificationManager.notify(NOTIFICATION_ID, buildNotification(state, text));
+            }
+
+            // Broadcast to Activity, Tiles, Widgets
+            broadcastStateToApp();
         }
-
-        // Update foreground notification
-        NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        if (notificationManager != null) {
-            notificationManager.notify(NOTIFICATION_ID, buildNotification(state, text));
-        }
-
-        // Broadcast to Activity, Tiles, Widgets
-        broadcastStateToApp();
-
-        // If returned to IDLE, stop foreground service self-destruct if needed, but we keep it active to listen for Widget triggers.
     }
 
     private void broadcastStateToApp() {
         Intent intent = new Intent(ACTION_STATE_CHANGED);
         intent.putExtra(EXTRA_STATE, mCurrentState);
         intent.putExtra(EXTRA_TEXT, mCurrentText);
+        intent.putExtra("session_id", mSelectedSessionId);
         intent.putExtra("continue_session", mContinueSession);
         intent.putExtra("bypass_antigravity", mBypassAntigravity);
         intent.putExtra(EXTRA_DIRECTORY, mTargetDirectory);
@@ -1129,6 +1200,39 @@ public class ToggleTalkService extends Service {
         intent.putExtra("tts_queue_empty", queueEmpty);
         
         sendBroadcast(intent);
+    }
+
+    private void terminateSession(String sessionId) {
+        if (sessionId == null || sessionId.isEmpty()) return;
+        
+        Log.d(TAG, "terminateSession called for " + sessionId);
+        
+        // 1. Force kill process using standard RunCommandService
+        String pidFilePath = "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain/" + sessionId + "/.system_generated/logs/run.pid";
+        Intent killIntent = new Intent();
+        killIntent.setClassName("com.termux", "com.termux.app.RunCommandService");
+        killIntent.setAction("com.termux.RUN_COMMAND");
+        killIntent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash");
+        killIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{"-c", "if [ -f " + pidFilePath + " ]; then PID=$(cat " + pidFilePath + "); kill -9 $PID 2>/dev/null; pkill -9 -P $PID 2>/dev/null; rm -f " + pidFilePath + "; fi"});
+        killIntent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
+        try {
+            startService(killIntent);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to start kill command", e);
+        }
+
+        // 2. Stop audio playback and flush TTS queue
+        stopAudioPlayback();
+        synchronized (mTtsQueue) {
+            mTtsQueue.clear();
+        }
+        mCurrentlyPlayingItem = null;
+        mCurrentPlayingChunk = null;
+        mIsTtsPaused = false;
+        mIsTtsPlaying = false;
+
+        // 3. Move state to IDLE
+        updateState(sessionId, "IDLE", "Terminated");
     }
 
     private Notification buildNotification(String state, String text) {
