@@ -893,10 +893,10 @@
                 android:orientation="horizontal"
                 android:gravity="end"
                 android:layout_marginTop="6dp">
-                <Button android:id="@+id/btn_edit_delete" android:text="Delete" android:textColor="#FF3B30" style="?android:attr/buttonBarButtonStyle" />
-                <Button android:id="@+id/btn_edit_cancel" android:text="Cancel" android:textColor="#8A8A8F" style="?android:attr/buttonBarButtonStyle" />
-                <Button android:id="@+id/btn_edit_update" android:text="Update" android:textColor="#00F2FE" style="?android:attr/buttonBarButtonStyle" />
-                <Button android:id="@+id/btn_edit_send" android:text="Send" android:textColor="#4CD964" style="?android:attr/buttonBarButtonStyle" android:visibility="gone" />
+                <Button android:id="@+id/btn_edit_delete" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Delete" android:textColor="#FF3B30" style="?android:attr/buttonBarButtonStyle" />
+                <Button android:id="@+id/btn_edit_cancel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Cancel" android:textColor="#8A8A8F" style="?android:attr/buttonBarButtonStyle" />
+                <Button android:id="@+id/btn_edit_update" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Update" android:textColor="#00F2FE" style="?android:attr/buttonBarButtonStyle" />
+                <Button android:id="@+id/btn_edit_send" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Send" android:textColor="#4CD964" style="?android:attr/buttonBarButtonStyle" android:visibility="gone" />
             </LinearLayout>
         </LinearLayout>
     </FrameLayout>
