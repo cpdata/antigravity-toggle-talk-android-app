@@ -23,13 +23,17 @@ This file outlines the environment details and integration configurations for th
 - **Build Numbering**: A script `increment_build.sh` is used to maintain a build counter in `build_number.txt`.
 - **Work Reports**: For each significant update, a report is created in `work_reports/WORK_REPORT_[X].md` where [X] is the build number.
 - **Commit Tagging**: Every completed task that results in a build should be committed and tagged with the build number (numeric only).
-- **TTS Progress Updates**: Use `tts_notification` to keep the user informed during long-running tasks.
 
-## Response Formatting & Text-to-Speech (TTS)
-- **CRITICAL**: You MUST wrap any text that should be spoken out loud by the Text-to-Speech (TTS) system inside `<tts>...</tts>` tags in your final response output meant for the user.
+## Text-to-Speech (TTS) & Notifications
+- **Environment Detection**: Always check if the environment variable `AGENT_ENV_TYPE` exists and is set to 'ToggleTalkApp'.
+- **Progress Notifications**: To keep the user informed during long-running tasks:
+  - If `AGENT_ENV_TYPE` is 'ToggleTalkApp', emit notifications by printing `<tts>message</tts>` to stdout.
+  - Otherwise, use the custom shell command: `tts 'message'`.
+  - **CRITICAL**: Do NOT use the `tts_notification` command or tool.
+- **Response Formatting**: You MUST wrap any text that should be spoken out loud by the TTS system inside `<tts>...</tts>` tags in your final response output.
 - **Rules**:
   - ONLY the content inside `<tts>...</tts>` tags will be spoken.
-  - Do NOT wrap text inside tool calls, thought processes, or intermediate steps.
+  - Do NOT wrap text inside tool calls, thought processes, or intermediate steps (except for progress notifications as noted above).
   - Place all thoughts, intermediate reasoning, tool calls, and verbose explanations outside the `<tts>...</tts>` tags so they are only displayed visually, keeping the spoken response concise and natural.
   - Example:
     ```markdown

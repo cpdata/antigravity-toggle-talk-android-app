@@ -74,7 +74,7 @@ AGY_ARGS+=(-p "$PROMPT" --print-timeout 60m)
 # Run Antigravity via proot
 # Ensure PWD env variable is explicitly set so Go binaries (like agy) read the correct working directory,
 # and explicitly use /bin/sh to launch the linker to establish a proper environment context.
-RESPONSE=$(env -u LD_PRELOAD -u LD_LIBRARY_PATH PWD="$TARGET_DIR" "$PROOT_BIN" --kill-on-exit \
+RESPONSE=$(env -u LD_PRELOAD -u LD_LIBRARY_PATH PWD="$TARGET_DIR" AGENT_ENV_TYPE="ToggleTalkApp" "$PROOT_BIN" --kill-on-exit \
       -w "$TARGET_DIR" \
       -b /data/data/com.termux/files/usr/etc/resolv.conf:/etc/resolv.conf \
       -b /data/data/com.termux/files/usr/bin/env:/usr/bin/env \
