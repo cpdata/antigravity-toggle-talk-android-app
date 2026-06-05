@@ -1,0 +1,22 @@
+{
+  "id": "ah5hER",
+  "title": "Refactor Conversation Log to Render Chronological Collapsible Bubbles and Fix Syntax Highlighting",
+  "description": "Refactor the conversation display logic in MainActivity.java to: 1. Remove the combined 'thoughts [x], tool calls [x]' grouping logic. 2. Display all non-user/non-agent messages (thoughts, tool calls, tool results, etc.) in chronological order inside their own individual collapsible chat bubbles. 3. Keep all non-user/non-agent bubbles collapsed by default. 4. If 'Expand All' is not toggled, clicking a collapsed bubble should expand it and collapse all other non-user/non-agent bubbles (only 1 open at a time). 5. If 'Expand All' is toggled, all bubbles expand/collapse together. 6. Fix syntax highlighting by removing the outer font color override (#A0E6FF) in renderAndHighlightCodeBlock and/or renderPlainMonospace so Dracula-style keyword/comment/string styling is visible.",
+  "status": "pending",
+  "priority": 0.95,
+  "assignedTo": "main-agent",
+  "dependencies": [],
+  "payload": {},
+  "metadata": {
+    "createdAt": "2026-06-05T02:32:44.930Z",
+    "updatedAt": "2026-06-05T02:32:44.930Z",
+    "createdBy": "main-agent",
+    "tags": [
+      "ui",
+      "syntax-highlighting"
+    ],
+    "requiredCapabilities": [],
+    "maxRetries": 3,
+    "retryCount": 0
+  }
+}
