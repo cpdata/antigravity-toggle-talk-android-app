@@ -2,14 +2,14 @@
   "id": "9pr1tx",
   "title": "Add Search Field",
   "description": "Add search box to search text in any messages or outputs from the user or agent. Results should show like a selection box and when clicked auto scrolls the conversation view to show the correlating message  The search box should be accesible from a magnifying glass icon button that is small and located next to the New chat button above the prompt input text field.\n\nRemove the word 'Settings' from the settings button and just have it be a gear icon.",
-  "status": "pending",
+  "status": "ready",
   "priority": 0.3,
   "assignedTo": "main-agent",
   "dependencies": [],
   "payload": {},
   "metadata": {
     "createdAt": "2026-06-05T10:46:23.001Z",
-    "updatedAt": "2026-06-05T14:01:35.718Z",
+    "updatedAt": "2026-06-05T14:01:43.099Z",
     "createdBy": "main-agent",
     "tags": [
       "ui",
