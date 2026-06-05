@@ -100,6 +100,27 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
     private boolean mContinueSession = false;
     private String mTargetDirectory = "Home";
     private boolean mIsResuming = false;
+
+    private ImageButton mBtnScrollBottom;
+    private ImageButton mBtnSearch;
+    private android.widget.EditText mEtSearch;
+    private android.widget.ListPopupWindow mSearchResultPopup;
+    private List<SearchResult> mCurrentSearchResults = new ArrayList<>();
+
+    private static class SearchResult {
+        String text;
+        View view;
+        SearchResult(String text, View view) {
+            this.text = text;
+            this.view = view;
+        }
+        @Override
+        public String toString() {
+            String preview = text.replace("\n", " ").trim();
+            if (preview.length() > 40) preview = preview.substring(0, 37) + "...";
+            return preview;
+        }
+    }
     
     private final List<String> mDirectoriesList = new ArrayList<>();
     private DirectoryAdapter mDirectoryAdapter;
@@ -497,6 +518,54 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
             mPromptQueueView = new PromptQueueView(queueContainer, this);
             View root = findViewById(android.R.id.content);
             mUnresolvedQueueManager = new UnresolvedQueueManager(this, root, mBtnSend, mEtMessage, queueContainer);
+        }
+
+        // Scroll to Bottom Button
+        mBtnScrollBottom = findViewById(R.id.btn_scroll_bottom);
+        if (mBtnScrollBottom != null) {
+            mBtnScrollBottom.setOnClickListener(v -> scrollToBottom());
+            if (mScrollLog != null) {
+                mScrollLog.getViewTreeObserver().addOnScrollChangedListener(() -> {
+                    if (isScrolledToBottom()) {
+                        mBtnScrollBottom.setVisibility(View.GONE);
+                    } else {
+                        mBtnScrollBottom.setVisibility(View.VISIBLE);
+                    }
+                });
+            }
+        }
+
+        // Search Components
+        mBtnSearch = findViewById(R.id.btn_search);
+        mEtSearch = findViewById(R.id.et_search);
+        if (mBtnSearch != null && mEtSearch != null) {
+            mBtnSearch.setOnClickListener(v -> {
+                if (mEtSearch.getVisibility() == View.GONE) {
+                    mEtSearch.setVisibility(View.VISIBLE);
+                    mEtSearch.requestFocus();
+                    android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                    imm.showSoftInput(mEtSearch, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+                } else {
+                    mEtSearch.setVisibility(View.GONE);
+                    if (mSearchResultPopup != null) mSearchResultPopup.dismiss();
+                }
+            });
+
+            mEtSearch.addTextChangedListener(new android.text.TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    performSearch(s.toString());
+                }
+                @Override public void afterTextChanged(android.text.Editable s) {}
+            });
+
+            mEtSearch.setOnEditorActionListener((v, actionId, event) -> {
+                if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                    performSearch(mEtSearch.getText().toString());
+                    return true;
+                }
+                return false;
+            });
         }
 
         // Initialize Prompt Edit Popup
@@ -1809,6 +1878,75 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
             if (mScrollLog.getChildCount() > 0) {
                 mScrollLog.scrollTo(0, mScrollLog.getChildAt(0).getBottom());
             }
+        });
+    }
+
+    private void performSearch(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            if (mSearchResultPopup != null) mSearchResultPopup.dismiss();
+            return;
+        }
+        
+        mCurrentSearchResults.clear();
+        String lowerQuery = query.toLowerCase().trim();
+        
+        if (mChatContainer != null) {
+            for (int i = 0; i < mChatContainer.getChildCount(); i++) {
+                View child = mChatContainer.getChildAt(i);
+                TextView tv = findTextView(child);
+                if (tv != null) {
+                    String text = tv.getText().toString();
+                    if (text.toLowerCase().contains(lowerQuery)) {
+                        mCurrentSearchResults.add(new SearchResult(text, child));
+                    }
+                }
+            }
+        }
+        
+        if (mCurrentSearchResults.isEmpty()) {
+            if (mSearchResultPopup != null) mSearchResultPopup.dismiss();
+        } else {
+            showSearchResults();
+        }
+    }
+
+    private TextView findTextView(View v) {
+        if (v instanceof TextView) return (TextView) v;
+        if (v instanceof ViewGroup) {
+            ViewGroup vg = (ViewGroup) v;
+            for (int i = 0; i < vg.getChildCount(); i++) {
+                TextView tv = findTextView(vg.getChildAt(i));
+                if (tv != null) return tv;
+            }
+        }
+        return null;
+    }
+
+    private void showSearchResults() {
+        if (mSearchResultPopup == null) {
+            mSearchResultPopup = new android.widget.ListPopupWindow(this);
+            mSearchResultPopup.setAnchorView(mEtSearch);
+            mSearchResultPopup.setWidth(600);
+            mSearchResultPopup.setHeight(android.widget.ListPopupWindow.WRAP_CONTENT);
+            mSearchResultPopup.setModal(false);
+            mSearchResultPopup.setOnItemClickListener((parent, view, position, id) -> {
+                SearchResult result = mCurrentSearchResults.get(position);
+                scrollToView(result.view);
+                mSearchResultPopup.dismiss();
+            });
+        }
+        
+        android.widget.ArrayAdapter<SearchResult> adapter = new android.widget.ArrayAdapter<>(
+                this, android.R.layout.simple_list_item_1, mCurrentSearchResults);
+        mSearchResultPopup.setAdapter(adapter);
+        mSearchResultPopup.show();
+    }
+
+    private void scrollToView(View view) {
+        if (mScrollLog == null || view == null) return;
+        mScrollLog.post(() -> {
+            int top = view.getTop();
+            mScrollLog.smoothScrollTo(0, top);
         });
     }
 
