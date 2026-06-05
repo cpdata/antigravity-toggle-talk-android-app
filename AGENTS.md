@@ -8,7 +8,7 @@ This file outlines the environment details and integration configurations for th
 
 ## Connection & Debugging
 - **Android Debug Bridge (ADB)**: Installed and configured.
-- **Wireless Debugging**: Prompt the user to connect wireless debug when you need to use `adb` if you do not see any devices listed when running `adb devices`..
+- **Wireless Debugging**: Stop and notify the user to connect wireless debug when you need to use `adb` if you do not see any devices listed when running `adb devices`.
 - **ADB Keep-Alive**: Use the `~/adb-keepalive.sh` script to keep the connection active.
   - To start it in the background for 5 hours (default): `~/adb-keepalive.sh` (logs to `~/adb-keepalive.log`, PID written to `~/.keepalive.pid`).
   - To stop it: `~/adb-keepalive.sh --stop` or `touch ~/.keepalive.stop`.
@@ -29,8 +29,6 @@ This file outlines the environment details and integration configurations for th
 - **Progress Notifications**: To keep the user informed during long-running tasks:
   - If `AGENT_ENV_TYPE` is 'ToggleTalkApp', emit notifications by printing `<tts>message</tts>` to stdout.
   - Otherwise, use the custom shell command: `tts 'message'`.
-  - **CRITICAL**: Do NOT use the `tts_notification` command or tool.
-- **Response Formatting**: You MUST wrap any text that should be spoken out loud by the TTS system inside `<tts>...</tts>` tags in your final response output.
 - **Rules**:
   - ONLY the content inside `<tts>...</tts>` tags will be spoken.
   - Do NOT wrap text inside tool calls, thought processes, or intermediate steps (except for progress notifications as noted above).
@@ -42,6 +40,12 @@ This file outlines the environment details and integration configurations for th
 
     <tts>I have completed the requested changes. Please verify and run the tests.</tts>
     ```
+
+## ADB
+- Use `adb` commands to directly control and test the app.
+
+## Deploy
+- Build and Deploy app with `./deploy.sh`
 
 ## Git
 - Always git stage and commit your file changes at the end of every turn  Always use the current 'main' branch unless instructed otherwise.
