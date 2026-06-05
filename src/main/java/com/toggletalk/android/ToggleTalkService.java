@@ -59,7 +59,19 @@ public class ToggleTalkService extends Service {
     private volatile boolean mStopRequested = false;
     private volatile boolean mIsTranscribing = false;
     private boolean mIsStreamingActive = false;
-    private final java.util.Queue<String> mTtsQueue = new java.util.LinkedList<>();
+    private static class TtsItem {
+        String sessionId;
+        String text;
+        TtsItem(String sessionId, String text) {
+            this.sessionId = sessionId;
+            this.text = text;
+        }
+    }
+
+    private final java.util.Queue<TtsItem> mTtsQueue = new java.util.LinkedList<>();
+    private TtsItem mCurrentlyPlayingItem = null;
+    private String mCurrentPlayingChunk = null;
+    private boolean mIsTtsPaused = false;
     private boolean mIsTtsPlaying = false;
     private Thread mTtsThread = null;
 
@@ -130,6 +142,16 @@ public class ToggleTalkService extends Service {
                 String filePath = intent.getStringExtra("file_path");
                 String ttsText = intent.getStringExtra("tts_text");
                 handleStreamedUpdate(sessionId, messagesJson, filePath, ttsText);
+            } else if ("com.toggletalk.android.ACTION_TERMINATE_TTS".equals(action)) {
+                Log.d(TAG, "Received ACTION_TERMINATE_TTS intent");
+                stopAudioPlayback();
+                synchronized (mTtsQueue) {
+                    mTtsQueue.clear();
+                }
+                mCurrentlyPlayingItem = null;
+                mCurrentPlayingChunk = null;
+                mIsTtsPaused = false;
+                updateState("IDLE", "");
             }
         }
     };
@@ -153,6 +175,7 @@ public class ToggleTalkService extends Service {
         filter.addAction(ACTION_STATE_UPDATE_FROM_TERMUX);
         filter.addAction(ACTION_ANTIGRAVITY_RESPONSE);
         filter.addAction("com.toggletalk.android.ACTION_STREAM_UPDATE");
+        filter.addAction("com.toggletalk.android.ACTION_TERMINATE_TTS");
         registerReceiver(mTermuxReceiver, filter);
         
         // Lazily initialize speech models in background thread so service creation is instant
@@ -248,6 +271,9 @@ public class ToggleTalkService extends Service {
             float[] samples = stopNativeRecording();
             runNativeTranscription(samples);
         } else if ("THINKING".equals(mCurrentState) || "SPEAKING".equals(mCurrentState)) {
+            if ("SPEAKING".equals(mCurrentState) || mIsTtsPlaying) {
+                mIsTtsPaused = true;
+            }
             stopAudioPlayback();
             stopNativeRecording();
             updateState("RECORDING", "Listening...");
@@ -259,6 +285,9 @@ public class ToggleTalkService extends Service {
         Log.d(TAG, "handleStop: stopping agent and TTS");
         mStopRequested = true;
         stopAudioPlayback();
+        mCurrentlyPlayingItem = null;
+        mCurrentPlayingChunk = null;
+        mIsTtsPaused = false;
         stopNativeRecording();
         synchronized (mTtsQueue) {
             mTtsQueue.clear();
@@ -341,6 +370,7 @@ public class ToggleTalkService extends Service {
     }
 
     private float[] stopNativeRecording() {
+        boolean wasRecording = mIsRecordingAudio;
         mIsRecordingAudio = false;
         if (mRecordThread != null) {
             try {
@@ -349,6 +379,23 @@ public class ToggleTalkService extends Service {
                 Log.e(TAG, "Interrupted while waiting for record thread to finish", e);
             }
             mRecordThread = null;
+        }
+        
+        if (wasRecording && mIsTtsPaused && mCurrentlyPlayingItem != null && mCurrentPlayingChunk != null) {
+            mIsTtsPaused = false;
+            synchronized (mTtsQueue) {
+                if (mTtsQueue instanceof java.util.LinkedList) {
+                    ((java.util.LinkedList<TtsItem>) mTtsQueue).addFirst(mCurrentlyPlayingItem);
+                } else {
+                    java.util.List<TtsItem> list = new ArrayList<>(mTtsQueue);
+                    list.add(0, mCurrentlyPlayingItem);
+                    mTtsQueue.clear();
+                    mTtsQueue.addAll(list);
+                }
+            }
+            mCurrentlyPlayingItem = null;
+            mCurrentPlayingChunk = null;
+            new Thread(() -> startTtsPlaybackIfNeeded()).start();
         }
         
         float[] floatSamples;
@@ -643,143 +690,30 @@ public class ToggleTalkService extends Service {
 
         updateState("SPEAKING", latestResponse);
         
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                initSpeechEngines();
-                if (mTts == null) {
-                    Log.e(TAG, "OfflineTts is null, cannot speak");
-                    updateState("IDLE", "TTS engine initialization failed. Ensure models are placed in /sdcard/ToggleTalkModels/");
-                    return;
-                }
-                
-                // Parse <tts>...</tts> tags in latestResponse
-                java.util.List<String> ttsSegments = new java.util.ArrayList<>();
-                java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("<tts>(.*?)</tts>", java.util.regex.Pattern.DOTALL);
-                java.util.regex.Matcher matcher = pattern.matcher(latestResponse);
-                while (matcher.find()) {
-                    ttsSegments.add(matcher.group(1));
-                }
-                
-                String textToSpeak;
-                if (!ttsSegments.isEmpty()) {
-                    StringBuilder sb = new StringBuilder();
-                    for (String seg : ttsSegments) {
-                        sb.append(seg).append(" ");
-                    }
-                    textToSpeak = sanitizeInApp(sb.toString().trim());
-                } else {
-                    textToSpeak = sanitizedTts;
-                }
-                
-                if (textToSpeak == null || textToSpeak.trim().isEmpty()) {
-                    Log.w(TAG, "No TTS text to speak");
-                    updateState("IDLE", "");
-                    return;
-                }
-                
-                java.util.List<String> chunks = splitIntoTtsChunks(textToSpeak);
-                if (chunks.isEmpty()) {
-                    updateState("IDLE", "");
-                    return;
-                }
-                
-                Log.d(TAG, "Starting Kokoro TTS streaming synthesis on " + chunks.size() + " chunks");
-                
-                mIsPlayingAudio = true;
-                android.media.AudioTrack track = null;
-                
-                try {
-                    for (int i = 0; i < chunks.size(); i++) {
-                        if (!mIsPlayingAudio) {
-                            break;
-                        }
-                        
-                        String chunk = chunks.get(i);
-                        Log.d(TAG, "Generating TTS chunk " + i + ": " + chunk);
-                        GeneratedAudio audio = mTts.generate(chunk, 0, 1.0f);
-                        float[] samples = audio.getSamples();
-                        int sampleRate = audio.getSampleRate();
-                        
-                        if (samples == null || samples.length == 0) {
-                            continue;
-                        }
-                        
-                        if (track == null) {
-                            int bufferSize = android.media.AudioTrack.getMinBufferSize(
-                                sampleRate,
-                                android.media.AudioFormat.CHANNEL_OUT_MONO,
-                                android.media.AudioFormat.ENCODING_PCM_FLOAT
-                            );
-                            if (bufferSize == android.media.AudioTrack.ERROR || bufferSize == android.media.AudioTrack.ERROR_BAD_VALUE) {
-                                bufferSize = samples.length * 4;
-                            }
-                            
-                            track = new android.media.AudioTrack(
-                                new android.media.AudioAttributes.Builder()
-                                    .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
-                                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
-                                    .build(),
-                                new android.media.AudioFormat.Builder()
-                                    .setChannelMask(android.media.AudioFormat.CHANNEL_OUT_MONO)
-                                    .setEncoding(android.media.AudioFormat.ENCODING_PCM_FLOAT)
-                                    .setSampleRate(sampleRate)
-                                    .build(),
-                                bufferSize,
-                                android.media.AudioTrack.MODE_STREAM,
-                                android.media.AudioManager.AUDIO_SESSION_ID_GENERATE
-                            );
-                            
-                            if (track.getState() != android.media.AudioTrack.STATE_INITIALIZED) {
-                                Log.e(TAG, "AudioTrack initialization failed");
-                                break;
-                            }
-                            mAudioTrack = track;
-                            track.play();
-                        }
-                        
-                        int offset = 0;
-                        int writeChunkSize = 4096;
-                        while (mIsPlayingAudio && offset < samples.length) {
-                            int writeSize = Math.min(writeChunkSize, samples.length - offset);
-                            int written = track.write(samples, offset, writeSize, android.media.AudioTrack.WRITE_BLOCKING);
-                            if (written > 0) {
-                                offset += written;
-                            } else if (written < 0) {
-                                Log.e(TAG, "AudioTrack write error: " + written);
-                                break;
-                            }
-                        }
-                    }
-                    
-                    // Wait for playback to finish
-                    if (mIsPlayingAudio && track != null) {
-                        try {
-                            track.stop();
-                        } catch (Exception e) {
-                            Log.e(TAG, "Error stopping track", e);
-                        }
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException ignored) {}
-                        while (mIsPlayingAudio && track.getPlayState() == android.media.AudioTrack.PLAYSTATE_PLAYING) {
-                            try {
-                                Thread.sleep(50);
-                            } catch (InterruptedException ignored) {}
-                        }
-                    }
-                    
-                } catch (Exception e) {
-                    Log.e(TAG, "TTS synthesis/playback failed", e);
-                } finally {
-                    cleanupAudioTrack();
-                    mIsPlayingAudio = false;
-                    if ("SPEAKING".equals(mCurrentState)) {
-                        updateState("IDLE", "");
-                    }
-                }
+        // Parse <tts>...</tts> tags in latestResponse
+        java.util.List<String> ttsSegments = new java.util.ArrayList<>();
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("<tts>(.*?)</tts>", java.util.regex.Pattern.DOTALL);
+        java.util.regex.Matcher matcher = pattern.matcher(latestResponse);
+        while (matcher.find()) {
+            ttsSegments.add(matcher.group(1));
+        }
+        
+        String textToSpeak;
+        if (!ttsSegments.isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            for (String seg : ttsSegments) {
+                sb.append(seg).append(" ");
             }
-        }).start();
+            textToSpeak = sanitizeInApp(sb.toString().trim());
+        } else {
+            textToSpeak = sanitizedTts;
+        }
+        
+        if (textToSpeak != null && !textToSpeak.trim().isEmpty()) {
+            queueTtsText(mSelectedSessionId, textToSpeak);
+        } else {
+            updateState("IDLE", "");
+        }
     }
 
     private void handleStreamedUpdate(String sessionId, String messagesJson, String filePath, String ttsText) {
@@ -808,24 +742,26 @@ public class ToggleTalkService extends Service {
         if (ttsText != null && !ttsText.trim().isEmpty()) {
             String textToSpeak = sanitizeInApp(ttsText.trim());
             if (!textToSpeak.isEmpty()) {
-                queueTtsText(textToSpeak);
+                queueTtsText(sessionId, textToSpeak);
             }
         }
     }
 
-    private synchronized void queueTtsText(String text) {
+    private synchronized void queueTtsText(String sessionId, String text) {
         if (text == null || text.trim().isEmpty()) return;
         
         java.util.List<String> chunks = splitIntoTtsChunks(text);
         synchronized (mTtsQueue) {
-            mTtsQueue.addAll(chunks);
+            for (String chunk : chunks) {
+                mTtsQueue.add(new TtsItem(sessionId, chunk));
+            }
         }
         
         startTtsPlaybackIfNeeded();
     }
 
     private synchronized void startTtsPlaybackIfNeeded() {
-        if (mIsTtsPlaying || mTtsQueue.isEmpty()) {
+        if (mIsTtsPlaying || mTtsQueue.isEmpty() || mIsTtsPaused) {
             return;
         }
         
@@ -851,16 +787,24 @@ public class ToggleTalkService extends Service {
                 
                 try {
                     while (mIsPlayingAudio) {
-                        String chunk;
+                        TtsItem item;
                         synchronized (mTtsQueue) {
                             if (mTtsQueue.isEmpty()) {
                                 break;
                             }
-                            chunk = mTtsQueue.poll();
+                            item = mTtsQueue.poll();
                         }
                         
-                        Log.d(TAG, "Generating TTS chunk: " + chunk);
-                        GeneratedAudio audio = mTts.generate(chunk, 0, 1.0f);
+                        if (item.sessionId != null && !item.sessionId.equals(mSelectedSessionId)) {
+                            Log.d(TAG, "Discarding TTS item from inactive session: " + item.sessionId + " (active: " + mSelectedSessionId + ")");
+                            continue;
+                        }
+                        
+                        mCurrentlyPlayingItem = item;
+                        mCurrentPlayingChunk = item.text;
+                        
+                        Log.d(TAG, "Generating TTS chunk: " + mCurrentPlayingChunk);
+                        GeneratedAudio audio = mTts.generate(mCurrentPlayingChunk, 0, 1.0f);
                         float[] samples = audio.getSamples();
                         int sampleRate = audio.getSampleRate();
                         
@@ -929,11 +873,16 @@ public class ToggleTalkService extends Service {
                     mIsPlayingAudio = false;
                     mIsTtsPlaying = false;
                     
+                    if (!mIsTtsPaused) {
+                        mCurrentlyPlayingItem = null;
+                        mCurrentPlayingChunk = null;
+                    }
+                    
                     synchronized (mTtsQueue) {
-                        if (!mTtsQueue.isEmpty()) {
+                        if (!mTtsQueue.isEmpty() && !mIsTtsPaused) {
                             new Thread(() -> startTtsPlaybackIfNeeded()).start();
                         } else {
-                            if ("SPEAKING".equals(mCurrentState)) {
+                            if ("SPEAKING".equals(mCurrentState) && !mIsTtsPaused) {
                                 updateState("IDLE", "");
                             }
                         }

@@ -441,19 +441,24 @@ public class MainActivity extends Activity {
         mEtMessage = findViewById(R.id.et_message);
         mBtnSend = findViewById(R.id.btn_send);
         mBtnSend.setOnClickListener(v -> {
-            if (mIsAgentActive) {
-                stopAgent();
-            } else {
-                sendMessage();
-            }
+            sendMessage();
         });
         mEtMessage.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEND) {
-                if (!mIsAgentActive) sendMessage();
+                sendMessage();
                 return true;
             }
             return false;
         });
+
+        View btnFlush = findViewById(R.id.btn_flush);
+        if (btnFlush != null) {
+            btnFlush.setOnClickListener(v -> {
+                Intent intent = new Intent("com.toggletalk.android.ACTION_TERMINATE_TTS");
+                intent.setPackage(getPackageName());
+                sendBroadcast(intent);
+            });
+        }
 
         mRingInner = findViewById(R.id.ring_inner);
         mRingMiddle = findViewById(R.id.ring_middle);
@@ -711,17 +716,9 @@ public class MainActivity extends Activity {
 
     private void updateSendButtonState() {
         if (mBtnSend == null) return;
-        if (mIsAgentActive) {
-            // Show red stop button
-            mBtnSend.setImageResource(android.R.drawable.ic_delete);
-            mBtnSend.setImageTintList(ColorStateList.valueOf(Color.parseColor("#FF3B30")));
-            mBtnSend.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#33FF3B30")));
-        } else {
-            // Restore send button
-            mBtnSend.setImageResource(android.R.drawable.ic_menu_send);
-            mBtnSend.setImageTintList(ColorStateList.valueOf(Color.parseColor("#00F2FE")));
-            mBtnSend.setBackgroundTintList(null);
-        }
+        mBtnSend.setImageResource(android.R.drawable.ic_menu_send);
+        mBtnSend.setImageTintList(ColorStateList.valueOf(Color.parseColor("#00F2FE")));
+        mBtnSend.setBackgroundTintList(null);
     }
 
     // --- Drawer Slide Animation Actions ---
@@ -1957,7 +1954,7 @@ public class MainActivity extends Activity {
         text = sbInline.toString();
 
         // --- Step 3: Strip <tts> tags ---
-        text = text.replaceAll("(?s)<tts>.*?</tts>", "");
+        text = text.replaceAll("<tts>", "").replaceAll("</tts>", "");
 
         // --- Step 4: Apply markdown formatting ---
         // Headers (process most specific first)
@@ -2697,7 +2694,7 @@ public class MainActivity extends Activity {
                 // Keep screen on
                 getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
-                if (mDisplayedStepKeys.isEmpty()) {
+                if (mDisplayedStepKeys.isEmpty() && !"Speaking...".equals(text)) {
                     if (mIsResuming) {
                         if (mActiveAgentTextView == null) {
                             addAgentBubble(text);
