@@ -1,0 +1,19 @@
+{
+  "id": "ny1As2",
+  "title": "Part 6: Markdown Rendering & Syntax Highlighting",
+  "description": "Fix headings parsing, restrict syntax highlighting to backticks, and auto-detect code languages. Ref: work_reports/tasks_subdivision/6_markdown_rendering_and_syntax_highlighting.md",
+  "status": "pending",
+  "priority": 0.6,
+  "assignedTo": "main-agent",
+  "dependencies": [],
+  "payload": {},
+  "metadata": {
+    "createdAt": "2026-06-05T10:44:00.682Z",
+    "updatedAt": "2026-06-05T10:44:00.682Z",
+    "createdBy": "main-agent",
+    "tags": [],
+    "requiredCapabilities": [],
+    "maxRetries": 3,
+    "retryCount": 0
+  }
+}
