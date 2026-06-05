@@ -1,0 +1,132 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.toggletalk.android"
+4    android:versionCode="1"
+5    android:versionName="1.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="26"
+9        android:targetSdkVersion="33" />
+10
+11    <!-- Permissions -->
+12    <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
+12-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:5:5-73
+12-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:5:22-70
+13    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+13-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:6:5-77
+13-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:6:22-74
+14    <uses-permission android:name="android.permission.VIBRATE" />
+14-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:7:5-66
+14-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:7:22-63
+15    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+15-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:8:5-77
+15-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:8:22-74
+16    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+16-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:9:5-71
+16-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:9:22-68
+17    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+17-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:10:5-80
+17-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:10:22-77
+18    <uses-permission android:name="android.permission.WAKE_LOCK" />
+18-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:11:5-68
+18-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:11:22-65
+19
+20    <!-- Package visibility for Android 11+ -->
+21    <queries>
+21-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:14:5-16:15
+22        <package android:name="com.termux" />
+22-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:15:9-46
+22-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:15:18-43
+23    </queries>
+24
+25    <application
+25-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:18:5-66:19
+26        android:allowBackup="true"
+26-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:19:9-35
+27        android:debuggable="true"
+28        android:extractNativeLibs="false"
+29        android:icon="@android:drawable/presence_audio_online"
+29-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:20:9-63
+30        android:label="ToggleTalk"
+30-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:21:9-35
+31        android:requestLegacyExternalStorage="true"
+31-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:23:9-52
+32        android:supportsRtl="true"
+32-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:22:9-35
+33        android:theme="@android:style/Theme.DeviceDefault.NoActionBar" >
+33-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:24:9-71
+34
+35        <!-- Main Activity -->
+36        <activity
+36-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:27:9-35:20
+37            android:name="com.toggletalk.android.MainActivity"
+37-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:28:13-41
+38            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+38-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:30:13-87
+39            android:exported="true" >
+39-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:29:13-36
+40            <intent-filter>
+40-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:31:13-34:29
+41                <action android:name="android.intent.action.MAIN" />
+41-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:32:17-69
+41-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:32:25-66
+42
+43                <category android:name="android.intent.category.LAUNCHER" />
+43-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:33:17-77
+43-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:33:27-74
+44            </intent-filter>
+45        </activity>
+46
+47        <!-- Foreground State Machine Service -->
+48        <service
+48-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:38:9-40:39
+49            android:name="com.toggletalk.android.ToggleTalkService"
+49-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:39:13-46
+50            android:exported="true" />
+50-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:40:13-36
+51
+52        <!-- Quick Settings Tile -->
+53        <service
+53-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:43:9-52:19
+54            android:name="com.toggletalk.android.ToggleTileService"
+54-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:44:13-46
+55            android:exported="true"
+55-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:48:13-36
+56            android:icon="@drawable/ic_mic"
+56-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:45:13-44
+57            android:label="ToggleTalk"
+57-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:46:13-39
+58            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE" >
+58-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:47:13-77
+59            <intent-filter>
+59-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:49:13-51:29
+60                <action android:name="android.service.quicksettings.action.QS_TILE" />
+60-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:50:17-87
+60-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:50:25-84
+61            </intent-filter>
+62        </service>
+63
+64        <!-- App Widget Provider -->
+65        <receiver
+65-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:55:9-64:20
+66            android:name="com.toggletalk.android.ToggleWidgetProvider"
+66-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:56:13-49
+67            android:exported="true" >
+67-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:57:13-36
+68            <intent-filter>
+68-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:58:13-60:29
+69                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+69-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:59:17-84
+69-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:59:25-81
+70            </intent-filter>
+71
+72            <meta-data
+72-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:61:13-63:62
+73                android:name="android.appwidget.provider"
+73-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:62:17-58
+74                android:resource="@xml/toggle_widget_info" />
+74-->/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/AndroidManifest.xml:63:17-59
+75        </receiver>
+76    </application>
+77
+78</manifest>

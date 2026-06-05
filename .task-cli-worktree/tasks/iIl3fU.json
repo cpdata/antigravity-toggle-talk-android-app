@@ -1,0 +1,25 @@
+{
+  "id": "iIl3fU",
+  "title": "Display session titles in right-side menu",
+  "description": "The right side active sessions menu should display the titles for the sessions instead of just their UUIDs.",
+  "status": "completed",
+  "priority": 0.2,
+  "assignedTo": "main-agent",
+  "dependencies": [],
+  "payload": {},
+  "result": "Created list_sessions.py script",
+  "metadata": {
+    "createdAt": "2026-06-03T20:27:40.959Z",
+    "updatedAt": "2026-06-03T20:50:19.215Z",
+    "createdBy": "main-agent",
+    "claimedAt": "2026-06-03T20:27:59.303Z",
+    "lastHeartbeatAt": "2026-06-03T20:27:59.303Z",
+    "tags": [
+      "feature",
+      "ui"
+    ],
+    "requiredCapabilities": [],
+    "maxRetries": 3,
+    "retryCount": 0
+  }
+}

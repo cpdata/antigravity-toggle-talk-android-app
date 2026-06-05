@@ -1,0 +1,22 @@
+{
+  "id": "Qzr7f7",
+  "title": "Fix hanging Speaking status tag and interrupt TTS on record",
+  "description": "The Speaking.. status tag remains even after TTS has completed. Ensure it resets to IDLE. Also, ensure the record button interrupts TTS by stopping its output.",
+  "status": "completed",
+  "priority": 0.2,
+  "assignedTo": "main-agent",
+  "dependencies": [],
+  "payload": {},
+  "metadata": {
+    "createdAt": "2026-06-03T20:27:12.450Z",
+    "updatedAt": "2026-06-03T21:07:12.068Z",
+    "createdBy": "main-agent",
+    "tags": [
+      "bug",
+      "tts"
+    ],
+    "requiredCapabilities": [],
+    "maxRetries": 3,
+    "retryCount": 0
+  }
+}

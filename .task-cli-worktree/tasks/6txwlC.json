@@ -1,0 +1,22 @@
+{
+  "id": "6txwlC",
+  "title": "Prevent agent text re-animation on resume",
+  "description": "When leaving the app and coming back, the text in the last agent response appears to be typed out from the beginning again. Ensure the text in the conversation log never re-animates on resume.",
+  "status": "completed",
+  "priority": 0.2,
+  "assignedTo": "main-agent",
+  "dependencies": [],
+  "payload": {},
+  "metadata": {
+    "createdAt": "2026-06-03T20:27:28.093Z",
+    "updatedAt": "2026-06-03T21:06:52.841Z",
+    "createdBy": "main-agent",
+    "tags": [
+      "bug",
+      "ui"
+    ],
+    "requiredCapabilities": [],
+    "maxRetries": 3,
+    "retryCount": 0
+  }
+}

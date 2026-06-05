@@ -1,0 +1,24 @@
+{
+  "id": "TdW49R",
+  "title": "Change size & position of mic button",
+  "description": "The main view has an icon button for triggering the microphone that is displayed in the center of the screen. Move the button to be smaller and close to the bottom edge of the screen remaining centered. You will have to also move the continue conversation checkbox/radio to the  left but still under the talk button. ",
+  "status": "completed",
+  "priority": 0.3,
+  "assignedTo": "main-agent",
+  "dependencies": [],
+  "payload": {},
+  "result": "The mic button has been repositioned to the bottom within settings_layout, reducing its container size from 260dp to 160dp. The continue conversation checkbox has been aligned to the left (start) under the talk button.",
+  "metadata": {
+    "createdAt": "2026-06-02T00:40:11.517Z",
+    "updatedAt": "2026-06-03T18:58:10.332Z",
+    "createdBy": "main-agent",
+    "claimedAt": "2026-06-02T00:49:20.223Z",
+    "lastHeartbeatAt": "2026-06-02T00:49:20.223Z",
+    "tags": [
+      "ui"
+    ],
+    "requiredCapabilities": [],
+    "maxRetries": 3,
+    "retryCount": 0
+  }
+}

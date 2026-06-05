@@ -1,0 +1,23 @@
+{
+  "id": "AoATc7",
+  "title": "Format Conversation Log UI",
+  "description": "Improve formatting of the Conversation Log to display the user's text and agent responses separately. Ensure that each agent response is rendered inside its own sub-container/boundary box as it is streaming, clearly separating different actions and responses. All agent responses must be wrapped and rendered using a Markdown renderer.",
+  "status": "completed",
+  "priority": 0.3,
+  "assignedTo": "main-agent",
+  "dependencies": [],
+  "payload": {},
+  "result": "Replaced log TextView with layout_chat_container LinearLayout displaying separate user and agent bubbles, using styled markdown html renderer with text typing animation.",
+  "metadata": {
+    "createdAt": "2026-06-03T19:30:58.038Z",
+    "updatedAt": "2026-06-03T19:58:30.227Z",
+    "createdBy": "main-agent",
+    "tags": [
+      "ui",
+      "log"
+    ],
+    "requiredCapabilities": [],
+    "maxRetries": 3,
+    "retryCount": 0
+  }
+}

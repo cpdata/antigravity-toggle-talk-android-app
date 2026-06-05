@@ -1,0 +1,23 @@
+{
+  "id": "nFFpL3",
+  "title": "Fix hanging/overloaded TTS response",
+  "description": "Currently, the antigravity agent returns large responses with actions and final answers that should only be displayed, not spoken via TTS. 1. Update the prompt suffix in run_antigravity.sh to instruct formatting TTS notifications in a specific way. 2. Update the Android app to parse incoming responses for these formatted TTS notifications, passing only those segments to the native Kokoro TTS engine. 3. Ensure the TTS system streams its output chunks instead of waiting for the full response to finish. 4. Verify that TTS chunking is handled correctly.",
+  "status": "completed",
+  "priority": 0.3,
+  "assignedTo": "main-agent",
+  "dependencies": [],
+  "payload": {},
+  "result": "Fixed hanging TTS responses by sentence-level chunking and continuous sequential playback via streaming AudioTrack, and added Mock Mode checkbox to bypass antigravity during testing.",
+  "metadata": {
+    "createdAt": "2026-06-03T19:30:52.638Z",
+    "updatedAt": "2026-06-03T19:58:38.468Z",
+    "createdBy": "main-agent",
+    "tags": [
+      "tts",
+      "bug"
+    ],
+    "requiredCapabilities": [],
+    "maxRetries": 3,
+    "retryCount": 0
+  }
+}

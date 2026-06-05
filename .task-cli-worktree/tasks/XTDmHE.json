@@ -1,0 +1,22 @@
+{
+  "id": "XTDmHE",
+  "title": "Fix bug where agent responses and thoughts are merged in a single chat bubble",
+  "description": "Fix a bug where all agent responses and thoughts are displayed together in a single chat bubble at the end of an active chat. This may happen during streaming or thought display.",
+  "status": "ready",
+  "priority": 0.3,
+  "assignedTo": "main-agent",
+  "dependencies": [],
+  "payload": {},
+  "metadata": {
+    "createdAt": "2026-06-05T01:44:45.572Z",
+    "updatedAt": "2026-06-05T01:44:45.572Z",
+    "createdBy": "main-agent",
+    "tags": [
+      "bug",
+      "ui"
+    ],
+    "requiredCapabilities": [],
+    "maxRetries": 3,
+    "retryCount": 0
+  }
+}

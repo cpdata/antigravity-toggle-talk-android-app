@@ -1,0 +1,25 @@
+{
+  "id": "8Vl4tj",
+  "title": "Add text input box next to speak button",
+  "description": "Add a text input box in the main UI and position the speak button adjacent to it. Transcribed speech must be appended/inserted into this text box instead of being automatically submitted to the agent, allowing the user to review, edit, or append additional spoken/typed text before manually sending it.",
+  "status": "completed",
+  "priority": 0.3,
+  "assignedTo": "main-agent",
+  "dependencies": [],
+  "payload": {},
+  "result": "Added glassmorphic text input box et_message and Send button btn_send next to speak button in bottom bar, communicating with service via ACTION_SEND_PROMPT intent.",
+  "metadata": {
+    "createdAt": "2026-06-03T19:31:38.473Z",
+    "updatedAt": "2026-06-03T19:58:13.241Z",
+    "createdBy": "main-agent",
+    "claimedAt": "2026-06-03T19:39:16.840Z",
+    "lastHeartbeatAt": "2026-06-03T19:39:16.840Z",
+    "tags": [
+      "ui",
+      "speech"
+    ],
+    "requiredCapabilities": [],
+    "maxRetries": 3,
+    "retryCount": 0
+  }
+}

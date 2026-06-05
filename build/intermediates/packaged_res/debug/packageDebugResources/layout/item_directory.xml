@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:padding="10dp"
+    android:layout_marginHorizontal="4dp"
+    android:layout_marginVertical="2dp"
+    android:background="?android:attr/selectableItemBackground">
+
+    <!-- Folder Icon -->
+    <ImageView
+        android:id="@+id/img_folder"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:src="@drawable/ic_folder"
+        android:layout_marginEnd="10dp"
+        android:contentDescription="Folder icon" />
+
+    <!-- Directory Name -->
+    <TextView
+        android:id="@+id/tv_dir_name"
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        android:layout_height="wrap_content"
+        android:textColor="#FFFFFF"
+        android:textSize="13sp"
+        android:textStyle="bold" />
+
+    <!-- Selected indicator dot -->
+    <View
+        android:id="@+id/view_indicator"
+        android:layout_width="7dp"
+        android:layout_height="7dp"
+        android:background="@drawable/bg_mic_btn"
+        android:backgroundTint="#00F2FE"
+        android:layout_marginStart="6dp"
+        android:visibility="gone" />
+
+</LinearLayout>

@@ -1,0 +1,26 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.toggletalk.android-mergeDebugResources-2:/values/values.xml",
+            "map": [
+                {
+                    "source": "/data/data/com.termux/files/home/ToggleTalkAndroid/src/main/res/values/strings.xml",
+                    "from": {
+                        "startLines": "2,3,4,6,5",
+                        "startColumns": "4,4,4,4,4",
+                        "startOffsets": "55,103,147,259,204",
+                        "endColumns": "47,43,56,54,54",
+                        "endOffsets": "98,142,199,309,254"
+                    },
+                    "to": {
+                        "startLines": "2,3,4,5,6",
+                        "startColumns": "4,4,4,4,4",
+                        "startOffsets": "55,103,147,204,259",
+                        "endColumns": "47,43,56,54,54",
+                        "endOffsets": "98,142,199,254,309"
+                    }
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,22 @@
+{
+  "id": "OnIn3R",
+  "title": "Change input box cursor to lighter color",
+  "description": "The input box cursor is currently too dark and near impossible to see. Change it to a lighter color (e.g., light blue, cyan, or white).",
+  "status": "completed",
+  "priority": 0.3,
+  "assignedTo": "main-agent",
+  "dependencies": [],
+  "payload": {},
+  "metadata": {
+    "createdAt": "2026-06-03T20:27:20.234Z",
+    "updatedAt": "2026-06-03T21:06:59.091Z",
+    "createdBy": "main-agent",
+    "tags": [
+      "ui",
+      "usability"
+    ],
+    "requiredCapabilities": [],
+    "maxRetries": 3,
+    "retryCount": 0
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "id": "UnGEJP",
+  "title": "Add launcher icon matching notifications",
+  "description": "Add/update the app launcher icon to match the existing icon used for notifications, ensuring visual consistency across the app.",
+  "status": "completed",
+  "priority": 0.3,
+  "assignedTo": "main-agent",
+  "dependencies": [],
+  "payload": {},
+  "result": "Added android:icon=@android:drawable/presence_audio_online to AndroidManifest.xml matching the notification icon.",
+  "metadata": {
+    "createdAt": "2026-06-03T19:31:08.236Z",
+    "updatedAt": "2026-06-03T19:58:07.881Z",
+    "createdBy": "main-agent",
+    "claimedAt": "2026-06-03T19:43:13.049Z",
+    "lastHeartbeatAt": "2026-06-03T19:43:13.049Z",
+    "tags": [
+      "assets",
+      "ui"
+    ],
+    "requiredCapabilities": [],
+    "maxRetries": 3,
+    "retryCount": 0
+  }
+}

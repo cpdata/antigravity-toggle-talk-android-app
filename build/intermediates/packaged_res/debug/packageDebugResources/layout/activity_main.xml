@@ -1,0 +1,665 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Main Content Relative Layout -->
+    <RelativeLayout
+        android:id="@+id/main_content_layout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_gradient"
+        android:padding="10dp">
+
+        <!-- Top header with Hamburger, App name and Status -->
+        <RelativeLayout
+            android:id="@+id/header_layout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp">
+
+            <!-- Hamburger Menu Button -->
+            <ImageButton
+                android:id="@+id/btn_menu"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_menu"
+                android:scaleType="centerInside"
+                android:contentDescription="Open directory menu" />
+
+            <!-- Title and Status centered -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:layout_centerInParent="true">
+
+                <TextView
+                    android:id="@+id/tv_active_dir_top"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Active: Home"
+                    android:textColor="#00F2FE"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.05" />
+
+                <TextView
+                    android:id="@+id/tv_active_session_top"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textColor="#80E6E6FA"
+                    android:textSize="10sp"
+                    android:singleLine="true"
+                    android:ellipsize="end"
+                    android:maxWidth="160dp" />
+
+                <TextView
+                    android:id="@+id/tv_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="IDLE"
+                    android:textColor="#8A8A8F"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:layout_marginTop="2dp"
+                    android:letterSpacing="0.1" />
+            </LinearLayout>
+
+            <!-- Right Drawer Menu Button -->
+            <ImageButton
+                android:id="@+id/btn_right_menu"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_menu_recent_history"
+                android:scaleType="centerInside"
+                android:tint="#E6E6FA"
+                android:contentDescription="Open sessions menu" />
+        </RelativeLayout>
+
+        <!-- Glassmorphic Text Transcript Log Card -->
+        <LinearLayout
+            android:id="@+id/card_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_below="@+id/header_layout"
+            android:layout_above="@+id/settings_layout"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="6dp"
+            android:orientation="vertical"
+            android:background="@drawable/card_glass"
+            android:padding="8dp">
+
+            <ScrollView
+                android:id="@+id/scroll_log"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:fillViewport="true">
+
+                <LinearLayout
+                    android:id="@+id/layout_chat_container"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="2dp" />
+            </ScrollView>
+
+            <!-- Thinking Spinner Progress Bar -->
+            <ProgressBar
+                android:id="@+id/pb_thinking"
+                android:layout_width="wrap_content"
+                android:layout_height="24dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="4dp"
+                android:indeterminate="true"
+                android:visibility="gone"
+                android:indeterminateTintMode="src_atop"
+                android:indeterminateTint="#00F2FE" />
+        </LinearLayout>
+
+        <!-- Bottom Settings (Continue session & Setup info) -->
+        <LinearLayout
+            android:id="@+id/settings_layout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:orientation="vertical"
+            android:gravity="center_horizontal"
+            android:layout_marginBottom="4dp">
+
+            <!-- Top Controls Row: New Chat + Mock Mode -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginStart="4dp"
+                android:layout_marginBottom="4dp">
+
+                <!-- New Chat Button -->
+                <TextView
+                    android:id="@+id/btn_new_chat"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✦ New Chat"
+                    android:textColor="#00F2FE"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:background="@drawable/card_glass"
+                    android:padding="6dp"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:layout_marginEnd="10dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:contentDescription="Start a new chat session" />
+
+                <!-- Expand All Button -->
+                <TextView
+                    android:id="@+id/btn_expand_all"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="⛶ Expand All"
+                    android:textColor="#00F2FE"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:background="@drawable/card_glass"
+                    android:padding="6dp"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:layout_marginEnd="10dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:contentDescription="Expand all thoughts and tool calls" />
+
+                <!-- Settings Button -->
+                <TextView
+                    android:id="@+id/btn_settings"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="⚙ Settings"
+                    android:textColor="#00F2FE"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:background="@drawable/card_glass"
+                    android:padding="6dp"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:contentDescription="Open settings" />
+            </LinearLayout>
+
+            <!-- Input Bar Layout -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="6dp">
+
+                <!-- Sleek glassmorphic text input box -->
+                <EditText
+                    android:id="@+id/et_message"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:minHeight="42dp"
+                    android:hint="Type or speak a message..."
+                    android:textColor="#FFFFFF"
+                    android:textColorHint="#80FFFFFF"
+                    android:background="@drawable/card_glass"
+                    android:padding="10dp"
+                    android:textSize="13sp"
+                    android:layout_marginEnd="5dp"
+                    android:maxLines="4"
+                    android:scrollbars="vertical"
+                    android:textCursorDrawable="@drawable/cursor_color" />
+
+                <!-- Scaled Down Speak Button & Rings Container -->
+                <FrameLayout
+                    android:id="@+id/button_container"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginEnd="5dp">
+
+                    <!-- Concentric Ring 3 (Outer Ring for Pulsing) -->
+                    <View
+                        android:id="@+id/ring_outer"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_mic_btn"
+                        android:alpha="0" />
+
+                    <!-- Concentric Ring 2 (Middle Ring for Pulsing) -->
+                    <View
+                        android:id="@+id/ring_middle"
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_mic_btn"
+                        android:alpha="0" />
+
+                    <!-- Concentric Ring 1 (Inner Ring/Halo) -->
+                    <View
+                        android:id="@+id/ring_inner"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_mic_btn"
+                        android:alpha="0" />
+
+
+
+                    <!-- Main Mic Action Button -->
+                    <ImageButton
+                        android:id="@+id/btn_mic"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_mic_btn"
+                        android:src="@drawable/ic_mic"
+                        android:padding="6dp"
+                        android:scaleType="fitCenter"
+                        android:tint="#120E2E"
+                        android:contentDescription="Toggle voice record"
+                        android:elevation="6dp" />
+                </FrameLayout>
+
+                <!-- Send Button -->
+                <ImageButton
+                    android:id="@+id/btn_send"
+                    android:layout_width="42dp"
+                    android:layout_height="42dp"
+                    android:background="@drawable/card_glass"
+                    android:src="@android:drawable/ic_menu_send"
+                    android:tint="#00F2FE"
+                    android:padding="8dp"
+                    android:scaleType="fitCenter"
+                    android:contentDescription="Send text message"
+                    android:elevation="6dp" />
+
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Powered by Antigravity in Termux"
+                android:textColor="#40FFFFFF"
+                android:textSize="9sp"
+                android:layout_gravity="center_horizontal"
+                android:letterSpacing="0.05" />
+        </LinearLayout>
+    </RelativeLayout>
+
+    <!-- Slide-out Drawer Overlay Container -->
+    <FrameLayout
+        android:id="@+id/drawer_root"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true">
+
+        <!-- Translucent dim background panel -->
+        <View
+            android:id="@+id/drawer_dim_background"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#A6000000"
+            android:alpha="0" />
+
+        <!-- Drawer Content Card (Glassmorphic) -->
+        <LinearLayout
+            android:id="@+id/drawer_content"
+            android:layout_width="260dp"
+            android:layout_height="match_parent"
+            android:layout_gravity="start"
+            android:orientation="vertical"
+            android:background="#FA0B0518"
+            android:padding="14dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:elevation="16dp">
+
+            <!-- Title Header -->
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="10dp">
+
+                <TextView
+                    android:id="@+id/tv_drawer_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="INITIAL DIRECTORY"
+                    android:textColor="#E6E6FA"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.05" />
+
+                <!-- Refresh Button -->
+                <ImageButton
+                    android:id="@+id/btn_refresh_dirs"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:src="@android:drawable/stat_notify_sync"
+                    android:tint="#E6E6FA"
+                    android:contentDescription="Refresh directories list" />
+            </RelativeLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Select the directory context where the Antigravity CLI will be run:"
+                android:textColor="#A0E6E6FA"
+                android:textSize="11sp"
+                android:layout_marginBottom="12dp"
+                android:lineSpacingMultiplier="1.2" />
+
+            <!-- Loading Spinner container -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <!-- List View of Directories -->
+                <ListView
+                    android:id="@+id/lv_directories"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:divider="@null"
+                    android:dividerHeight="0dp" />
+
+                <!-- Progress Bar during query -->
+                <ProgressBar
+                    android:id="@+id/pb_drawer_loading"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_gravity="center"
+                    android:visibility="gone"
+                    android:indeterminateTint="#00F2FE" />
+
+                <!-- Empty state message -->
+                <TextView
+                    android:id="@+id/tv_empty_dirs"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:text="No directories found in home"
+                    android:textColor="#60FFFFFF"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <!-- Bottom Selected Status -->
+            <TextView
+                android:id="@+id/tv_active_dir"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:layout_marginBottom="6dp"
+                android:text="Active: Home"
+                android:textColor="#E6E6FA"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:letterSpacing="0.05" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- Slide-out Right Drawer Overlay Container -->
+    <FrameLayout
+        android:id="@+id/right_drawer_root"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true">
+
+        <!-- Translucent dim background panel -->
+        <View
+            android:id="@+id/right_drawer_dim_background"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#A6000000"
+            android:alpha="0" />
+
+        <!-- Drawer Content Card (Glassmorphic) -->
+        <LinearLayout
+            android:id="@+id/right_drawer_content"
+            android:layout_width="260dp"
+            android:layout_height="match_parent"
+            android:layout_gravity="end"
+            android:orientation="vertical"
+            android:background="#FA0B0518"
+            android:padding="14dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:elevation="16dp">
+
+            <!-- Title Header -->
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="10dp">
+
+                <TextView
+                    android:id="@+id/tv_right_drawer_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ANTIGRAVITY SESSIONS"
+                    android:textColor="#E6E6FA"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.05" />
+
+                <!-- Refresh Button -->
+                <ImageButton
+                    android:id="@+id/btn_refresh_sessions"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:src="@android:drawable/stat_notify_sync"
+                    android:tint="#E6E6FA"
+                    android:contentDescription="Refresh sessions list" />
+            </RelativeLayout>
+
+            <!-- New Chat Button (same height as a session item) -->
+            <TextView
+                android:id="@+id/btn_new_chat_drawer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="✦  New Chat"
+                android:textColor="#00F2FE"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:gravity="center_vertical"
+                android:padding="10dp"
+                android:paddingStart="12dp"
+                android:layout_marginHorizontal="8dp"
+                android:layout_marginVertical="4dp"
+                android:background="@drawable/card_glass"
+                android:clickable="true"
+                android:focusable="true"
+                android:contentDescription="Start a new chat session" />
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#20FFFFFF"
+                android:layout_marginTop="6dp"
+                android:layout_marginBottom="2dp" />
+
+            <!-- Loading Spinner container -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <!-- List View of Sessions -->
+                <ListView
+                    android:id="@+id/lv_sessions"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:divider="@null"
+                    android:dividerHeight="0dp" />
+
+                <!-- Progress Bar during query -->
+                <ProgressBar
+                    android:id="@+id/pb_right_drawer_loading"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_gravity="center"
+                    android:visibility="gone"
+                    android:indeterminateTint="#00F2FE" />
+
+                <!-- Empty state message -->
+                <TextView
+                    android:id="@+id/tv_empty_sessions"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:text="No sessions found"
+                    android:textColor="#60FFFFFF"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <!-- Bottom Selected Status -->
+            <TextView
+                android:id="@+id/tv_active_session"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:layout_marginBottom="6dp"
+                android:text="Active: None"
+                android:textColor="#E6E6FA"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:letterSpacing="0.05" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- Settings Popup Overlay Container -->
+    <FrameLayout
+        android:id="@+id/settings_popup_root"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true">
+
+        <!-- Translucent dim background panel -->
+        <View
+            android:id="@+id/settings_popup_dim_background"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#A6000000" />
+
+        <!-- Settings Card Container (Glassmorphic) centered -->
+        <LinearLayout
+            android:layout_width="280dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:orientation="vertical"
+            android:background="#FA0B0518"
+            android:padding="16dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:elevation="24dp">
+
+            <!-- Title Header -->
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="SETTINGS"
+                    android:textColor="#E6E6FA"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.05" />
+
+                <!-- Close Button -->
+                <ImageButton
+                    android:id="@+id/btn_settings_close"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:src="@android:drawable/ic_menu_close_clear_cancel"
+                    android:tint="#E6E6FA"
+                    android:contentDescription="Close settings" />
+            </RelativeLayout>
+
+            <!-- Scrollable Settings Content -->
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="220dp"
+                android:fillViewport="true">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <!-- Mock Mode Checkbox -->
+                    <CheckBox
+                        android:id="@+id/cb_mock_mode"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Mock Mode"
+                        android:textColor="#E6E6FA"
+                        android:textSize="14sp"
+                        android:buttonTint="#9D50BB"
+                        android:paddingStart="8dp"
+                        android:layout_marginBottom="12dp"
+                        android:checked="false" />
+
+                    <!-- Clear Session History Cache Button -->
+                    <TextView
+                        android:id="@+id/btn_clear_session_cache"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Clear Session History Cache"
+                        android:textColor="#FF416C"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:gravity="center"
+                        android:padding="12dp"
+                        android:layout_marginTop="8dp"
+                        android:layout_marginBottom="12dp"
+                        android:background="@drawable/card_glass"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:contentDescription="Clear session history cache" />
+                </LinearLayout>
+            </ScrollView>
+        </LinearLayout>
+    </FrameLayout>
+</FrameLayout>

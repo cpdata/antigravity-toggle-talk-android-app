@@ -1,0 +1,26 @@
+{
+  "id": "GwYv6M",
+  "title": "Fix UI Reset and Glitchiness During Active Session Text Streaming and Input",
+  "description": "Address UI glitchiness and resetting of expanded bubbles when typing or when the agent streams updates: 1. Throttle/buffer streaming updates using a timed interval or Handler in handleStreamedDisplay. 2. Preserve bubble expansion states by mapping them to unique message identifiers/indices. 3. Prevent layout shifts and input/scroll lags during active text generation.",
+  "status": "ready",
+  "priority": 0.75,
+  "assignedTo": "main-agent",
+  "groupId": "77MxP9",
+  "dependencies": [
+    "QBt5p7"
+  ],
+  "payload": {},
+  "metadata": {
+    "createdAt": "2026-06-04T23:45:20.595Z",
+    "updatedAt": "2026-06-04T23:47:57.799Z",
+    "createdBy": "main-agent",
+    "tags": [
+      "ui",
+      "performance",
+      "bug"
+    ],
+    "requiredCapabilities": [],
+    "maxRetries": 3,
+    "retryCount": 0
+  }
+}

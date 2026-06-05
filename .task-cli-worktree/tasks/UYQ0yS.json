@@ -1,0 +1,25 @@
+{
+  "id": "UYQ0yS",
+  "title": "Add Antigravity Sessions navigation and view",
+  "description": "Add an 'Antigravity Sessions' navigation button that opens a scrollable list view of all available antigravity sessions located in '.gemini/antigravity-cli/brain/'. Clicking a session must automatically check the 'continue conversation' box and pass the selected session ID to run_antigravity.sh (which will execute 'agy_va39 --conversation <session-id>' instead of '-c'). The selected session ID must be passed on every subsequent invocation as long as the continue box remains checked.",
+  "status": "completed",
+  "priority": 0.3,
+  "assignedTo": "main-agent",
+  "dependencies": [],
+  "payload": {},
+  "result": "Implemented sessions lists retrieved via Termux command in right drawer ListView, and added session parameter to run_antigravity.sh.",
+  "metadata": {
+    "createdAt": "2026-06-03T19:31:23.180Z",
+    "updatedAt": "2026-06-03T19:58:23.264Z",
+    "createdBy": "main-agent",
+    "claimedAt": "2026-06-03T19:40:39.072Z",
+    "lastHeartbeatAt": "2026-06-03T19:40:39.072Z",
+    "tags": [
+      "ui",
+      "navigation"
+    ],
+    "requiredCapabilities": [],
+    "maxRetries": 3,
+    "retryCount": 0
+  }
+}

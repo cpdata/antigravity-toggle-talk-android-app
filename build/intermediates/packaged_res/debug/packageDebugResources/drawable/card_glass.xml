@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <!-- Glass background color (semi-translucent white/grey) -->
+    <solid android:color="#1AFFFFFF" />
+    
+    <!-- Thin white translucent border to give a glass shine edge -->
+    <stroke
+        android:width="1dp"
+        android:color="#26FFFFFF" />
+        
+    <!-- Rounded corners -->
+    <corners android:radius="16dp" />
+</shape>

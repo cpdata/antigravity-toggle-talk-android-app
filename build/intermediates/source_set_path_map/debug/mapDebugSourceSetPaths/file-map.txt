@@ -1,0 +1,7 @@
+com.toggletalk.android-pngs-0 /data/data/com.termux/files/home/ToggleTalkAndroid/build/generated/res/pngs/debug
+com.toggletalk.android-resValues-1 /data/data/com.termux/files/home/ToggleTalkAndroid/build/generated/res/resValues/debug
+com.toggletalk.android-packageDebugResources-2 /data/data/com.termux/files/home/ToggleTalkAndroid/build/intermediates/incremental/debug/packageDebugResources/merged.dir
+com.toggletalk.android-packageDebugResources-3 /data/data/com.termux/files/home/ToggleTalkAndroid/build/intermediates/incremental/debug/packageDebugResources/stripped.dir
+com.toggletalk.android-debug-4 /data/data/com.termux/files/home/ToggleTalkAndroid/build/intermediates/merged_res/debug/mergeDebugResources
+com.toggletalk.android-debug-5 /data/data/com.termux/files/home/ToggleTalkAndroid/src/debug/res
+com.toggletalk.android-main-6 /data/data/com.termux/files/home/ToggleTalkAndroid/src/main/res

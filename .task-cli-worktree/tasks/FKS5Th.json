@@ -1,0 +1,25 @@
+{
+  "id": "FKS5Th",
+  "title": "Add right side menu",
+  "description": "Implement a right-side navigation drawer/menu that swipes out similarly to the left-side menu. This menu will display additional options, settings, and navigation for the user.",
+  "status": "completed",
+  "priority": 0.3,
+  "assignedTo": "main-agent",
+  "dependencies": [],
+  "payload": {},
+  "result": "Added right side menu button btn_right_menu in header and implemented right-side swipe gesture listener to open/close right card drawer.",
+  "metadata": {
+    "createdAt": "2026-06-03T19:31:15.187Z",
+    "updatedAt": "2026-06-03T19:58:18.559Z",
+    "createdBy": "main-agent",
+    "claimedAt": "2026-06-03T19:41:54.357Z",
+    "lastHeartbeatAt": "2026-06-03T19:41:54.357Z",
+    "tags": [
+      "ui",
+      "menu"
+    ],
+    "requiredCapabilities": [],
+    "maxRetries": 3,
+    "retryCount": 0
+  }
+}

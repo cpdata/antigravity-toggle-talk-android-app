@@ -1,0 +1,11 @@
+{
+  "id": "77MxP9",
+  "tags": [],
+  "title": "Chat Log UI & Markdown Link Support",
+  "description": "Enhance the conversation chat log UI with proper chronological collapsible bubbles, fix syntax highlighting, and implement interactive markdown links (supporting both web URLs and Termux file paths via nano).",
+  "metadata": {
+    "createdAt": "2026-06-04T23:39:51.918Z",
+    "updatedAt": "2026-06-05T01:42:37.687Z",
+    "createdBy": "main-agent"
+  }
+}
