@@ -315,10 +315,10 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                         mUnresolvedQueueManager.onStateOrQueueChanged(mCurrentState, mPromptQueue);
                     }
                     
-                    // CRITICAL: Re-enforce thinking container visibility if state is THINKING
-                    if ("THINKING".equals(mCurrentState)) {
+                    // CRITICAL: Re-enforce thinking container visibility if state is THINKING or SPEAKING
+                    if ("THINKING".equals(mCurrentState) || "SPEAKING".equals(mCurrentState)) {
                         if (mLayoutThinkingContainer != null) {
-                            Log.d(TAG, "QueueChanged: THINKING state detected, re-showing thinking container");
+                            Log.d(TAG, "QueueChanged: " + mCurrentState + " state detected, re-showing thinking container");
                             mLayoutThinkingContainer.setVisibility(View.VISIBLE);
                             mLayoutThinkingContainer.bringToFront();
                         }
@@ -3522,12 +3522,17 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
             case "SPEAKING":
                 Log.d(TAG, "onStateChanged: SPEAKING");
                 mIsAgentActive = true;
-                mTvStatus.setText("SPEAKING...");
-                mTvStatus.setTextColor(Color.parseColor("#4CD964"));
-                mBtnMic.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#4CD964")));
-                mBtnMic.setImageTintList(ColorStateList.valueOf(Color.parseColor("#FFFFFF")));
+                // User requested: "We dont need speaking displayed in the header"
+                // So we keep it as THINKING or previous state, or just ensure it's not changed to SPEAKING.
+                // We'll keep the cyan color to indicate activity.
+                mTvStatus.setTextColor(Color.parseColor("#00F2FE"));
+                mBtnMic.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#0D1A2E")));
+                mBtnMic.setImageTintList(ColorStateList.valueOf(Color.parseColor("#00F2FE")));
+                
                 if (mLayoutThinkingContainer != null) {
-                    mLayoutThinkingContainer.setVisibility(View.GONE);
+                    Log.d(TAG, "onStateChanged: SPEAKING - Keeping ThinkingContainer VISIBLE");
+                    mLayoutThinkingContainer.setVisibility(View.VISIBLE);
+                    mLayoutThinkingContainer.bringToFront();
                 }
                 
                 // Keep screen on
