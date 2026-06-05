@@ -135,105 +135,100 @@
                     android:contentDescription="Scroll to bottom" />
             </FrameLayout>
 
-            <!-- Bottom Control Area (Thinking + Queue) -->
+            <!-- Thinking spinner & Terminate button container (DIRECT CHILD) -->
             <LinearLayout
+                android:id="@+id/layout_thinking_container"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_gravity="center_horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="4dp"
+                android:background="@drawable/card_glass"
+                android:padding="6dp"
+                android:elevation="10dp"
+                android:visibility="gone"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ProgressBar
+                    android:id="@+id/pb_thinking"
+                    android:layout_width="wrap_content"
+                    android:layout_height="20dp"
+                    android:indeterminate="true"
+                    android:indeterminateTintMode="src_atop"
+                    android:indeterminateTint="#00F2FE" />
+
+                <!-- Red X Terminate Button -->
+                <ImageButton
+                    android:id="@+id/btn_terminate"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/card_glass"
+                    android:src="@android:drawable/ic_menu_close_clear_cancel"
+                    android:tint="#FF3B30"
+                    android:padding="6dp"
+                    android:scaleType="fitCenter"
+                    android:contentDescription="Terminate session execution"
+                    android:clickable="true"
+                    android:focusable="true" />
+            </LinearLayout>
+
+            <!-- Prompt Queue Container Layout (DIRECT CHILD) -->
+            <LinearLayout
+                android:id="@+id/layout_queue_container"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:gravity="center_horizontal"
-                android:layout_marginTop="2dp">
+                android:padding="4dp"
+                android:layout_marginTop="2dp"
+                android:layout_marginBottom="2dp"
+                android:visibility="gone"
+                android:background="@drawable/card_glass"
+                android:elevation="4dp">
 
-                <!-- Thinking spinner & Terminate button container -->
+                <!-- Collapsed Layout -->
                 <LinearLayout
-                    android:id="@+id/layout_thinking_container"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginBottom="4dp"
-                    android:background="@drawable/card_glass"
-                    android:padding="6dp"
-                    android:elevation="6dp"
-                    android:visibility="gone"
-                    android:clickable="true"
-                    android:focusable="true">
-
-                    <ProgressBar
-                        android:id="@+id/pb_thinking"
-                        android:layout_width="wrap_content"
-                        android:layout_height="20dp"
-                        android:indeterminate="true"
-                        android:indeterminateTintMode="src_atop"
-                        android:indeterminateTint="#00F2FE" />
-
-                    <!-- Red X Terminate Button -->
-                    <ImageButton
-                        android:id="@+id/btn_terminate"
-                        android:layout_width="32dp"
-                        android:layout_height="32dp"
-                        android:layout_marginStart="8dp"
-                        android:background="@drawable/card_glass"
-                        android:src="@android:drawable/ic_menu_close_clear_cancel"
-                        android:tint="#FF3B30"
-                        android:padding="6dp"
-                        android:scaleType="fitCenter"
-                        android:contentDescription="Terminate session execution"
-                        android:clickable="true"
-                        android:focusable="true" />
-                </LinearLayout>
-
-                <!-- Prompt Queue Container Layout -->
-                <LinearLayout
-                    android:id="@+id/layout_queue_container"
+                    android:id="@+id/layout_queue_collapsed"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="4dp"
-                    android:visibility="gone"
-                    android:background="@drawable/card_glass"
-                    android:elevation="4dp">
-
-                    <!-- Collapsed Layout -->
-                    <LinearLayout
-                        android:id="@+id/layout_queue_collapsed"
-                        android:layout_width="match_parent"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+                    <TextView
+                        android:id="@+id/tv_queue_badge"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:gravity="center"
+                        android:textColor="#FFFFFF"
+                        android:textSize="9sp"
+                        android:textStyle="bold"
+                        android:background="@drawable/bg_badge" />
+                    <TextView
+                        android:id="@+id/tv_queue_collapsed_text"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
-                        <TextView
-                            android:id="@+id/tv_queue_badge"
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
-                            android:gravity="center"
-                            android:textColor="#FFFFFF"
-                            android:textSize="9sp"
-                            android:textStyle="bold"
-                            android:background="@drawable/bg_badge" />
-                        <TextView
-                            android:id="@+id/tv_queue_collapsed_text"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:layout_marginStart="6dp"
-                            android:textColor="#E6E6FA"
-                            android:textSize="10sp"
-                            android:ellipsize="end"
-                            android:singleLine="true" />
-                    </LinearLayout>
-
-                    <!-- Expanded Scrollable Layout -->
-                    <ScrollView
-                        android:id="@+id/scroll_queue_expanded"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:visibility="gone">
-                        <LinearLayout
-                            android:id="@+id/layout_queue_expanded_list"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="vertical" />
-                    </ScrollView>
+                        android:layout_weight="1"
+                        android:layout_marginStart="6dp"
+                        android:textColor="#E6E6FA"
+                        android:textSize="10sp"
+                        android:ellipsize="end"
+                        android:singleLine="true" />
                 </LinearLayout>
+
+                <!-- Expanded Scrollable Layout -->
+                <ScrollView
+                    android:id="@+id/scroll_queue_expanded"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone">
+                    <LinearLayout
+                        android:id="@+id/layout_queue_expanded_list"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical" />
+                </ScrollView>
             </LinearLayout>
         </LinearLayout>
 

@@ -304,7 +304,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         public void onReceive(Context context, Intent intent) {
             if (ToggleTalkService.ACTION_QUEUE_CHANGED.equals(intent.getAction())) {
                 ArrayList<String> queue = intent.getStringArrayListExtra("queue");
-                Log.d(TAG, "Queue changed receiver. New size: " + (queue != null ? queue.size() : 0));
+                Log.d(TAG, "QueueChanged: current state=" + mCurrentState + ", queue size=" + (queue != null ? queue.size() : 0));
                 if (queue != null) {
                     mPromptQueue.clear();
                     mPromptQueue.addAll(queue);
@@ -315,9 +315,13 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                         mUnresolvedQueueManager.onStateOrQueueChanged(mCurrentState, mPromptQueue);
                     }
                     
-                    // Re-enforce thinking container visibility if in THINKING state
-                    if ("THINKING".equals(mCurrentState) && mLayoutThinkingContainer != null) {
-                        mLayoutThinkingContainer.setVisibility(View.VISIBLE);
+                    // CRITICAL: Re-enforce thinking container visibility if state is THINKING
+                    if ("THINKING".equals(mCurrentState)) {
+                        if (mLayoutThinkingContainer != null) {
+                            Log.d(TAG, "QueueChanged: THINKING state detected, re-showing thinking container");
+                            mLayoutThinkingContainer.setVisibility(View.VISIBLE);
+                            mLayoutThinkingContainer.bringToFront();
+                        }
                     }
                 }
             }
@@ -3473,7 +3477,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                 break;
 
             case "THINKING":
-                Log.d(TAG, "onStateChanged: THINKING");
+                Log.d(TAG, "onStateChanged: THINKING. Queue size: " + mPromptQueue.size());
                 mIsResuming = false;
                 mIsAgentActive = true;
                 if ("Transcribing...".equals(text)) {
@@ -3485,7 +3489,9 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                 mBtnMic.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#0D1A2E")));
                 mBtnMic.setImageTintList(ColorStateList.valueOf(Color.parseColor("#00F2FE")));
                 if (mLayoutThinkingContainer != null) {
+                    Log.d(TAG, "onStateChanged: Setting ThinkingContainer VISIBLE");
                     mLayoutThinkingContainer.setVisibility(View.VISIBLE);
+                    mLayoutThinkingContainer.bringToFront();
                 }
                 
                 // Keep screen on

@@ -132,7 +132,8 @@ public class UnresolvedQueueManager {
         
         if (isIdle && hasQueue) {
             setUnresolvedState(true);
-        } else if (!hasQueue) {
+        } else {
+            // Clear unresolved actions if executing (THINKING/SPEAKING) or if queue is empty
             setUnresolvedState(false);
         }
     }
