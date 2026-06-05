@@ -1,0 +1,25 @@
+{
+  "id": "gJOK94",
+  "title": "Implement Markdown Link Support with Browser and Termux Nano Integration",
+  "description": "Implement markdown link parsing and click interception in MainActivity.java: 1. Parse markdown links [text](url) into HTML anchors inside renderMarkdown. 2. Enable LinkMovementMethod on message TextViews so links are clickable. 3. Intercept link clicks: if it is a web URL, open it in the browser; if it is a Termux file path, launch nano inside Termux using a foreground com.termux.RUN_COMMAND intent.",
+  "status": "pending",
+  "priority": 0.85,
+  "assignedTo": "main-agent",
+  "dependencies": [
+    "ah5hER"
+  ],
+  "payload": {},
+  "metadata": {
+    "createdAt": "2026-06-05T02:35:03.499Z",
+    "updatedAt": "2026-06-05T02:35:03.499Z",
+    "createdBy": "main-agent",
+    "tags": [
+      "markdown",
+      "links",
+      "termux-integration"
+    ],
+    "requiredCapabilities": [],
+    "maxRetries": 3,
+    "retryCount": 0
+  }
+}
