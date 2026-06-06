@@ -31,21 +31,15 @@ STREAM_PID=$!
 
 # Prepare Gemini command
 GEMINI_BIN="/data/data/com.termux/files/usr/bin/gemini"
-PROOT_BIN="/data/data/com.termux/files/usr/bin/proot"
 ARGS=("--yolo" "--output-format" "json" "--skip-trust") # Using json for the final result
 
 if [ "$CONTINUE_SESSION" = "true" ] && [ -n "$SESSION_ID" ]; then
     ARGS+=("--resume" "$SESSION_ID")
 fi
 
-# Run Gemini via proot
-export GEMINI_RAW_RESPONSE=$(env -u LD_PRELOAD -u LD_LIBRARY_PATH PWD="$TARGET_DIR" AGENT_ENV_TYPE="ToggleTalkApp" "$PROOT_BIN" --kill-on-exit \
-      -w "$TARGET_DIR" \
-      -b /data/data/com.termux/files/usr/etc/resolv.conf:/etc/resolv.conf \
-      -b /data/data/com.termux/files/usr/bin/env:/usr/bin/env \
-      -b /data/data/com.termux/files/usr/bin/sh:/bin/sh \
-      -b /data/data/com.termux/files/usr/bin/bash:/bin/bash \
-      /bin/sh -c 'cd "$1" 2>/dev/null || true; shift; exec "$@"' sh "$TARGET_DIR" node "$GEMINI_BIN" "${ARGS[@]}" -p "$TRANSCRIPT" 2>>"$HOME/.gemini/gemini_err.log")
+# Run Gemini
+# We use export to pass the response to the python parser safely
+export GEMINI_RAW_RESPONSE=$(node "$GEMINI_BIN" "${ARGS[@]}" -p "$TRANSCRIPT" 2>>"$HOME/.gemini/gemini_err.log")
 
 # Stop streaming
 sleep 0.5
