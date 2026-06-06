@@ -4,3 +4,5 @@ __pycache__/
 ignore/
 .task-cli-worktree/
 logs/
+.gemini/
+GEMINI.md
