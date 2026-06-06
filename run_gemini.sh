@@ -39,7 +39,7 @@ fi
 
 # Run Gemini
 # We use export to pass the response to the python parser safely
-export GEMINI_RAW_RESPONSE=$("$GEMINI_BIN" "${ARGS[@]}" -p "$TRANSCRIPT" 2>>"$HOME/.gemini/gemini_err.log")
+export GEMINI_RAW_RESPONSE=$(node "$GEMINI_BIN" "${ARGS[@]}" -p "$TRANSCRIPT" 2>>"$HOME/.gemini/gemini_err.log")
 
 # Stop streaming
 sleep 0.5
