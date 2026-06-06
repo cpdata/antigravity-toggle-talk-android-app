@@ -279,8 +279,9 @@ def tail_transcript(path, session_id, prompt):
                     
                     # Update session_id if it's still a placeholder
                     if (not session_id or session_id == "unknown" or session_id.startswith("new_")) and "sessionId" in obj:
+                        old_session_id = session_id
                         session_id = obj["sessionId"]
-                        print(f"Adopted real session ID from stream: {session_id}")
+                        print(f"DEBUG: Adopted real session ID from stream: {old_session_id} -> {session_id}")
 
                     # Extract any TTS text to speak from this new step
                     tts_text = extract_tts_text(obj)
@@ -298,6 +299,7 @@ def tail_transcript(path, session_id, prompt):
                     messages = parse_transcript_steps(parsed_steps)
                     json_str = json.dumps(messages)
                     
+                    print(f"DEBUG: Broadcasting update for session: {session_id}")
                     if len(json_str.encode('utf-8')) < 90 * 1024:
                         send_broadcast(session_id, json_str=json_str, tts_text=tts_text)
                     else:

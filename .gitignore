@@ -6,3 +6,4 @@ ignore/
 logs/
 .gemini/
 GEMINI.md
+.geminiignore
