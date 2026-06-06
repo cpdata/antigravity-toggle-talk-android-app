@@ -2578,6 +2578,8 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
     private void addUserBubble(String message) {
         if (mChatContainer == null || message == null || message.trim().isEmpty()) return;
 
+        String newText = renderMarkdown(message).toString();
+
         // Check for duplicates
         for (int i = 0; i < mChatContainer.getChildCount(); i++) {
             View view = mChatContainer.getChildAt(i);
@@ -2587,7 +2589,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                     View child = layout.getChildAt(j);
                     if (child instanceof TextView) {
                         String existingText = ((TextView) child).getText().toString();
-                        if (existingText.equals(renderMarkdown(message))) {
+                        if (existingText.equals(newText)) {
                             return; // Already exists
                         }
                     }

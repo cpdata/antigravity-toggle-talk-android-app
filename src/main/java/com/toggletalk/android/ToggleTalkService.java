@@ -871,8 +871,12 @@ public class ToggleTalkService extends Service {
         }
 
         Log.d(TAG, "Forwarding streamed update to MainActivity. jsonLen=" + (messagesJson != null ? messagesJson.length() : 0) + ", filePath=" + filePath);
-        if (!"THINKING".equals(mSessionStates.get(mSelectedSessionId)) && !"SPEAKING".equals(mSessionStates.get(mSelectedSessionId))) {
-            updateState(mSelectedSessionId, "THINKING", "Streaming updates...");
+        
+        String currentState = mSessionStates.get(mSelectedSessionId);
+        if (!"SPEAKING".equals(currentState) && !"FINISHED".equals(currentState)) {
+            if (!"THINKING".equals(currentState)) {
+                updateState(mSelectedSessionId, "THINKING", "Streaming updates...");
+            }
         }
 
         Intent intent = new Intent("com.toggletalk.android.ACTION_STREAM_DISPLAY");

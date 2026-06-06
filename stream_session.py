@@ -26,23 +26,24 @@ def find_gemini_transcript(session_id):
     home = os.environ.get("HOME")
     
     project_names = []
-    if target_dir and home and target_dir.startswith(home):
-        rel_path = os.path.relpath(target_dir, home)
-        if rel_path == ".":
-            project_names.append("home")
-        else:
-            # Force lowercase as Gemini CLI convention for chat directories
-            project_names.append(rel_path.lower())
-            # Fallback to case-sensitive if that fails
-            if rel_path.lower() != rel_path:
-                project_names.append(rel_path)
+    if target_dir and home:
+        # Use case-insensitive comparison for matching directory structure
+        if target_dir.startswith(home):
+            rel_path = os.path.relpath(target_dir, home)
+            if rel_path == ".":
+                project_names.append("home")
+            else:
+                project_names.append(rel_path.lower())
+                # Fallback to case-sensitive if needed
+                if rel_path.lower() != rel_path:
+                    project_names.append(rel_path)
     
     # Fallback to detected projects in GEMINI_TMP_DIR
     if os.path.exists(GEMINI_TMP_DIR):
         try:
             detected_projects = [d for d in os.listdir(GEMINI_TMP_DIR) if os.path.isdir(os.path.join(GEMINI_TMP_DIR, d))]
             for dp in detected_projects:
-                if dp not in project_names:
+                if dp.lower() not in [p.lower() for p in project_names]:
                     project_names.append(dp)
         except: pass
     
@@ -51,7 +52,9 @@ def find_gemini_transcript(session_id):
     
     print(f"Searching for Gemini transcript. session_id='{session_id}', projects={project_names}")
     
-    if session_id and not session_id.startswith("new_"):
+    is_new = not session_id or session_id.startswith("new_")
+    
+    if not is_new:
         # We have a session ID, try to find the file directly first
         for project in project_names:
             chats_dir = os.path.join(GEMINI_TMP_DIR, project, "chats")
@@ -104,12 +107,14 @@ def find_gemini_transcript(session_id):
                         print(f"Found new Gemini transcript file in {project}: {res}")
                         return res
                 
-                # Fallback: check if ANY file was modified since we started
-                all_files = [os.path.join(chats_dir, f) for f in current_files if f.endswith(".jsonl")]
-                if all_files:
-                    latest = max(all_files, key=os.path.getmtime)
-                    print(f"Adopting most recent transcript file in {project}: {latest}")
-                    return latest
+                # Fallback: ONLY if it is a NEW session, we might adopt the most recent if it was modified just now
+                if is_new:
+                    all_files = [os.path.join(chats_dir, f) for f in current_files if f.endswith(".jsonl")]
+                    if all_files:
+                        latest = max(all_files, key=os.path.getmtime)
+                        if os.path.getmtime(latest) >= start_time - 1.0:
+                            print(f"Adopting recent transcript file in {project}: {latest}")
+                            return latest
             except: pass
         time.sleep(0.5)
         

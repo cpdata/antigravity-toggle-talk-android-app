@@ -32,7 +32,6 @@ TARGET_DIR="$(pwd)"
 
 # Prepare Gemini command
 GEMINI_BIN="/data/data/com.termux/files/usr/bin/gemini"
-# If GEMINI_BIN is a symlink to gemini.js, we call it with node
 if [[ "$GEMINI_BIN" == *.js ]] || [ -L "$GEMINI_BIN" ]; then
     NODE_BIN="/data/data/com.termux/files/usr/bin/node"
     RUN_CMD=("$NODE_BIN" "$GEMINI_BIN")
@@ -41,27 +40,25 @@ else
 fi
 
 ARGS=("--yolo" "--output-format" "stream-json" "--skip-trust")
-
 if [ "$CONTINUE_SESSION" = "true" ] && [ -n "$SESSION_ID" ]; then
     ARGS+=("--resume" "$SESSION_ID")
 fi
 
-# Run Gemini in the background and redirect output to a temporary JSONL file
 TEMP_STREAM="$HOME/.gemini/stream_output_$$.jsonl"
 touch "$TEMP_STREAM"
 
+# Execute gemini in background
 "${RUN_CMD[@]}" "${ARGS[@]}" -p "$TRANSCRIPT" > "$TEMP_STREAM" 2>>"$HOME/.gemini/gemini_err.log" &
 GEMINI_PID=$!
 
-# Wait for the init event to capture the actual SESSION_ID
+# Extract REAL_SESSION_ID from the first line (init event)
 REAL_SESSION_ID=""
 MAX_WAIT=50 # 5 seconds max wait
 WAIT_COUNT=0
 while [ -z "$REAL_SESSION_ID" ] && [ $WAIT_COUNT -lt $MAX_WAIT ]; do
-    if ! kill -0 $GEMINI_PID 2>/dev/null; then
+    if ! kill -0 $GEMINI_PID 2>/dev/null && [ ! -s "$TEMP_STREAM" ]; then
         break
     fi
-    # Use python/jq to extract session_id from the init event
     REAL_SESSION_ID=$(python3 -c '
 import json, sys
 try:
@@ -81,14 +78,15 @@ print("")
     WAIT_COUNT=$((WAIT_COUNT + 1))
 done
 
-if [ -z "$REAL_SESSION_ID" ]; then
-    REAL_SESSION_ID="$SESSION_ID"
-fi
+# We MUST have a real session ID to continue reliably. 
+# If init failed, we use the passed ID, but this is a fallback we should avoid if possible.
+USED_SESSION_ID="${REAL_SESSION_ID:-$SESSION_ID}"
 
-# Start streaming watcher in background using the real session ID
+# Start streaming watcher in background
 STREAM_LOG="$HOME/.gemini/stream_session_gemini.log"
-echo "--- Starting new Gemini stream session at $(date) ---" > "$STREAM_LOG"
-python3 "$SCRIPT_DIR/stream_session.py" "$REAL_SESSION_ID" "$TRANSCRIPT" >> "$STREAM_LOG" 2>&1 &
+echo "--- Starting new Gemini stream session at $(date) for ID $USED_SESSION_ID ---" > "$STREAM_LOG"
+echo "run_gemini.sh: Using session ID: $USED_SESSION_ID (captured: $REAL_SESSION_ID, original: $SESSION_ID)" >> "$STREAM_LOG"
+python3 "$SCRIPT_DIR/stream_session.py" "$USED_SESSION_ID" "$TRANSCRIPT" >> "$STREAM_LOG" 2>&1 &
 STREAM_PID=$!
 
 trap 'kill "$STREAM_PID" "$GEMINI_PID" 2>/dev/null; rm -f "$PID_FILE" "$TEMP_STREAM"' EXIT
@@ -96,57 +94,34 @@ trap 'kill "$STREAM_PID" "$GEMINI_PID" 2>/dev/null; rm -f "$PID_FILE" "$TEMP_STR
 # Wait for Gemini CLI to finish
 wait $GEMINI_PID
 
-# Give stream_session.py more time to finish broadcasting final steps
-sleep 2.0
+# Kill stream_session immediately to stop further broadcasts
 kill "$STREAM_PID" 2>/dev/null
 
-# Parse the final message from the stream JSONL file
-LATEST_RESPONSE=$(python3 -c '
-import json, sys
-try:
-    with open(sys.argv[1], "r") as f:
-        latest_text = ""
-        for line in f:
-            try:
-                obj = json.loads(line)
-                # stream-json outputs "message" type with "assistant" role
-                if obj.get("type") == "message" and obj.get("role") in ["model", "assistant"]:
-                    if obj.get("delta"):
-                        latest_text += obj.get("content", "")
-                    else:
-                        latest_text = obj.get("content", "")
-            except: pass
-        print(latest_text)
-except: print("")
-' "$TEMP_STREAM")
+# Final check of the transcript file to get the definitive last response
+FINAL_TRANSCRIPT=$(AGENT=gemini AGENT_TARGET_DIR="$TARGET_DIR" python3 -c "from stream_session import find_gemini_transcript; print(find_gemini_transcript('$USED_SESSION_ID') or '')")
 
-# If empty, fallback to reading the transcript file directly
-if [ -z "$LATEST_RESPONSE" ]; then
-    export RESPONSE_FILE=$(AGENT=gemini python3 -c "from stream_session import find_gemini_transcript; print(find_gemini_transcript('$REAL_SESSION_ID') or '')")
-    if [ -n "$RESPONSE_FILE" ] && [ -f "$RESPONSE_FILE" ]; then
-        LATEST_RESPONSE=$(python3 -c '
-import json, os
-path = os.environ.get("RESPONSE_FILE")
+LATEST_RESPONSE="No response received."
+if [ -n "$FINAL_TRANSCRIPT" ] && [ -f "$FINAL_TRANSCRIPT" ]; then
+    LATEST_RESPONSE=$(python3 -c '
+import json, sys
+path = sys.argv[1]
 try:
-    with open(path, "r") as f:
+    with open(path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
         latest_text = ""
-        for line in reversed(f.readlines()):
+        for line in reversed(lines):
             try:
                 data = json.loads(line)
                 if data.get("type") == "gemini" and data.get("content"):
                     latest_text = data["content"]
                     break
             except: continue
-        print(latest_text)
-except: print("")
-')
-    fi
-fi
-
-if [ -z "$LATEST_RESPONSE" ]; then
-    echo "{\"latest_response\": \"No response from Gemini.\", \"sanitized_tts\": \"No response from Gemini.\", \"session_id\": \"$REAL_SESSION_ID\"}"
-    exit 1
+        print(latest_text if latest_text else "No response in transcript.")
+except: print("Error reading transcript.")
+' "$FINAL_TRANSCRIPT")
 fi
 
 SANITIZED_TTS=$(printf "%s" "$LATEST_RESPONSE" | python3 "$SCRIPT_DIR/tts_sanitize.py")
-python3 -c 'import sys, json; print(json.dumps({"latest_response": sys.argv[1], "sanitized_tts": sys.argv[2], "session_id": sys.argv[3]}))' "$LATEST_RESPONSE" "$SANITIZED_TTS" "$REAL_SESSION_ID"
+
+# Output JSON for Android
+python3 -c 'import sys, json; print(json.dumps({"latest_response": sys.argv[1], "sanitized_tts": sys.argv[2], "session_id": sys.argv[3]}))' "$LATEST_RESPONSE" "$SANITIZED_TTS" "$USED_SESSION_ID"
