@@ -1489,11 +1489,11 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         // Clear previous state for a new turn
         mUserPrompt = message;
         mLastStreamedAgentText = "";
+        mActiveAgentTextView = null;
         mIsResuming = false;
         
         // Add manual bubbles immediately for better UX
         addUserBubble(mUserPrompt);
-        addAgentBubble("...");
 
         Intent intent = new Intent(this, ToggleTalkService.class);
         intent.setAction("com.toggletalk.android.ACTION_SEND_PROMPT");
@@ -1994,30 +1994,8 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
             }
         }
 
-        if (mIsAgentActive && !hasAgentResponseAtEnd && mActiveAgentTextView == null) {
-            BubbleTag expectedTag = new BubbleTag("agent_active", -1, "...");
-            if (!mRecreateMode && mViewIndex < mChatContainer.getChildCount()) {
-                View existingView = mChatContainer.getChildAt(mViewIndex);
-                Object tag = existingView.getTag();
-                if (tag instanceof BubbleTag && tag.equals(expectedTag)) {
-                    mViewIndex++;
-                    android.widget.LinearLayout layout = (android.widget.LinearLayout) existingView;
-                    mActiveAgentTextView = (TextView) layout.getChildAt(0);
-                } else {
-                    mRecreateMode = true;
-                    mChatContainer.removeViews(mViewIndex, mChatContainer.getChildCount() - mViewIndex);
-                    clearHoldersFromIndex(total);
-                }
-            }
-            if (mRecreateMode || mViewIndex >= mChatContainer.getChildCount()) {
-                addAgentBubble("...");
-                View newView = mChatContainer.getChildAt(mChatContainer.getChildCount() - 1);
-                if (newView != null) newView.setTag(expectedTag);
-                mViewIndex = mChatContainer.getChildCount();
-            }
-        }
-
-        if (mViewIndex < mChatContainer.getChildCount()) {
+        // If we are NOT in a streaming "up to" mode, clean up remaining views
+        if (limitCount >= array.length() && mViewIndex < mChatContainer.getChildCount()) {
             mChatContainer.removeViews(mViewIndex, mChatContainer.getChildCount() - mViewIndex);
             clearHoldersFromIndex(total);
         }
@@ -3711,7 +3689,6 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                     if (!text.isEmpty() && !text.equals(mUserPrompt) && !text.equals("Listening...") && !text.equals("Thinking...")) {
                         mUserPrompt = text;
                         addUserBubble(mUserPrompt);
-                        addAgentBubble("...");
                     }
                 }
 
@@ -3789,10 +3766,6 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                 mRingInner.setAlpha(0f);
                 mRingMiddle.setAlpha(0f);
                 mRingOuter.setAlpha(0f);
-
-                if (mActiveAgentTextView != null && "...".equals(mActiveAgentTextView.getText().toString())) {
-                    mActiveAgentTextView.setText("No response received.");
-                }
 
                 // Auto-continue: if a session is selected, always continue
                 mContinueSession = (mSelectedSessionId != null && !mSelectedSessionId.isEmpty());
