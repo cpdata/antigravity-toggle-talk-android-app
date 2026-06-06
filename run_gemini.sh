@@ -13,6 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export AGENT_ENV_TYPE="ToggleTalkApp"
 export AGENT="gemini"
 export SCRIPT_DIR="$SCRIPT_DIR"
+export AGENT_TARGET_DIR="$TARGET_DIR"
 export PYTHONPATH="$SCRIPT_DIR:$PYTHONPATH"
 export PATH="/data/data/com.termux/files/usr/bin:$PATH"
 export CI=true

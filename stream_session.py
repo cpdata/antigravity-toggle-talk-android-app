@@ -21,29 +21,42 @@ signal.signal(signal.SIGTERM, handle_signal)
 signal.signal(signal.SIGINT, handle_signal)
 
 def find_gemini_transcript(session_id):
-    # Try multiple possible project names
-    project_names = ["toggletalkandroid", "home", os.path.basename(os.getcwd()).lower()]
+    # Try to derive project name from AGENT_TARGET_DIR relative to HOME
+    target_dir = os.environ.get("AGENT_TARGET_DIR")
+    home = os.environ.get("HOME")
     
-    # Also look at directories in GEMINI_TMP_DIR
+    project_names = []
+    if target_dir and home and target_dir.startswith(home):
+        rel_path = os.path.relpath(target_dir, home)
+        if rel_path == ".":
+            project_names.append("home")
+        else:
+            # User wants case-sensitive relative path
+            project_names.append(rel_path)
+            # Fallback to lowercase as some versions of Gemini CLI might use it
+            if rel_path.lower() != rel_path:
+                project_names.append(rel_path.lower())
+    
+    # Fallback to detected projects in GEMINI_TMP_DIR
     if os.path.exists(GEMINI_TMP_DIR):
         try:
             detected_projects = [d for d in os.listdir(GEMINI_TMP_DIR) if os.path.isdir(os.path.join(GEMINI_TMP_DIR, d))]
             for dp in detected_projects:
                 if dp not in project_names:
-                    project_names.insert(0, dp)
+                    project_names.append(dp)
         except: pass
     
     # Deduplicate while preserving order
     project_names = list(dict.fromkeys(project_names))
     
-    print(f"Searching for transcript. session_id='{session_id}', projects={project_names}")
+    print(f"Searching for Gemini transcript. session_id='{session_id}', projects={project_names}")
     
     if session_id and not session_id.startswith("new_"):
         # We have a session ID, try to find the file directly first
         for project in project_names:
             chats_dir = os.path.join(GEMINI_TMP_DIR, project, "chats")
             if os.path.exists(chats_dir):
-                # Try specific pattern first (filename contains first or last 8 chars)
+                # Try specific pattern first
                 search_id = session_id[:8]
                 pattern = os.path.join(chats_dir, f"session-*-{search_id}*.jsonl")
                 files = glob.glob(pattern)
@@ -61,8 +74,8 @@ def find_gemini_transcript(session_id):
                                 return f
                     except: continue
 
-    # For new sessions or if not found yet, watch all possible chats directories
-    print(f"Waiting for transcript file to appear in {GEMINI_TMP_DIR}...")
+    # For new sessions or if not found yet, watch chats directories
+    print(f"Waiting for Gemini transcript file to appear in {GEMINI_TMP_DIR}...")
     start_time = time.time()
     
     # Pre-record existing files to detect NEW ones
@@ -88,20 +101,20 @@ def find_gemini_transcript(session_id):
                     new_paths = [os.path.join(chats_dir, f) for f in new_files if f.endswith(".jsonl")]
                     if new_paths:
                         res = max(new_paths, key=os.path.getmtime)
-                        print(f"Found new transcript file in {project}: {res}")
+                        print(f"Found new Gemini transcript file in {project}: {res}")
                         return res
                 
                 # Fallback: check if ANY file was modified since we started
                 all_files = [os.path.join(chats_dir, f) for f in current_files if f.endswith(".jsonl")]
                 if all_files:
                     latest = max(all_files, key=os.path.getmtime)
-                    if os.path.getmtime(latest) >= start_time - 1.0: # Allow 1s slack
-                        print(f"Adopting recent transcript file in {project}: {latest}")
+                    if os.path.getmtime(latest) >= start_time - 1.0:
+                        print(f"Adopting recent Gemini transcript file in {project}: {latest}")
                         return latest
             except: pass
         time.sleep(0.5)
         
-    print("Transcript not found.")
+    print("Gemini transcript not found.")
     return None
 
 def find_log_path(session_id):

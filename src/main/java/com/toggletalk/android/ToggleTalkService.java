@@ -247,12 +247,30 @@ public class ToggleTalkService extends Service {
             } else if ("com.toggletalk.android.ACTION_SEND_PROMPT".equals(action)) {
                 String prompt = intent.getStringExtra("prompt");
                 boolean continueIntent = intent.getBooleanExtra("continue_session", false);
-                mContinueSession = continueIntent || (mSelectedSessionId != null && !mSelectedSessionId.isEmpty());
+                String intentSessionId = intent.getStringExtra("session_id");
+
+                Log.d(TAG, "ACTION_SEND_PROMPT: prompt=" + prompt + ", continueIntent=" + continueIntent + ", intentSessionId=" + intentSessionId + ", mSelectedSessionId=" + mSelectedSessionId);
+
+                // Use the intent's session ID if provided, otherwise fallback to selected
+                if (intentSessionId != null && !intentSessionId.isEmpty()) {
+                    mSelectedSessionId = intentSessionId;
+                }
+
+                if (!continueIntent) {
+                    // Force new session by clearing current ID or using a placeholder
+                    mSelectedSessionId = "new_" + System.currentTimeMillis();
+                    mContinueSession = false;
+                    Log.d(TAG, "Starting new session, set placeholder ID: " + mSelectedSessionId);
+                } else {
+                    mContinueSession = (mSelectedSessionId != null && !mSelectedSessionId.isEmpty());
+                }
+                
                 boolean bypass = intent.getBooleanExtra("bypass_antigravity", mBypassAntigravity);
                 
                 if (prompt != null && !prompt.trim().isEmpty()) {
                     String currentSessState = mSessionStates.getOrDefault(mSelectedSessionId, "IDLE");
                     if (!"IDLE".equals(currentSessState)) {
+                        Log.d(TAG, "Session " + mSelectedSessionId + " is busy (" + currentSessState + "), enqueuing prompt");
                         // Queue the prompt
                         java.util.List<String> queue = mSessionQueues.get(mSelectedSessionId);
                         if (queue == null) {
@@ -262,13 +280,14 @@ public class ToggleTalkService extends Service {
                         queue.add(prompt);
                         broadcastQueueChanged(mSelectedSessionId);
                     } else {
-                        mStopRequested = false; // reset stop flag for new request
+                        mStopRequested = false;
                         updateState(mSelectedSessionId, "THINKING", prompt);
                         if (bypass || prompt.toLowerCase().startsWith("mock:") || prompt.toLowerCase().startsWith("/mock")) {
                             runMockReasoning(mSelectedSessionId, prompt);
                         } else {
                             final String runSessionId = mSelectedSessionId;
-                            new Thread(() -> runAntigravityReasoning(runSessionId, prompt)).start();
+                            final boolean finalContinue = mContinueSession;
+                            new Thread(() -> runAntigravityReasoning(runSessionId, prompt, finalContinue)).start();
                         }
                     }
                 }
@@ -383,7 +402,7 @@ public class ToggleTalkService extends Service {
             if (mBypassAntigravity || nextPrompt.toLowerCase().startsWith("mock:") || nextPrompt.toLowerCase().startsWith("/mock")) {
                 runMockReasoning(sessionId, nextPrompt);
             } else {
-                new Thread(() -> runAntigravityReasoning(sessionId, nextPrompt)).start();
+                new Thread(() -> runAntigravityReasoning(sessionId, nextPrompt, true)).start();
             }
         }
     }
@@ -666,9 +685,9 @@ public class ToggleTalkService extends Service {
         }).start();
     }
 
-    private void runAntigravityReasoning(String sessionId, String transcript) {
+    private void runAntigravityReasoning(String sessionId, String transcript, boolean continueSess) {
         mIsStreamingActive = true;
-        
+
         String absoluteTargetDir = "/data/data/com.termux/files/home";
         if (mTargetDirectory != null && !mTargetDirectory.isEmpty() && !"Home".equals(mTargetDirectory)) {
             if (mTargetDirectory.startsWith("/")) {
@@ -677,13 +696,10 @@ public class ToggleTalkService extends Service {
                 absoluteTargetDir = "/data/data/com.termux/files/home/" + mTargetDirectory;
             }
         }
-        
-        boolean continueSess = (sessionId != null && !sessionId.isEmpty());
-        
-        Log.d(TAG, "Executing active agent for session " + sessionId + ": transcript=" + transcript);
+
+        Log.d(TAG, "Executing active agent for session " + sessionId + ": transcript=" + transcript + ", continue=" + continueSess);
         AgentManager.getInstance(this).getActiveAgent().run(sessionId, transcript, absoluteTargetDir, continueSess);
     }
-
     private void handleAntigravityResponse(String callbackSessionId, String jsonString) {
         try {
             // Find start of JSON object in case of extra output lines
@@ -845,12 +861,13 @@ public class ToggleTalkService extends Service {
 
         // Allow update if session matches, OR if we don't have a real session ID yet
         boolean isMatch = (mSelectedSessionId != null && mSelectedSessionId.equals(sessionId));
-        
+
         if (!isMatch && !currentIsPlaceholder) {
             Log.d(TAG, "Ignoring streamed update: sessionId mismatch. expected=" + mSelectedSessionId + ", got=" + sessionId);
             return;
         }
 
+        Log.d(TAG, "Forwarding streamed update to MainActivity. jsonLen=" + (messagesJson != null ? messagesJson.length() : 0) + ", filePath=" + filePath);
         if (!"THINKING".equals(mSessionStates.get(mSelectedSessionId)) && !"SPEAKING".equals(mSessionStates.get(mSelectedSessionId))) {
             updateState(mSelectedSessionId, "THINKING", "Streaming updates...");
         }

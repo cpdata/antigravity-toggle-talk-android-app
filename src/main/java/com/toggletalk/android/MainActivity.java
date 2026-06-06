@@ -2422,10 +2422,11 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
     }
 
     private void performStreamedDisplay(String sessionId, String messagesJson, String filePath) {
-        Log.d("MainActivity", "performStreamedDisplay: sess=" + sessionId);
+        Log.d("MainActivity", "performStreamedDisplay start: sess=" + sessionId + ", mSelectedSessionId=" + mSelectedSessionId);
         try {
             String jsonContent = messagesJson;
             if ((jsonContent == null || jsonContent.isEmpty()) && filePath != null && !filePath.isEmpty()) {
+                Log.d("MainActivity", "Reading content from file: " + filePath);
                 jsonContent = readFileContent(filePath);
             }
             if (jsonContent == null || jsonContent.isEmpty()) {
@@ -2434,7 +2435,10 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
             }
 
             org.json.JSONArray newHistory = new org.json.JSONArray(jsonContent);
+            Log.d("MainActivity", "Streamed history length: " + newHistory.length());
+
             if (mCurrentSessionHistory != null && newHistory.toString().equals(mCurrentSessionHistory.toString())) {
+                Log.d("MainActivity", "History unchanged, skipping update");
                 return;
             }
 
@@ -2449,6 +2453,8 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                 org.json.JSONObject lastMsg = mCurrentSessionHistory.getJSONObject(mCurrentSessionHistory.length() - 1);
                 String role = lastMsg.optString("role", "");
                 String text = lastMsg.optString("text", "");
+                Log.d("MainActivity", "Last message: role=" + role + ", textLength=" + text.length());
+
                 if ("agent".equals(role) && !text.equals(mLastStreamedAgentText)) {
                     mLastStreamedAgentText = text;
                     displayMessagesUpTo(mCurrentSessionHistory.length() - 1, mShowAllEarlierMessages);

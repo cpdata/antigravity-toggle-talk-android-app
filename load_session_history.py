@@ -15,8 +15,24 @@ AGY_BRAIN_DIR = "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain"
 GEMINI_TMP_DIR = "/data/data/com.termux/files/home/.gemini/tmp"
 
 def find_gemini_transcript(session_id):
-    project_name = os.path.basename(os.getcwd()).lower()
-    candidates = [project_name, "toggletalkandroid", "home"]
+    # Try to derive project name from current working directory or environment
+    target_dir = os.getcwd()
+    home = os.environ.get("HOME", "/data/data/com.termux/files/home")
+    
+    candidates = []
+    if target_dir and target_dir.startswith(home):
+        rel_path = os.path.relpath(target_dir, home)
+        if rel_path == ".":
+            candidates.append("home")
+        else:
+            candidates.append(rel_path)
+            if rel_path.lower() != rel_path:
+                candidates.append(rel_path.lower())
+    
+    # Defaults
+    for d in ["toggletalkandroid", "home"]:
+        if d not in candidates: candidates.append(d)
+        
     if os.path.exists(GEMINI_TMP_DIR):
         try:
             detected = [d for d in os.listdir(GEMINI_TMP_DIR) if os.path.isdir(os.path.join(GEMINI_TMP_DIR, d))]
