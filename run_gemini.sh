@@ -38,29 +38,41 @@ if [ "$CONTINUE_SESSION" = "true" ] && [ -n "$SESSION_ID" ]; then
 fi
 
 # Run Gemini
-RESPONSE=$("$GEMINI_BIN" "${ARGS[@]}" -p "$TRANSCRIPT" 2>/dev/null)
+# We use export to pass the response to the python parser safely
+export GEMINI_RAW_RESPONSE=$("$GEMINI_BIN" "${ARGS[@]}" -p "$TRANSCRIPT" 2>>"$HOME/.gemini/gemini_err.log")
 
 # Stop streaming
 sleep 0.5
 kill "$STREAM_PID" 2>/dev/null
 
-# If RESPONSE is empty, Gemini CLI might have failed or session ID changed
-if [ -z "$RESPONSE" ]; then
+# If response is empty, Gemini CLI might have failed or session ID changed
+if [ -z "$GEMINI_RAW_RESPONSE" ]; then
     # Fallback: Extract from the latest transcript file
-    RESPONSE_FILE=$(AGENT=gemini python3 -c "from stream_session import find_gemini_transcript; print(find_gemini_transcript('$SESSION_ID') or '')")
+    export RESPONSE_FILE=$(AGENT=gemini python3 -c "from stream_session import find_gemini_transcript; print(find_gemini_transcript('$SESSION_ID') or '')")
     if [ -n "$RESPONSE_FILE" ] && [ -f "$RESPONSE_FILE" ]; then
         # Extract last message from transcript
         python3 - <<EOF
 import json, re, os
+path = os.environ.get("RESPONSE_FILE")
 try:
-    with open("$RESPONSE_FILE", "r") as f:
+    with open(path, "r") as f:
         lines = f.readlines()
         latest_text = ""
+        sess_id = "$SESSION_ID"
+        # Extract real session ID from first line if needed
+        if lines:
+            try:
+                meta = json.loads(lines[0])
+                if "sessionId" in meta: sess_id = meta["sessionId"]
+            except: pass
+
         for line in reversed(lines):
-            data = json.loads(line)
-            if data.get("type") == "gemini" and data.get("content"):
-                latest_text = data["content"]
-                break
+            try:
+                data = json.loads(line)
+                if data.get("type") == "gemini" and data.get("content"):
+                    latest_text = data["content"]
+                    break
+            except: continue
         
         # Sanitize for TTS
         sanitized_tts = re.sub(r'#+\s+', '', latest_text)
@@ -70,7 +82,7 @@ try:
         print(json.dumps({
             "latest_response": latest_text,
             "sanitized_tts": sanitized_tts,
-            "session_id": "$SESSION_ID"
+            "session_id": sess_id
         }))
 except Exception as e:
     print(json.dumps({"latest_response": "Error: " + str(e), "sanitized_tts": "Error", "session_id": "$SESSION_ID"}))
@@ -84,8 +96,8 @@ fi
 # Parse the JSON response from Gemini CLI
 # Note: Gemini CLI output might contain extra text before/after JSON
 python3 - <<EOF
-import sys, json, re
-raw = '''$RESPONSE'''
+import sys, json, re, os
+raw = os.environ.get("GEMINI_RAW_RESPONSE", "")
 try:
     # Find JSON block
     match = re.search(r'\{.*\}', raw, re.DOTALL)

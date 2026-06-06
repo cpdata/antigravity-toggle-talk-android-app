@@ -122,12 +122,18 @@ def find_log_path(session_id):
         if subdirs:
             latest_dir = max(subdirs, key=os.path.getmtime)
             path = os.path.join(latest_dir, ".system_generated", "logs", "transcript_full.jsonl")
-            if os.path.exists(path): return path
+            if os.path.exists(path): 
+                print(f"Found Antigravity transcript via fallback: {path}")
+                return path
     except: pass
+    print("Antigravity transcript not found.")
     return None
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from transcript_parser import parse_transcript_steps
+agent = os.environ.get("AGENT", "antigravity")
+if agent == "gemini":
+    from gemini_transcript_parser import parse_transcript_steps
+else:
+    from antigravity_transcript_parser import parse_transcript_steps
 
 def send_broadcast(session_id, json_str=None, file_path=None, tts_text=None):
     cmd = [
@@ -139,6 +145,8 @@ def send_broadcast(session_id, json_str=None, file_path=None, tts_text=None):
     if json_str: cmd += ["--es", "messages_json", json_str]
     if file_path: cmd += ["--es", "file_path", file_path]
     if tts_text: cmd += ["--es", "tts_text", tts_text]
+    
+    print(f"Broadcasting update for session {session_id}. messages_len={len(json_str) if json_str else 0}")
     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def extract_tts_text(step_obj):
@@ -171,6 +179,35 @@ def find_start_index(lines, prompt):
 def tail_transcript(path, session_id, prompt):
     global stop_requested
     
+    # Always try to get session_id from the first line if we don't have it (Gemini)
+    if not session_id or session_id.startswith("new_"):
+        try:
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    first_line = f.readline()
+                    if first_line:
+                        obj = json.loads(first_line)
+                        if "sessionId" in obj:
+                            session_id = obj["sessionId"]
+                            print(f"Pre-adopted session ID from first line: {session_id}")
+        except: pass
+
+    # For Antigravity, extract session ID from path if still missing
+    if not session_id or session_id.startswith("new_"):
+        print(f"Attempting to extract session ID from path: {path}")
+        if "antigravity-cli/brain" in path:
+            # path is like .../brain/<session_id>/.system_generated/logs/transcript_full.jsonl
+            # Using os.path to be safe
+            parts = path.split(os.sep)
+            try:
+                brain_idx = parts.index("brain")
+                if len(parts) > brain_idx + 1:
+                    session_id = parts[brain_idx + 1]
+                    print(f"Pre-adopted session ID from Antigravity path: {session_id}")
+            except ValueError:
+                pass
+
+
     current_line_idx = 0
     if os.path.exists(path):
         try:
@@ -206,6 +243,7 @@ def tail_transcript(path, session_id, prompt):
                     if not session_id or session_id.startswith("new_"):
                         if "sessionId" in obj:
                             session_id = obj["sessionId"]
+                            print(f"Adopted real session ID from transcript: {session_id}")
                         elif "id" in obj and obj.get("type") == "user":
                             # Use file metadata or something
                             pass
@@ -239,6 +277,10 @@ def tail_transcript(path, session_id, prompt):
         time.sleep(0.5)
 
 def main():
+    # Force line buffering
+    import sys
+    sys.stdout.reconfigure(line_buffering=True)
+    
     session_id = sys.argv[1] if len(sys.argv) > 1 else ""
     prompt = sys.argv[2] if len(sys.argv) > 2 else ""
     path = find_log_path(session_id)

@@ -6,8 +6,6 @@ TARGET_DIR="${2:-$HOME}"
 CONTINUE_SESSION="${3:-false}"
 SESSION_ID="$4"
 
-export AGENT="antigravity"
-
 # PID Process Tracking for active session termination
 if [ -n "$SESSION_ID" ]; then
     PID_FILE="$HOME/.gemini/antigravity-cli/brain/$SESSION_ID/.system_generated/logs/run.pid"
@@ -57,7 +55,7 @@ TARGET_DIR="$(pwd)"
 PROMPT="${TRANSCRIPT}"
 
 # Start streaming updates in the background
-python3 "/data/data/com.termux/files/home/ToggleTalkAndroid/stream_session.py" "$SESSION_ID" "$TRANSCRIPT" >/dev/null 2>&1 &
+python3 "/data/data/com.termux/files/home/ToggleTalkAndroid/stream_session.py" "$SESSION_ID" "$TRANSCRIPT" &
 STREAM_PID=$!
 
 # Build agy argument list
