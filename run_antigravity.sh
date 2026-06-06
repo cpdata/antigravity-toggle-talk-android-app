@@ -92,8 +92,8 @@ if [ -z "$SESSION_ID" ]; then
 fi
 
 # Extract latest and sanitized versions
-LATEST_RESPONSE=$(printf "%s" "$RESPONSE" | python3 "$HOME/toggle-talk-antigravity/tts_sanitize.py" --history-file "$LOG_FILE" --history-only)
-SANITIZED_TTS=$(printf "%s" "$RESPONSE" | python3 "$HOME/toggle-talk-antigravity/tts_sanitize.py" --history-file "$LOG_FILE")
+LATEST_RESPONSE=$(printf "%s" "$RESPONSE" | python3 "$TARGET_DIR/tts_sanitize.py" --history-file "$LOG_FILE" --history-only)
+SANITIZED_TTS=$(printf "%s" "$RESPONSE" | python3 "$TARGET_DIR/tts_sanitize.py" --history-file "$LOG_FILE")
 
 # Save history
 echo "$RESPONSE" > "$LOG_FILE"

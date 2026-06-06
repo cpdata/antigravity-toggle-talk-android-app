@@ -112,6 +112,12 @@ try:
                     break
         if not latest_text: latest_text = data.get('content', '')
         if not latest_text: latest_text = data.get('response', '')
+        if not latest_text and 'error' in data:
+            err = data['error']
+            if isinstance(err, dict):
+                latest_text = "Error: " + err.get('message', str(err))
+            else:
+                latest_text = "Error: " + str(err)
         
         sess_id = data.get('sessionId') or data.get('session_id') or '$SESSION_ID'
         
