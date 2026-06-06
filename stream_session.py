@@ -22,12 +22,15 @@ signal.signal(signal.SIGINT, handle_signal)
 
 def find_gemini_transcript(session_id):
     # Try multiple possible project names
-    project_names = ["toggletalkandroid", os.path.basename(os.getcwd()).lower(), "home"]
+    project_names = ["toggletalkandroid", "home", os.path.basename(os.getcwd()).lower()]
     
     # Also look at directories in GEMINI_TMP_DIR
     if os.path.exists(GEMINI_TMP_DIR):
         try:
-            project_names.extend([d for d in os.listdir(GEMINI_TMP_DIR) if os.path.isdir(os.path.join(GEMINI_TMP_DIR, d))])
+            detected_projects = [d for d in os.listdir(GEMINI_TMP_DIR) if os.path.isdir(os.path.join(GEMINI_TMP_DIR, d))]
+            for dp in detected_projects:
+                if dp not in project_names:
+                    project_names.insert(0, dp)
         except: pass
     
     # Deduplicate while preserving order
@@ -36,17 +39,19 @@ def find_gemini_transcript(session_id):
     print(f"Searching for transcript. session_id='{session_id}', projects={project_names}")
     
     if session_id and not session_id.startswith("new_"):
+        # We have a session ID, try to find the file directly first
         for project in project_names:
             chats_dir = os.path.join(GEMINI_TMP_DIR, project, "chats")
             if os.path.exists(chats_dir):
-                # Try specific pattern first
-                pattern = os.path.join(chats_dir, f"session-*-{session_id[:8]}*.jsonl")
+                # Try specific pattern first (filename contains first or last 8 chars)
+                search_id = session_id[:8]
+                pattern = os.path.join(chats_dir, f"session-*-{search_id}*.jsonl")
                 files = glob.glob(pattern)
                 if files: 
-                    print(f"Found transcript by pattern in {project}: {files[0]}")
+                    print(f"Found transcript by pattern {search_id} in {project}: {files[0]}")
                     return files[0]
                 
-                # Fallback: scan files in this project's chats_dir
+                # Try scanning
                 for f in glob.glob(os.path.join(chats_dir, "*.jsonl")):
                     try:
                         with open(f, "r") as fh:
@@ -56,21 +61,11 @@ def find_gemini_transcript(session_id):
                                 return f
                     except: continue
 
-        print("Falling back to global search...")
-        pattern = os.path.join(GEMINI_TMP_DIR, "*", "chats", "*.jsonl")
-        for f in glob.glob(pattern):
-            try:
-                with open(f, "r") as fh:
-                    first_line = fh.readline()
-                    if session_id in first_line: 
-                        print(f"Found transcript globally: {f}")
-                        return f
-            except: continue
-    
     # For new sessions or if not found yet, watch all possible chats directories
-    print(f"Waiting for transcript file to appear...")
+    print(f"Waiting for transcript file to appear in {GEMINI_TMP_DIR}...")
     start_time = time.time()
     
+    # Pre-record existing files to detect NEW ones
     initial_states = {}
     for project in project_names:
         chats_dir = os.path.join(GEMINI_TMP_DIR, project, "chats")
@@ -90,17 +85,17 @@ def find_gemini_transcript(session_id):
                 new_files = current_files - initial_files
                 
                 if new_files:
-                    new_paths = [os.path.join(chats_dir, f) for f in new_files]
-                    res = max(new_paths, key=os.path.getmtime)
-                    print(f"Found new transcript file in {project}: {res}")
-                    return res
+                    new_paths = [os.path.join(chats_dir, f) for f in new_files if f.endswith(".jsonl")]
+                    if new_paths:
+                        res = max(new_paths, key=os.path.getmtime)
+                        print(f"Found new transcript file in {project}: {res}")
+                        return res
                 
-                # If session_id is still unknown, we might have to settle for the newest file overall
-                # if it was modified VERY recently (within the last few seconds)
+                # Fallback: check if ANY file was modified since we started
                 all_files = [os.path.join(chats_dir, f) for f in current_files if f.endswith(".jsonl")]
                 if all_files:
                     latest = max(all_files, key=os.path.getmtime)
-                    if os.path.getmtime(latest) > start_time:
+                    if os.path.getmtime(latest) >= start_time - 1.0: # Allow 1s slack
                         print(f"Adopting recent transcript file in {project}: {latest}")
                         return latest
             except: pass
@@ -123,15 +118,13 @@ def find_log_path(session_id):
         if os.path.exists(path):
             return path
     
-    # Capture initial directories to exclude them (avoid latching onto the previous session)
+    # Capture initial directories to exclude them
     initial_dirs = set()
     if os.path.exists(BRAIN_DIR):
         try:
             initial_dirs = {d for d in os.listdir(BRAIN_DIR) if os.path.isdir(os.path.join(BRAIN_DIR, d))}
-        except Exception:
-            pass
+        except: pass
             
-    # Wait for a new transcript file to appear
     print(f"Waiting for new Antigravity session directory in {BRAIN_DIR}...")
     start_time = time.time()
     while time.time() - start_time < 30:
@@ -143,27 +136,22 @@ def find_log_path(session_id):
                     new_paths = [os.path.join(BRAIN_DIR, d) for d in new_dirs]
                     latest_dir = max(new_paths, key=os.path.getmtime)
                     path = os.path.join(latest_dir, ".system_generated", "logs", "transcript_full.jsonl")
-                    # Wait a bit for the file to actually be created within the new dir
                     for _ in range(20):
                         if os.path.exists(path):
                             print(f"Found new Antigravity transcript: {path}")
                             return path
                         time.sleep(0.2)
                 
-                # Fallback: check if ANY directory was modified recently
                 all_dirs = [os.path.join(BRAIN_DIR, d) for d in current_dirs]
                 if all_dirs:
                     latest_dir = max(all_dirs, key=os.path.getmtime)
-                    if os.path.getmtime(latest_dir) > start_time:
+                    if os.path.getmtime(latest_dir) >= start_time - 1.0:
                         path = os.path.join(latest_dir, ".system_generated", "logs", "transcript_full.jsonl")
                         if os.path.exists(path):
                             print(f"Adopting recent Antigravity transcript: {path}")
                             return path
-        except Exception:
-            pass
+        except: pass
         time.sleep(0.5)
-        
-    print("Antigravity transcript not found.")
     return None
 
 agent = os.environ.get("AGENT", "antigravity")
@@ -190,13 +178,13 @@ def send_broadcast(session_id, json_str=None, file_path=None, tts_text=None):
 def extract_tts_text(step_obj):
     msg_type = step_obj.get("type", "")
     source = step_obj.get("source", "")
+    content = step_obj.get("content") or ""
     if msg_type == "PLANNER_RESPONSE" and source == "MODEL":
         content = step_obj.get("content") or step_obj.get("thinking") or ""
-        tts_segments = re.findall(r"<tts>(.*?)</tts>", content, re.DOTALL)
-        if tts_segments:
-            return " ".join(seg.strip() for seg in tts_segments).strip()
     elif msg_type == "gemini":
         content = step_obj.get("content", "")
+    
+    if isinstance(content, str):
         tts_segments = re.findall(r"<tts>(.*?)</tts>", content, re.DOTALL)
         if tts_segments:
             return " ".join(seg.strip() for seg in tts_segments).strip()
@@ -205,82 +193,69 @@ def extract_tts_text(step_obj):
 def find_start_index(lines, prompt, session_id):
     agent = os.environ.get("AGENT", "antigravity")
     
-    # If it's a new session, we want everything
     if not session_id or session_id == "unknown" or session_id.startswith("new_"):
         print("New session detected, starting from index 0")
         return 0
         
     if not prompt:
-        # If no prompt, start from the beginning to show full history
         return 0
     
-    # Clean prompt for matching
     clean_prompt = prompt.strip().lower()
     
-    # Find the last USER_INPUT that matches the prompt
-    # We look backwards to find the most recent one
     for idx in range(len(lines) - 1, -1, -1):
         try:
             obj = json.loads(lines[idx].strip())
-            content = obj.get("content", "").lower()
             msg_type = obj.get("type", "")
+            content_val = obj.get("content", "")
             
             is_user = False
+            text = ""
             if agent == "gemini":
-                if msg_type == "user": is_user = True
+                if msg_type == "user": 
+                    is_user = True
+                    if isinstance(content_val, list):
+                        text = " ".join(p.get("text", "") for p in content_val if isinstance(p, dict))
+                    else:
+                        text = str(content_val)
             else:
-                if msg_type == "USER_INPUT": is_user = True
+                if msg_type == "USER_INPUT": 
+                    is_user = True
+                    text = str(content_val)
                 
-            if is_user and clean_prompt in content:
+            if is_user and clean_prompt in text.lower():
                 print(f"Found matching prompt at index {idx}")
                 return idx
         except Exception:
             pass
 
-    # Fallback: Find the index of the last final response (the end of the last turn)
     last_final_resp_idx = -1
     for idx in range(len(lines) - 1, -1, -1):
         try:
             obj = json.loads(lines[idx].strip())
             if agent == "gemini":
-                if obj.get("type") == "gemini":
-                    # For Gemini, a message with content is a final response
-                    if obj.get("content"):
-                        last_final_resp_idx = idx
-                        break
+                if obj.get("type") == "gemini" and obj.get("content"):
+                    last_final_resp_idx = idx
+                    break
             else:
                 if obj.get("type") == "PLANNER_RESPONSE" and obj.get("source") == "MODEL":
-                    tool_calls = obj.get("tool_calls") or []
-                    if not tool_calls: # Final response has no tool calls
+                    if not obj.get("tool_calls"):
                         last_final_resp_idx = idx
                         break
         except Exception:
             pass
             
-    # Look for the USER_INPUT step after the last final response
     for idx in range(last_final_resp_idx + 1, len(lines)):
         try:
             obj = json.loads(lines[idx].strip())
             if agent == "gemini":
-                if obj.get("type") == "user":
-                    return idx
+                if obj.get("type") == "user": return idx
             else:
-                if obj.get("type") == "USER_INPUT":
-                    return idx
+                if obj.get("type") == "USER_INPUT": return idx
         except Exception:
             pass
             
-    # If we are here, it means we didn't find a new user input.
-    # If the file has lines but we are skipping them all, that's likely wrong for a streaming session
-    # unless we are sure they are old.
-    
-    # If the last line is a model response, maybe it's the one we are looking for?
-    # To be safe, if we have a prompt but couldn't find a matching USER_INPUT, 
-    # we start from after the last final response, but if that skips everything, 
-    # and the prompt was recent, we might want to be less aggressive.
-    
     start_idx = last_final_resp_idx + 1
-    print(f"Fallback: streaming from index {start_idx} (last_final_resp_idx={last_final_resp_idx})")
+    print(f"Fallback: streaming from index {start_idx}")
     return start_idx
 
 def tail_transcript(path, session_id, prompt):

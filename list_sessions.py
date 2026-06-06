@@ -12,71 +12,71 @@ AGY_BRAIN_DIR = "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain"
 GEMINI_TMP_DIR = "/data/data/com.termux/files/home/.gemini/tmp"
 
 def get_gemini_sessions(target_dir=None):
-    # Use target_dir to find the project name for Gemini CLI
+    # Try current project first, then toggletalkandroid, then all others
     cwd = target_dir or os.getcwd()
     project_name = os.path.basename(cwd).lower()
-    chats_dir = os.path.join(GEMINI_TMP_DIR, project_name, "chats")
     
-    # If not found by exact project name, don't just pick any random one.
-    if not os.path.exists(chats_dir):
-        # Fallback to home if toggletalkandroid doesn't exist
-        if project_name == "toggletalkandroid":
-            chats_dir = os.path.join(GEMINI_TMP_DIR, "home", "chats")
-            if not os.path.exists(chats_dir):
-                return []
-        else:
-            return []
+    candidates = [project_name, "toggletalkandroid", "home"]
+    if os.path.exists(GEMINI_TMP_DIR):
+        try:
+            detected = [d for d in os.listdir(GEMINI_TMP_DIR) if os.path.isdir(os.path.join(GEMINI_TMP_DIR, d))]
+            for d in detected:
+                if d not in candidates: candidates.append(d)
+        except: pass
 
     sessions = []
-    for filename in os.listdir(chats_dir):
-        if filename.endswith(".jsonl"):
-            path = os.path.join(chats_dir, filename)
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    # First line should be session metadata
-                    first_line = f.readline()
-                    if not first_line: continue
-                    meta = json.loads(first_line)
-                    sess_id = meta.get("sessionId")
-                    if not sess_id: continue
-                    
-                    # Find first user message for title
-                    title = None
-                    f.seek(0)
-                    for line in f:
-                        try:
-                            entry = json.loads(line)
-                            if entry.get("type") == "user":
-                                content = entry.get("content")
-                                if isinstance(content, list) and len(content) > 0:
-                                    title = content[0].get("text", sess_id)
-                                elif isinstance(content, str):
-                                    title = content
-                                break
-                        except: continue
-                    
-                    # Only include session if it has a user message (title is not None)
-                    if title is None:
-                        continue
-                    
-                    # Clean title
-                    title = re.sub(r"\s+", " ", title).strip()
-                    if len(title) > 60:
-                        title = title[:57] + "..."
+    seen_session_ids = set()
+
+    for proj in candidates:
+        chats_dir = os.path.join(GEMINI_TMP_DIR, proj, "chats")
+        if not os.path.exists(chats_dir): continue
+
+        for filename in os.listdir(chats_dir):
+            if filename.endswith(".jsonl"):
+                path = os.path.join(chats_dir, filename)
+                try:
+                    with open(path, "r", encoding="utf-8") as f:
+                        first_line = f.readline()
+                        if not first_line: continue
+                        meta = json.loads(first_line)
+                        sess_id = meta.get("sessionId")
+                        if not sess_id or sess_id in seen_session_ids: continue
                         
-                    mtime = os.path.getmtime(path)
-                    sessions.append({
-                        "id": sess_id,
-                        "title": title,
-                        "mtime": mtime
-                    })
-            except Exception:
-                continue
+                        # Find first user message for title
+                        title = None
+                        f.seek(0)
+                        for line in f:
+                            try:
+                                entry = json.loads(line)
+                                if entry.get("type") == "user":
+                                    content = entry.get("content")
+                                    if isinstance(content, list) and len(content) > 0:
+                                        title = content[0].get("text", sess_id)
+                                    elif isinstance(content, str):
+                                        title = content
+                                    break
+                            except: continue
+                        
+                        if title is None: continue
+                        
+                        seen_session_ids.add(sess_id)
+                        title = re.sub(r"\s+", " ", title).strip()
+                        if len(title) > 60:
+                            title = title[:57] + "..."
+                            
+                        mtime = os.path.getmtime(path)
+                        sessions.append({
+                            "id": sess_id,
+                            "title": title,
+                            "mtime": mtime
+                        })
+                except Exception:
+                    continue
                     
     # Sort by mtime descending (most recent first)
     sessions.sort(key=lambda x: x["mtime"], reverse=True)
     for s in sessions:
-        del s["mtime"]
+        if "mtime" in s: del s["mtime"]
     return sessions
 
 def get_antigravity_session_title(session_id):

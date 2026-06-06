@@ -59,7 +59,7 @@ TARGET_DIR="$(pwd)"
 PROMPT="${TRANSCRIPT}"
 
 # Start streaming updates in the background
-STREAM_LOG="$HOME/.gemini/stream_session.log"
+STREAM_LOG="$HOME/.gemini/stream_session_antigravity.log"
 python3 "$SCRIPT_DIR/stream_session.py" "$SESSION_ID" "$TRANSCRIPT" > "$STREAM_LOG" 2>&1 &
 STREAM_PID=$!
 

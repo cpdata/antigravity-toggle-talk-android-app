@@ -30,7 +30,7 @@ TARGET_DIR="$(pwd)"
 
 # Start streaming watcher in background
 # It will find the transcript file automatically
-STREAM_LOG="$HOME/.gemini/stream_session.log"
+STREAM_LOG="$HOME/.gemini/stream_session_gemini.log"
 python3 "$SCRIPT_DIR/stream_session.py" "$SESSION_ID" "$TRANSCRIPT" > "$STREAM_LOG" 2>&1 &
 STREAM_PID=$!
 
@@ -56,21 +56,13 @@ if [ -z "$GEMINI_RAW_RESPONSE" ]; then
     export RESPONSE_FILE=$(AGENT=gemini python3 -c "from stream_session import find_gemini_transcript; print(find_gemini_transcript('$SESSION_ID') or '')")
     if [ -n "$RESPONSE_FILE" ] && [ -f "$RESPONSE_FILE" ]; then
         # Extract last message from transcript
-        python3 - <<EOF
-import json, re, os
+        LATEST_RESPONSE=$(python3 - <<EOF
+import json, os
 path = os.environ.get("RESPONSE_FILE")
 try:
     with open(path, "r") as f:
         lines = f.readlines()
         latest_text = ""
-        sess_id = "$SESSION_ID"
-        # Extract real session ID from first line if needed
-        if lines:
-            try:
-                meta = json.loads(lines[0])
-                if "sessionId" in meta: sess_id = meta["sessionId"]
-            except: pass
-
         for line in reversed(lines):
             try:
                 data = json.loads(line)
@@ -78,20 +70,26 @@ try:
                     latest_text = data["content"]
                     break
             except: continue
-        
-        # Sanitize for TTS
-        sanitized_tts = re.sub(r'#+\s+', '', latest_text)
-        sanitized_tts = re.sub(r'\*\*|\*', '', sanitized_tts)
-        sanitized_tts = re.sub(r'\[(.*?)\]\(.*?\)', r'\1', sanitized_tts)
-        
-        print(json.dumps({
-            "latest_response": latest_text,
-            "sanitized_tts": sanitized_tts,
-            "session_id": sess_id
-        }))
-except Exception as e:
-    print(json.dumps({"latest_response": "Error: " + str(e), "sanitized_tts": "Error", "session_id": "$SESSION_ID"}))
+        print(latest_text)
+except: print("")
 EOF
+)
+        # Get real session ID
+        SESS_ID=$(python3 - <<EOF
+import json, os
+path = os.environ.get("RESPONSE_FILE")
+try:
+    with open(path, "r") as f:
+        line = f.readline()
+        if line:
+            meta = json.loads(line)
+            print(meta.get("sessionId", "$SESSION_ID"))
+        else: print("$SESSION_ID")
+except: print("$SESSION_ID")
+EOF
+)
+        SANITIZED_TTS=$(printf "%s" "$LATEST_RESPONSE" | python3 "$SCRIPT_DIR/tts_sanitize.py")
+        python3 -c 'import sys, json; print(json.dumps({"latest_response": sys.argv[1], "sanitized_tts": sys.argv[2], "session_id": sys.argv[3]}))' "$LATEST_RESPONSE" "$SANITIZED_TTS" "$SESS_ID"
         exit 0
     fi
     echo '{"latest_response": "No response from Gemini.", "sanitized_tts": "No response from Gemini.", "session_id": "'$SESSION_ID'"}'
@@ -99,12 +97,11 @@ EOF
 fi
 
 # Parse the JSON response from Gemini CLI
-# Note: Gemini CLI output might contain extra text before/after JSON
-python3 - <<EOF
+# Extract fields and sanitize via tts_sanitize.py
+PARSED_JSON=$(python3 - <<EOF
 import sys, json, re, os
 raw = os.environ.get("GEMINI_RAW_RESPONSE", "")
 try:
-    # Find JSON block
     match = re.search(r'\{.*\}', raw, re.DOTALL)
     if match:
         data = json.loads(match.group(0))
@@ -117,27 +114,18 @@ try:
                     break
         if not latest_text: latest_text = data.get('content', '')
         if not latest_text: latest_text = data.get('response', '')
-        if not latest_text and 'error' in data:
-            err = data['error']
-            if isinstance(err, dict):
-                latest_text = "Error: " + err.get('message', str(err))
-            else:
-                latest_text = "Error: " + str(err)
         
         sess_id = data.get('sessionId') or data.get('session_id') or '$SESSION_ID'
-        
-        # Sanitize
-        sanitized_tts = re.sub(r'#+\s+', '', latest_text)
-        sanitized_tts = re.sub(r'\*\*|\*', '', sanitized_tts)
-        sanitized_tts = re.sub(r'\[(.*?)\]\(.*?\)', r'\1', sanitized_tts)
-        
-        print(json.dumps({
-            "latest_response": latest_text,
-            "sanitized_tts": sanitized_tts,
-            "session_id": sess_id
-        }))
+        print(json.dumps({"text": latest_text, "session_id": sess_id}))
     else:
-        print(json.dumps({"latest_response": raw, "sanitized_tts": raw, "session_id": "$SESSION_ID"}))
-except Exception as e:
-    print(json.dumps({"latest_response": raw, "sanitized_tts": "Error parsing response", "session_id": "$SESSION_ID"}))
+        print(json.dumps({"text": raw, "session_id": "$SESSION_ID"}))
+except:
+    print(json.dumps({"text": raw, "session_id": "$SESSION_ID"}))
 EOF
+)
+
+LATEST_RESPONSE=$(echo "$PARSED_JSON" | python3 -c 'import sys, json; print(json.loads(sys.stdin.read())["text"])')
+SESS_ID=$(echo "$PARSED_JSON" | python3 -c 'import sys, json; print(json.loads(sys.stdin.read())["session_id"])')
+SANITIZED_TTS=$(printf "%s" "$LATEST_RESPONSE" | python3 "$SCRIPT_DIR/tts_sanitize.py")
+
+python3 -c 'import sys, json; print(json.dumps({"latest_response": sys.argv[1], "sanitized_tts": sys.argv[2], "session_id": sys.argv[3]}))' "$LATEST_RESPONSE" "$SANITIZED_TTS" "$SESS_ID"

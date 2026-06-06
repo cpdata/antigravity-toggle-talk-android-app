@@ -1486,6 +1486,15 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
 
         mEtMessage.setText("");
 
+        // Clear previous state for a new turn
+        mUserPrompt = message;
+        mLastStreamedAgentText = "";
+        mIsResuming = false;
+        
+        // Add manual bubbles immediately for better UX
+        addUserBubble(mUserPrompt);
+        addAgentBubble("...");
+
         Intent intent = new Intent(this, ToggleTalkService.class);
         intent.setAction("com.toggletalk.android.ACTION_SEND_PROMPT");
         intent.putExtra("prompt", message);
@@ -3664,17 +3673,14 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                 getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
                 // After loading a session, mActiveAgentTextView is null so new bubbles are fresh
-                if (!"Transcribing...".equals(text)) {
+                if (!"Transcribing...".equals(text) && !"Streaming updates...".equals(text)) {
                     if (mNewChatStartedBubble != null && mChatContainer != null) {
                         mChatContainer.removeView(mNewChatStartedBubble);
                         mNewChatStartedBubble = null;
                     }
-                    if (!text.isEmpty() && !text.equals(mUserPrompt)) {
+                    // If we get a prompt that we didn't add manually (e.g. from voice transcription)
+                    if (!text.isEmpty() && !text.equals(mUserPrompt) && !text.equals("Listening...") && !text.equals("Thinking...")) {
                         mUserPrompt = text;
-                        addUserBubble(mUserPrompt);
-                        addAgentBubble("...");
-                    } else if (mUserPrompt.isEmpty()) {
-                        mUserPrompt = text.isEmpty() ? "Voice Command" : text;
                         addUserBubble(mUserPrompt);
                         addAgentBubble("...");
                     }
@@ -3704,7 +3710,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                 // Keep screen on
                 getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
-                if (mDisplayedStepKeys.isEmpty() && !"Speaking...".equals(text)) {
+                if (mDisplayedStepKeys.isEmpty() && !"Speaking...".equals(text) && !"Streaming updates...".equals(text) && !text.equals(mUserPrompt)) {
                     if (mIsResuming) {
                         if (mActiveAgentTextView == null) {
                             addAgentBubble(text);

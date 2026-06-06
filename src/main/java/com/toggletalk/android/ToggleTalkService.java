@@ -851,7 +851,10 @@ public class ToggleTalkService extends Service {
             return;
         }
 
-        updateState(mSelectedSessionId, "THINKING", "Streaming updates...");
+        if (!"THINKING".equals(mSessionStates.get(mSelectedSessionId)) && !"SPEAKING".equals(mSessionStates.get(mSelectedSessionId))) {
+            updateState(mSelectedSessionId, "THINKING", "Streaming updates...");
+        }
+
         Intent intent = new Intent("com.toggletalk.android.ACTION_STREAM_DISPLAY");
         intent.putExtra("session_id", sessionId);
         intent.putExtra("messages_json", messagesJson);

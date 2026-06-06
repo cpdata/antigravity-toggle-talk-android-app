@@ -16,29 +16,30 @@ GEMINI_TMP_DIR = "/data/data/com.termux/files/home/.gemini/tmp"
 
 def find_gemini_transcript(session_id):
     project_name = os.path.basename(os.getcwd()).lower()
-    chats_dir = os.path.join(GEMINI_TMP_DIR, project_name, "chats")
-    
-    if session_id:
-        if os.path.exists(chats_dir):
-            # Try specific pattern first
-            pattern = os.path.join(chats_dir, f"session-*-{session_id[:8]}*.jsonl")
-            files = glob.glob(pattern)
-            if files: return files[0]
-            
-            # Fallback: scan files in this project's chats_dir
-            for f in glob.glob(os.path.join(chats_dir, "*.jsonl")):
-                try:
-                    with open(f, "r") as fh:
-                        if session_id in fh.readline(): return f
-                except: continue
+    candidates = [project_name, "toggletalkandroid", "home"]
+    if os.path.exists(GEMINI_TMP_DIR):
+        try:
+            detected = [d for d in os.listdir(GEMINI_TMP_DIR) if os.path.isdir(os.path.join(GEMINI_TMP_DIR, d))]
+            for d in detected:
+                if d not in candidates: candidates.append(d)
+        except: pass
 
-        # Global fallback: search all projects
-        pattern = os.path.join(GEMINI_TMP_DIR, "*", "chats", "*.jsonl")
-        for f in glob.glob(pattern):
-            try:
-                with open(f, "r") as fh:
-                    if session_id in fh.readline(): return f
-            except: continue
+    if session_id:
+        search_id = session_id[:8]
+        for proj in candidates:
+            chats_dir = os.path.join(GEMINI_TMP_DIR, proj, "chats")
+            if os.path.exists(chats_dir):
+                # Try specific pattern first
+                pattern = os.path.join(chats_dir, f"session-*-{search_id}*.jsonl")
+                files = glob.glob(pattern)
+                if files: return files[0]
+                
+                # Fallback: scan files in this project's chats_dir
+                for f in glob.glob(os.path.join(chats_dir, "*.jsonl")):
+                    try:
+                        with open(f, "r") as fh:
+                            if session_id in fh.readline(): return f
+                    except: continue
             
     return None
 
