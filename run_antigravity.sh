@@ -58,9 +58,13 @@ TARGET_DIR="$(pwd)"
 
 PROMPT="${TRANSCRIPT}"
 
+# Ensure .gemini directory exists
+mkdir -p "$HOME/.gemini"
+
 # Start streaming updates in the background
 STREAM_LOG="$HOME/.gemini/stream_session_antigravity.log"
-python3 "$SCRIPT_DIR/stream_session.py" "$SESSION_ID" "$TRANSCRIPT" > "$STREAM_LOG" 2>&1 &
+echo "--- Starting new Antigravity stream session at $(date) ---" > "$STREAM_LOG"
+python3 "$SCRIPT_DIR/stream_session.py" "$SESSION_ID" "$TRANSCRIPT" >> "$STREAM_LOG" 2>&1 &
 STREAM_PID=$!
 
 # Build agy argument list
@@ -88,7 +92,7 @@ RESPONSE=$(env -u LD_PRELOAD -u LD_LIBRARY_PATH PWD="$TARGET_DIR" AGENT_ENV_TYPE
       /bin/sh -c 'cd "$1" 2>/dev/null || true; shift; exec "$@"' sh "$TARGET_DIR" "${AGY_ARGS[@]}" < /dev/null 2>>"$ERR_FILE")
 
 # Stop streaming updates
-sleep 0.5
+sleep 2.0
 kill $STREAM_PID 2>/dev/null
 wait $STREAM_PID 2>/dev/null
 

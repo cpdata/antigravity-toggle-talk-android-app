@@ -845,6 +845,7 @@ public class ToggleTalkService extends Service {
         Log.d(TAG, "handleStreamedUpdate: received sessionId=" + sessionId + ", mSelectedSessionId=" + mSelectedSessionId);
 
         // Adopt real session ID if current is empty or a placeholder
+        // Placeholders include: null, empty, "new_...", "unknown", "test_session", or if we are NOT in a continue_session state but have an old ID
         boolean currentIsPlaceholder = (mSelectedSessionId == null || mSelectedSessionId.isEmpty() || mSelectedSessionId.startsWith("new_") || mSelectedSessionId.equals("unknown") || mSelectedSessionId.equals("test_session"));
         boolean newIsReal = (sessionId != null && !sessionId.isEmpty() && !sessionId.startsWith("new_") && !sessionId.equals("unknown"));
 
@@ -863,6 +864,8 @@ public class ToggleTalkService extends Service {
         boolean isMatch = (mSelectedSessionId != null && mSelectedSessionId.equals(sessionId));
 
         if (!isMatch && !currentIsPlaceholder) {
+            // Special case: if we just started a session and the first update has a different ID, maybe we should adopt it anyway?
+            // But only if we are in a state where we expect a new session.
             Log.d(TAG, "Ignoring streamed update: sessionId mismatch. expected=" + mSelectedSessionId + ", got=" + sessionId);
             return;
         }

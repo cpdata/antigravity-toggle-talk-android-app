@@ -1787,6 +1787,10 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
     }
 
     private void displayMessagesInternal(final org.json.JSONArray array, int limitCount, boolean showAll) {
+        if (array == null || (array.length() == 0 && mUserPrompt != null && !mUserPrompt.isEmpty())) {
+            Log.d(TAG, "displayMessagesInternal: skipping empty array while user prompt is pending");
+            return;
+        }
         updateBtnExpandAllText();
         boolean wasAtBottom = isScrolledToBottom();
         

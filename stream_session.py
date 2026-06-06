@@ -186,7 +186,12 @@ def send_broadcast(session_id, json_str=None, file_path=None, tts_text=None):
         cmd += ["--es", "file_path", file_path]
     if tts_text:
         cmd += ["--es", "tts_text", tts_text]
-    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    print(f"Executing: {' '.join(cmd)}")
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if res.returncode != 0:
+        print(f"Broadcast failed (code {res.returncode}): {res.stderr}")
+    else:
+        print(f"Broadcast successful: {res.stdout.strip()}")
 
 def extract_tts_text(step_obj):
     msg_type = step_obj.get("type", "")
@@ -316,6 +321,28 @@ def tail_transcript(path, session_id, prompt):
 
     current_line_idx = find_start_index(initial_lines, prompt, session_id)
     
+    # Initial broadcast of whatever we have so far
+    parsed_steps = []
+    for l in initial_lines[:current_line_idx]:
+        l = l.strip()
+        if l:
+            try:
+                parsed_steps.append(json.loads(l))
+            except: pass
+    if parsed_steps:
+        messages = parse_transcript_steps(parsed_steps)
+        json_str = json.dumps(messages)
+        print(f"Initial broadcast for {session_id} (msg count: {len(messages)})")
+        if len(json_str.encode('utf-8')) < 10 * 1024:
+            send_broadcast(session_id, json_str=json_str)
+        else:
+            out_dir = "/sdcard/Android/media/com.toggletalk.android"
+            os.makedirs(out_dir, exist_ok=True)
+            out_path = os.path.join(out_dir, "stream_history.json")
+            with open(out_path, "w", encoding="utf-8") as out_f:
+                out_f.write(json_str)
+            send_broadcast(session_id, file_path=out_path)
+
     # If we have lines to process, process them immediately once
     if current_line_idx < len(initial_lines):
         print(f"Processing {len(initial_lines) - current_line_idx} initial lines")
@@ -370,7 +397,7 @@ def tail_transcript(path, session_id, prompt):
                     json_str = json.dumps(messages)
                     
                     print(f"Broadcasting update for {session_id} (msg count: {len(messages)})")
-                    if len(json_str.encode('utf-8')) < 90 * 1024:
+                    if len(json_str.encode('utf-8')) < 10 * 1024:
                         send_broadcast(session_id, json_str=json_str, tts_text=tts_text)
                     else:
                         out_dir = "/sdcard/Android/media/com.toggletalk.android"

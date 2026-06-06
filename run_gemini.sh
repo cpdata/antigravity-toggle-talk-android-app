@@ -18,26 +18,37 @@ export PYTHONPATH="$SCRIPT_DIR:$PYTHONPATH"
 export PATH="/data/data/com.termux/files/usr/bin:$PATH"
 export CI=true
 
+# Ensure .gemini directory exists
+mkdir -p "$HOME/.gemini"
+
 # PID Tracking
 PID_DIR="$HOME/.gemini/agent-pids"
 mkdir -p "$PID_DIR"
 PID_FILE="$PID_DIR/gemini_${SESSION_ID:-new}.pid"
 echo "$$" > "$PID_FILE"
 
+# Start streaming watcher in background
+STREAM_LOG="$HOME/.gemini/stream_session_gemini.log"
+echo "--- Starting new Gemini stream session at $(date) ---" > "$STREAM_LOG"
+python3 "$SCRIPT_DIR/stream_session.py" "$SESSION_ID" "$TRANSCRIPT" >> "$STREAM_LOG" 2>&1 &
+STREAM_PID=$!
+
 trap 'kill "$STREAM_PID" 2>/dev/null; rm -f "$PID_FILE"' EXIT
 
 cd "$TARGET_DIR" 2>/dev/null || cd "$HOME"
 TARGET_DIR="$(pwd)"
 
-# Start streaming watcher in background
-# It will find the transcript file automatically
-STREAM_LOG="$HOME/.gemini/stream_session_gemini.log"
-python3 "$SCRIPT_DIR/stream_session.py" "$SESSION_ID" "$TRANSCRIPT" > "$STREAM_LOG" 2>&1 &
-STREAM_PID=$!
-
 # Prepare Gemini command
 GEMINI_BIN="/data/data/com.termux/files/usr/bin/gemini"
-ARGS=("--yolo" "--output-format" "json" "--skip-trust") # Using json for the final result
+# If GEMINI_BIN is a symlink to gemini.js, we call it with node
+if [[ "$GEMINI_BIN" == *.js ]] || [ -L "$GEMINI_BIN" ]; then
+    NODE_BIN="/data/data/com.termux/files/usr/bin/node"
+    RUN_CMD=("$NODE_BIN" "$GEMINI_BIN")
+else
+    RUN_CMD=("$GEMINI_BIN")
+fi
+
+ARGS=("--yolo" "--output-format" "json" "--skip-trust")
 
 if [ "$CONTINUE_SESSION" = "true" ] && [ -n "$SESSION_ID" ]; then
     ARGS+=("--resume" "$SESSION_ID")
@@ -45,10 +56,10 @@ fi
 
 # Run Gemini
 # We use export to pass the response to the python parser safely
-export GEMINI_RAW_RESPONSE=$(node "$GEMINI_BIN" "${ARGS[@]}" -p "$TRANSCRIPT" 2>>"$HOME/.gemini/gemini_err.log")
+export GEMINI_RAW_RESPONSE=$("${RUN_CMD[@]}" "${ARGS[@]}" -p "$TRANSCRIPT" 2>>"$HOME/.gemini/gemini_err.log")
 
-# Stop streaming
-sleep 0.5
+# Give stream_session.py more time to finish broadcasting final steps
+sleep 2.0
 kill "$STREAM_PID" 2>/dev/null
 
 # If response is empty, Gemini CLI might have failed or session ID changed
