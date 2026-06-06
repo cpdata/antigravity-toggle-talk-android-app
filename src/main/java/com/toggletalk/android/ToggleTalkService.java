@@ -825,24 +825,23 @@ public class ToggleTalkService extends Service {
     }
 
     private void handleStreamedUpdate(String sessionId, String messagesJson, String filePath, String ttsText) {
-        if (mSelectedSessionId == null || mSelectedSessionId.isEmpty()) {
+        if ((mSelectedSessionId == null || mSelectedSessionId.isEmpty()) && sessionId != null && !sessionId.isEmpty()) {
             mSelectedSessionId = sessionId;
             mContinueSession = true;
             getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putString("selected_session_id", sessionId).apply();
             Log.d(TAG, "Adopted new session ID from stream: " + sessionId);
-            
+
             Intent sessionIntent = new Intent("com.toggletalk.android.ACTION_NEW_SESSION_ADOPTED");
             sessionIntent.putExtra("session_id", sessionId);
             sendBroadcast(sessionIntent);
         }
 
-        updateState(sessionId, "THINKING", "Streaming updates...");
-
-        if (!mSelectedSessionId.equals(sessionId)) {
+        if (mSelectedSessionId != null && !mSelectedSessionId.equals(sessionId) && sessionId != null && !sessionId.isEmpty()) {
             Log.d(TAG, "Ignoring streamed update: sessionId mismatch. expected=" + mSelectedSessionId + ", got=" + sessionId);
             return;
         }
 
+        updateState(mSelectedSessionId, "THINKING", "Streaming updates...");
         Intent intent = new Intent("com.toggletalk.android.ACTION_STREAM_DISPLAY");
         intent.putExtra("session_id", sessionId);
         intent.putExtra("messages_json", messagesJson);

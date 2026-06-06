@@ -60,17 +60,33 @@ def parse_gemini_cli_format(raw_steps):
                 tc_args = tc.get("args", {})
                 args_str = ", ".join(f"{k}={v}" for k, v in tc_args.items())
                 messages.append({"role": "tool_call", "text": f"Calling tool {tc_name}({args_str})"})
+                
+                # Check for embedded results in Gemini CLI format
+                tc_result = tc.get("result", [])
+                if tc_result:
+                    for res in tc_result:
+                        if isinstance(res, dict) and "functionResponse" in res:
+                            resp = res["functionResponse"].get("response", {})
+                            output = resp.get("output", "")
+                            if not output and "content" in resp:
+                                output = resp["content"]
+                            if output:
+                                messages.append({"role": "tool_result", "text": f"{tc_name.title()} Result:\n{output.strip()}"})
             
             if text.strip():
                 messages.append({"role": "agent", "text": text.strip()})
         
-        elif msg_type == "tool_result" or (msg_type == "gemini" and "toolCalls" in obj):
-            # Tool results are often embedded or separate in Gemini CLI
-            # If separate:
-            if msg_type == "tool_result":
-                text = content.strip() if isinstance(content, str) else ""
-                if text:
-                    messages.append({"role": "tool_result", "text": text})
+        elif msg_type == "tool_result":
+            # Gemini CLI tool results
+            text = ""
+            if isinstance(content, str):
+                text = content
+            elif isinstance(content, dict):
+                text = json.dumps(content, indent=2)
+            
+            if text.strip():
+                tool_name = obj.get("toolName", "tool")
+                messages.append({"role": "tool_result", "text": f"{tool_name.title()} Result:\n{text.strip()}"})
 
     return messages
 

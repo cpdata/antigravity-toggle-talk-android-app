@@ -25,7 +25,8 @@ TARGET_DIR="$(pwd)"
 
 # Start streaming watcher in background
 # It will find the transcript file automatically
-python3 "/data/data/com.termux/files/home/ToggleTalkAndroid/stream_session.py" "$SESSION_ID" "$TRANSCRIPT" >/dev/null 2>&1 &
+STREAM_LOG="$HOME/.gemini/stream_session.log"
+python3 "/data/data/com.termux/files/home/ToggleTalkAndroid/stream_session.py" "$SESSION_ID" "$TRANSCRIPT" > "$STREAM_LOG" 2>&1 &
 STREAM_PID=$!
 
 # Prepare Gemini command

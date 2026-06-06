@@ -25,30 +25,39 @@ signal.signal(signal.SIGINT, handle_signal)
 def find_gemini_transcript(session_id):
     project_name = os.path.basename(os.getcwd()).lower()
     chats_dir = os.path.join(GEMINI_TMP_DIR, project_name, "chats")
+    print(f"Searching for transcript. project={project_name}, session_id={session_id}")
     
     if session_id and not session_id.startswith("new_"):
         if os.path.exists(chats_dir):
             pattern = os.path.join(chats_dir, f"session-*-{session_id[:8]}*.jsonl")
             files = glob.glob(pattern)
-            if files: return files[0]
+            if files: 
+                print(f"Found transcript by pattern: {files[0]}")
+                return files[0]
             
             # Fallback: scan files for session_id in first line
             for f in glob.glob(os.path.join(chats_dir, "*.jsonl")):
                 try:
                     with open(f, "r") as fh:
-                        if session_id in fh.readline(): return f
+                        if session_id in fh.readline(): 
+                            print(f"Found transcript by scanning: {f}")
+                            return f
                 except: continue
 
         # Global fallback: search all projects
+        print("Falling back to global search...")
         pattern = os.path.join(GEMINI_TMP_DIR, "*", "chats", "*.jsonl")
         for f in glob.glob(pattern):
             try:
                 with open(f, "r") as fh:
-                    if session_id in fh.readline(): return f
+                    if session_id in fh.readline(): 
+                        print(f"Found transcript globally: {f}")
+                        return f
             except: continue
     
     # If new session, wait for a new file in current project
     if os.path.exists(chats_dir):
+        print(f"New session. Waiting for new file in {chats_dir}...")
         start_time = time.time()
         initial_files = set(os.listdir(chats_dir))
         while time.time() - start_time < 30:
@@ -58,14 +67,20 @@ def find_gemini_transcript(session_id):
                 if new_files:
                     # Pick the newest one
                     new_paths = [os.path.join(chats_dir, f) for f in new_files]
-                    return max(new_paths, key=os.path.getmtime)
+                    res = max(new_paths, key=os.path.getmtime)
+                    print(f"Found new transcript file: {res}")
+                    return res
             time.sleep(0.5)
     
     # Final fallback: latest file in current project's chats_dir
     if os.path.exists(chats_dir):
         files = [os.path.join(chats_dir, f) for f in os.listdir(chats_dir) if f.endswith(".jsonl")]
-        if files: return max(files, key=os.path.getmtime)
+        if files: 
+            res = max(files, key=os.path.getmtime)
+            print(f"Final fallback to latest file: {res}")
+            return res
         
+    print("Transcript not found.")
     return None
 
 def find_log_path(session_id):
