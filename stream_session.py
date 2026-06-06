@@ -107,17 +107,7 @@ def find_log_path(session_id):
             pass
         time.sleep(0.2)
         
-    # Fallback to the latest directory overall if no new directory was created after timeout
-    try:
-        subdirs = [os.path.join(BRAIN_DIR, d) for d in os.listdir(BRAIN_DIR) if os.path.isdir(os.path.join(BRAIN_DIR, d))]
-        if subdirs:
-            latest_dir = max(subdirs, key=os.path.getmtime)
-            path = os.path.join(latest_dir, ".system_generated", "logs", "transcript_full.jsonl")
-            if os.path.exists(path):
-                return path
-    except Exception:
-        pass
-        
+    print("Antigravity transcript not found.")
     return None
 
 agent = os.environ.get("AGENT", "antigravity")
