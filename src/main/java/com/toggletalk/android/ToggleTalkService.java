@@ -599,6 +599,11 @@ public class ToggleTalkService extends Service {
                     Thread.sleep(1500); // Simulate thinking delay
                 } catch (InterruptedException ignored) {}
 
+                if (mStopRequested || !"THINKING".equals(mSessionStates.get(sessionId))) {
+                    Log.d(TAG, "runMockReasoning: Cancelled or state is not THINKING, aborting mock response");
+                    return;
+                }
+
                 String queryText = prompt;
                 if (prompt.toLowerCase().startsWith("mock:")) {
                     queryText = prompt.substring(5).trim();
@@ -1226,28 +1231,32 @@ public class ToggleTalkService extends Service {
     }
 
     private void terminateSession(String sessionId) {
-        if (sessionId == null || sessionId.isEmpty()) return;
+        if (sessionId == null) sessionId = "";
         
         Log.d(TAG, "terminateSession called for " + sessionId);
         
-        // 1. Force kill process using standard RunCommandService
-        String pidFilePath = "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain/" + sessionId + "/.system_generated/logs/run.pid";
-        Intent killIntent = new Intent();
-        killIntent.setClassName("com.termux", "com.termux.app.RunCommandService");
-        killIntent.setAction("com.termux.RUN_COMMAND");
-        killIntent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash");
+        mStopRequested = true;
         
-        // Improved individual kill: try to kill by PID from file, AND by session_id pattern in process list
-        String killCmd = "if [ -f " + pidFilePath + " ]; then PID=$(cat " + pidFilePath + "); kill -9 $PID 2>/dev/null; pkill -9 -P $PID 2>/dev/null; rm -f " + pidFilePath + "; fi; " +
-                         "pkill -9 -f " + sessionId + "; " +
-                         "pkill -9 -f \"stream_session.py.*" + sessionId + "\"";
-                         
-        killIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{"-c", killCmd});
-        killIntent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
-        try {
-            startService(killIntent);
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to start kill command", e);
+        // 1. Force kill process using standard RunCommandService if session ID is not empty
+        if (!sessionId.isEmpty()) {
+            String pidFilePath = "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain/" + sessionId + "/.system_generated/logs/run.pid";
+            Intent killIntent = new Intent();
+            killIntent.setClassName("com.termux", "com.termux.app.RunCommandService");
+            killIntent.setAction("com.termux.RUN_COMMAND");
+            killIntent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash");
+            
+            // Improved individual kill: try to kill by PID from file, AND by session_id pattern in process list
+            String killCmd = "if [ -f " + pidFilePath + " ]; then PID=$(cat " + pidFilePath + "); kill -9 $PID 2>/dev/null; pkill -9 -P $PID 2>/dev/null; rm -f " + pidFilePath + "; fi; " +
+                             "pkill -9 -f " + sessionId + "; " +
+                             "pkill -9 -f \"stream_session.py.*" + sessionId + "\"";
+                             
+            killIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{"-c", killCmd});
+            killIntent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
+            try {
+                startService(killIntent);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to start kill command", e);
+            }
         }
 
         // 2. Stop audio playback and flush TTS queue

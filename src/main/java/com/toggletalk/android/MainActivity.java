@@ -327,7 +327,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                     
                     // CRITICAL: Re-enforce thinking container visibility if state is THINKING or SPEAKING
                     if ("THINKING".equals(mCurrentState) || "SPEAKING".equals(mCurrentState)) {
-                        if (mLayoutThinkingContainer != null) {
+                        if (mLayoutThinkingContainer != null && mTvStatus != null && !"TRANSCRIBING...".equals(mTvStatus.getText())) {
                             Log.d(TAG, "QueueChanged: " + mCurrentState + " state detected, re-showing thinking container");
                             mLayoutThinkingContainer.setVisibility(View.VISIBLE);
                             mLayoutThinkingContainer.bringToFront();
@@ -3574,9 +3574,13 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                 mBtnMic.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#0D1A2E")));
                 mBtnMic.setImageTintList(ColorStateList.valueOf(Color.parseColor("#00F2FE")));
                 if (mLayoutThinkingContainer != null) {
-                    Log.d(TAG, "onStateChanged: Setting ThinkingContainer VISIBLE");
-                    mLayoutThinkingContainer.setVisibility(View.VISIBLE);
-                    mLayoutThinkingContainer.bringToFront();
+                    if ("Transcribing...".equals(text)) {
+                        mLayoutThinkingContainer.setVisibility(View.GONE);
+                    } else {
+                        Log.d(TAG, "onStateChanged: Setting ThinkingContainer VISIBLE");
+                        mLayoutThinkingContainer.setVisibility(View.VISIBLE);
+                        mLayoutThinkingContainer.bringToFront();
+                    }
                 }
                 
                 // Keep screen on
