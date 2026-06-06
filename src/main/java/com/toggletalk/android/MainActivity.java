@@ -1458,6 +1458,11 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         mTargetDirectory = dir;
         updateActiveDirLabel();
         mDirectoryAdapter.notifyDataSetChanged();
+        
+        // Sync with helper
+        if (mHelper != null) {
+            mHelper.setTargetDirectory(dir);
+        }
 
         // Update the ToggleTalkService with the new active directory setting
         Intent intent = new Intent(this, ToggleTalkService.class);

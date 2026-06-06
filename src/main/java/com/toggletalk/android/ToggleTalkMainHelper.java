@@ -34,6 +34,19 @@ public class ToggleTalkMainHelper {
         this.mSelectedSessionId = mPrefs.getString("selected_session_id", "");
         this.mContinueSession = !mSelectedSessionId.isEmpty();
         this.mBypassAntigravity = mPrefs.getBoolean("bypass_antigravity", false);
+        this.mTargetDirectory = mPrefs.getString("target_directory", "Home");
+    }
+
+    private String getAbsoluteTargetDir() {
+        String absoluteTargetDir = "/data/data/com.termux/files/home";
+        if (mTargetDirectory != null && !mTargetDirectory.isEmpty() && !"Home".equals(mTargetDirectory)) {
+            if (mTargetDirectory.startsWith("/")) {
+                absoluteTargetDir = mTargetDirectory;
+            } else {
+                absoluteTargetDir = "/data/data/com.termux/files/home/" + mTargetDirectory;
+            }
+        }
+        return absoluteTargetDir;
     }
 
     public String getSelectedSessionId() { return mSelectedSessionId; }
@@ -77,7 +90,7 @@ public class ToggleTalkMainHelper {
         if (!background) {
             runCommandIntent.putExtra("com.termux.RUN_COMMAND_SESSION_ACTION", 1); // 1 = NEW_SESSION
         }
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home");
+        runCommandIntent.putExtra("com.termux.RUN_COMMAND_WORKDIR", getAbsoluteTargetDir());
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -164,7 +177,7 @@ public class ToggleTalkMainHelper {
         runCommandIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{"-c", command});
         
         runCommandIntent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home");
+        runCommandIntent.putExtra("com.termux.RUN_COMMAND_WORKDIR", getAbsoluteTargetDir());
         runCommandIntent.putExtra("com.termux.RUN_COMMAND_PENDING_INTENT", pendingIntent);
 
         try {

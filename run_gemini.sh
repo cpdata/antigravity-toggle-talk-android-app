@@ -29,14 +29,14 @@ STREAM_PID=$!
 
 # Prepare Gemini command
 GEMINI_BIN="/data/data/com.termux/files/usr/bin/gemini"
-ARGS=("--yolo" "--output-format" "json") # Using json for the final result
+ARGS=("--yolo" "--output-format" "json" "--skip-trust") # Using json for the final result
 
 if [ "$CONTINUE_SESSION" = "true" ] && [ -n "$SESSION_ID" ]; then
     ARGS+=("--resume" "$SESSION_ID")
 fi
 
 # Run Gemini
-RESPONSE=$("$GEMINI_BIN" "${ARGS[@]}" --prompt "$TRANSCRIPT" 2>/dev/null)
+RESPONSE=$("$GEMINI_BIN" "${ARGS[@]}" -p "$TRANSCRIPT" 2>/dev/null)
 
 # Stop streaming
 sleep 0.5

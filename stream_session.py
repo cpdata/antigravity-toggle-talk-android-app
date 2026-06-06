@@ -27,11 +27,7 @@ def find_gemini_transcript(session_id):
     chats_dir = os.path.join(GEMINI_TMP_DIR, project_name, "chats")
     
     if not os.path.exists(chats_dir):
-        # Try finding any chats dir in tmp
-        chats_dir_pattern = os.path.join(GEMINI_TMP_DIR, "*", "chats")
-        chats_dirs = glob.glob(chats_dir_pattern)
-        if not chats_dirs: return None
-        chats_dir = chats_dirs[0]
+        return None
 
     if session_id and not session_id.startswith("new_"):
         pattern = os.path.join(chats_dir, f"session-*-{session_id[:8]}*.jsonl")
