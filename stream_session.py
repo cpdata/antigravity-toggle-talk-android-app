@@ -226,8 +226,13 @@ def tail_transcript(path, session_id, prompt):
         elif "chats" in path:
             filename = os.path.basename(path)
             if filename.startswith("session-"):
-                session_id = filename.split("-")[2] # Assuming session-YYYY-MM-DD-ID format
-                print(f"Adopted session ID from filename: {session_id}")
+                # Format: session-YYYY-MM-DDTHH-MM-ID.jsonl
+                # session-2026-06-06T11-03-dd0b486c.jsonl
+                # The ID is the last part before .jsonl
+                parts = filename.split('-')
+                if len(parts) >= 5:
+                    session_id = parts[-1].replace('.jsonl', '')
+                    print(f"Adopted session ID from filename: {session_id}")
 
     # Read initial lines if file exists
     initial_lines = []
