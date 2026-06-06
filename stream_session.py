@@ -217,6 +217,17 @@ def tail_transcript(path, session_id, prompt):
                 
     if not session_id or session_id.startswith("new_"):
         session_id = "unknown"
+        parts = path.split(os.sep)
+        # Check if the path looks like it belongs to antigravity brain
+        if "antigravity-cli/brain" in path and len(parts) >= 6:
+            session_id = parts[-4]
+            print(f"Adopted session ID from path: {session_id}")
+        # Or check if it looks like a gemini chat file
+        elif "chats" in path:
+            filename = os.path.basename(path)
+            if filename.startswith("session-"):
+                session_id = filename.split("-")[2] # Assuming session-YYYY-MM-DD-ID format
+                print(f"Adopted session ID from filename: {session_id}")
 
     # Read initial lines if file exists
     initial_lines = []
