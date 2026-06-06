@@ -65,13 +65,6 @@ def find_gemini_transcript(session_id):
                     print(f"Found new transcript file: {res}")
                     return res
             time.sleep(0.5)
-    
-    if os.path.exists(chats_dir):
-        files = [os.path.join(chats_dir, f) for f in os.listdir(chats_dir) if f.endswith(".jsonl")]
-        if files: 
-            res = max(files, key=os.path.getmtime)
-            print(f"Final fallback to latest file: {res}")
-            return res
         
     print("Transcript not found.")
     return None
