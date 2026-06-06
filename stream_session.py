@@ -276,6 +276,12 @@ def tail_transcript(path, session_id, prompt):
                     
                 try:
                     obj = json.loads(line)
+                    
+                    # Update session_id if it's still a placeholder
+                    if (not session_id or session_id == "unknown" or session_id.startswith("new_")) and "sessionId" in obj:
+                        session_id = obj["sessionId"]
+                        print(f"Adopted real session ID from stream: {session_id}")
+
                     # Extract any TTS text to speak from this new step
                     tts_text = extract_tts_text(obj)
                     

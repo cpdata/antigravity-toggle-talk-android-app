@@ -3,7 +3,13 @@ import os
 import sys
 import json
 import glob
-from transcript_parser import parse_transcript_steps
+
+def get_parse_func(agent):
+    if agent == "gemini":
+        from gemini_transcript_parser import parse_transcript_steps
+    else:
+        from antigravity_transcript_parser import parse_transcript_steps
+    return parse_transcript_steps
 
 AGY_BRAIN_DIR = "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain"
 GEMINI_TMP_DIR = "/data/data/com.termux/files/home/.gemini/tmp"
@@ -63,6 +69,7 @@ def load_history(session_id, agent="antigravity"):
         print(json.dumps({"error": str(e)}))
         return
 
+    parse_transcript_steps = get_parse_func(agent)
     messages = parse_transcript_steps(raw_steps)
     json_str = json.dumps(messages)
 
