@@ -845,9 +845,8 @@ public class ToggleTalkService extends Service {
 
         // Allow update if session matches, OR if we don't have a real session ID yet
         boolean isMatch = (mSelectedSessionId != null && mSelectedSessionId.equals(sessionId));
-        boolean isInitialUpdate = currentIsPlaceholder;
-
-        if (!isMatch && !isInitialUpdate) {
+        
+        if (!isMatch && !currentIsPlaceholder) {
             Log.d(TAG, "Ignoring streamed update: sessionId mismatch. expected=" + mSelectedSessionId + ", got=" + sessionId);
             return;
         }
