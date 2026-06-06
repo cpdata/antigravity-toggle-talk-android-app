@@ -344,21 +344,45 @@
                 android:gravity="center_vertical"
                 android:layout_marginBottom="6dp">
 
-                <!-- File Upload Button -->
-                <ImageButton
-                    android:id="@+id/btn_upload"
-                    android:layout_width="42dp"
-                    android:layout_height="42dp"
-                    android:background="@drawable/card_glass"
-                    android:src="@drawable/ic_folder"
-                    android:tint="#00F2FE"
-                    android:padding="8dp"
-                    android:scaleType="fitCenter"
-                    android:contentDescription="Upload file or screenshot"
+                <!-- Button Column -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
                     android:layout_marginEnd="5dp"
-                    android:elevation="6dp"
-                    android:clickable="true"
-                    android:focusable="true" />
+                    android:gravity="center">
+
+                    <!-- File Upload Button -->
+                    <ImageButton
+                        android:id="@+id/btn_upload"
+                        android:layout_width="42dp"
+                        android:layout_height="42dp"
+                        android:background="@drawable/card_glass"
+                        android:src="@drawable/ic_folder"
+                        android:tint="#00F2FE"
+                        android:padding="8dp"
+                        android:scaleType="fitCenter"
+                        android:contentDescription="Upload file or screenshot"
+                        android:layout_marginBottom="4dp"
+                        android:elevation="6dp"
+                        android:clickable="true"
+                        android:focusable="true" />
+
+                    <!-- Quick Prompts Button -->
+                    <ImageButton
+                        android:id="@+id/btn_quick_prompts"
+                        android:layout_width="42dp"
+                        android:layout_height="42dp"
+                        android:background="@drawable/card_glass"
+                        android:src="@drawable/ic_menu"
+                        android:tint="#00F2FE"
+                        android:padding="8dp"
+                        android:scaleType="fitCenter"
+                        android:contentDescription="Quick prompts"
+                        android:elevation="6dp"
+                        android:clickable="true"
+                        android:focusable="true" />
+                </LinearLayout>
 
                 <!-- Sleek glassmorphic text input box -->
                 <EditText
@@ -1144,6 +1168,90 @@
                 android:divider="#20FFFFFF"
                 android:dividerHeight="1dp"
                 android:maxHeight="180dp" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- Quick Prompts Popup Overlay Container -->
+    <FrameLayout
+        android:id="@+id/quick_prompts_popup_root"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true">
+        
+        <!-- Dim clickable background -->
+        <View
+            android:id="@+id/quick_prompts_popup_dim_background"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#66000000" />
+            
+        <!-- Popup panel at the bottom -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:orientation="vertical"
+            android:background="#F00B0518"
+            android:padding="8dp"
+            android:layout_margin="8dp"
+            android:elevation="16dp">
+            
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Quick Prompts"
+                android:textColor="#E6E6FA"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="4dp" />
+                
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
+                
+                <EditText
+                    android:id="@+id/et_new_quick_prompt"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:minHeight="42dp"
+                    android:hint="New prompt..."
+                    android:textColor="#FFFFFF"
+                    android:textColorHint="#80FFFFFF"
+                    android:background="@drawable/card_glass"
+                    android:padding="8dp"
+                    android:textSize="13sp" />
+                    
+                <Button
+                    android:id="@+id/btn_add_quick_prompt"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Add"
+                    android:textColor="#00F2FE"
+                    style="?android:attr/buttonBarButtonStyle" />
+            </LinearLayout>
+                
+            <!-- Quick Prompts List -->
+            <ListView
+                android:id="@+id/lv_quick_prompts"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:divider="#20FFFFFF"
+                android:dividerHeight="1dp" />
+                
+            <Button
+                android:id="@+id/btn_quick_prompts_close"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Close"
+                android:textColor="#8A8A8F"
+                style="?android:attr/buttonBarButtonStyle"
+                android:layout_marginTop="4dp" />
         </LinearLayout>
     </FrameLayout>
 </FrameLayout>

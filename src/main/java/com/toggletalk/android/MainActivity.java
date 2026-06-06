@@ -60,6 +60,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
     private boolean mIsQueueExpanded = false;
 
     private PromptEditPopup mPromptEditPopup;
+    private QuickPromptsPopup mQuickPromptsPopup;
     private UnresolvedQueueManager mUnresolvedQueueManager;
     private int mEditingPromptIndex = -1;
 
@@ -558,6 +559,15 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         if (mBtnUpload != null) {
             mBtnUpload.setOnClickListener(v -> openFilePicker());
         }
+
+        View btnQuickPrompts = findViewById(R.id.btn_quick_prompts);
+        if (btnQuickPrompts != null) {
+            btnQuickPrompts.setOnClickListener(v -> {
+                if (mQuickPromptsPopup != null) {
+                    mQuickPromptsPopup.show();
+                }
+            });
+        }
         
         mEtMessage = findViewById(R.id.et_message);
         mBtnSend = findViewById(R.id.btn_send);
@@ -716,6 +726,21 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                 @Override
                 public void onCancel() {
                     mEditingPromptIndex = -1;
+                }
+            });
+        }
+
+        // Initialize Quick Prompts Popup
+        View quickPromptsRoot = findViewById(R.id.quick_prompts_popup_root);
+        if (quickPromptsRoot != null) {
+            mQuickPromptsPopup = new QuickPromptsPopup(quickPromptsRoot, prompt -> {
+                if (mEtMessage != null) {
+                    String current = mEtMessage.getText().toString();
+                    if (!current.isEmpty() && !current.endsWith(" ")) {
+                        current += " ";
+                    }
+                    mEtMessage.setText(current + prompt);
+                    mEtMessage.setSelection(mEtMessage.getText().length());
                 }
             });
         }
