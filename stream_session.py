@@ -31,11 +31,11 @@ def find_gemini_transcript(session_id):
         if rel_path == ".":
             project_names.append("home")
         else:
-            # User wants case-sensitive relative path
-            project_names.append(rel_path)
-            # Fallback to lowercase as some versions of Gemini CLI might use it
+            # Force lowercase as Gemini CLI convention for chat directories
+            project_names.append(rel_path.lower())
+            # Fallback to case-sensitive if that fails
             if rel_path.lower() != rel_path:
-                project_names.append(rel_path.lower())
+                project_names.append(rel_path)
     
     # Fallback to detected projects in GEMINI_TMP_DIR
     if os.path.exists(GEMINI_TMP_DIR):
@@ -108,9 +108,8 @@ def find_gemini_transcript(session_id):
                 all_files = [os.path.join(chats_dir, f) for f in current_files if f.endswith(".jsonl")]
                 if all_files:
                     latest = max(all_files, key=os.path.getmtime)
-                    if os.path.getmtime(latest) >= start_time - 1.0:
-                        print(f"Adopting recent Gemini transcript file in {project}: {latest}")
-                        return latest
+                    print(f"Adopting most recent transcript file in {project}: {latest}")
+                    return latest
             except: pass
         time.sleep(0.5)
         

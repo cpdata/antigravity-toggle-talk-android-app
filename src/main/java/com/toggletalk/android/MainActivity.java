@@ -2577,6 +2577,23 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
 
     private void addUserBubble(String message) {
         if (mChatContainer == null || message == null || message.trim().isEmpty()) return;
+
+        // Check for duplicates
+        for (int i = 0; i < mChatContainer.getChildCount(); i++) {
+            View view = mChatContainer.getChildAt(i);
+            if (view instanceof android.widget.LinearLayout) {
+                android.widget.LinearLayout layout = (android.widget.LinearLayout) view;
+                for (int j = 0; j < layout.getChildCount(); j++) {
+                    View child = layout.getChildAt(j);
+                    if (child instanceof TextView) {
+                        String existingText = ((TextView) child).getText().toString();
+                        if (existingText.equals(renderMarkdown(message))) {
+                            return; // Already exists
+                        }
+                    }
+                }
+            }
+        }
         
         float density = getResources().getDisplayMetrics().density;
         
