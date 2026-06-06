@@ -825,11 +825,11 @@ public class ToggleTalkService extends Service {
     }
 
     private void handleStreamedUpdate(String sessionId, String messagesJson, String filePath, String ttsText) {
-        if ((mSelectedSessionId == null || mSelectedSessionId.isEmpty()) && sessionId != null && !sessionId.isEmpty()) {
+        if ((mSelectedSessionId == null || mSelectedSessionId.isEmpty() || mSelectedSessionId.startsWith("new_") || mSelectedSessionId.equals("unknown")) && sessionId != null && !sessionId.isEmpty() && !sessionId.startsWith("new_")) {
             mSelectedSessionId = sessionId;
             mContinueSession = true;
             getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putString("selected_session_id", sessionId).apply();
-            Log.d(TAG, "Adopted new session ID from stream: " + sessionId);
+            Log.d(TAG, "Adopted real session ID from stream: " + sessionId);
 
             Intent sessionIntent = new Intent("com.toggletalk.android.ACTION_NEW_SESSION_ADOPTED");
             sessionIntent.putExtra("session_id", sessionId);
