@@ -4,6 +4,7 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -78,13 +79,21 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
     private View mBtnSettingsClose;
     private View mSettingsDimBackground;
     private View mBtnClearSessionCache;
+    private View mBtnKillAll;
     private boolean mBypassAntigravity = false;
     private ImageButton mBtnMic;
     private ProgressBar mPbThinking;
     private View mLayoutThinkingContainer;
-    private ImageButton mBtnTerminate;
-    private View mBtnUpload;
+    private View mBtnTerminate;
+    private View mBtnAddOptions;
+    private View mAddOptionsDrawerRoot;
+    private View mAddOptionsDimBackground;
+    private View mBtnAddOptionsClose;
+    private View mOptionFiles;
+    private View mOptionCamera;
+    private View mOptionQuickPrompts;
     private final java.util.Map<Integer, android.text.Spanned> mRenderedTextCache = new java.util.HashMap<>();
+
     private final java.util.Map<Integer, android.text.Spanned> mRenderedCodeCache = new java.util.HashMap<>();
     private final java.util.Map<Integer, String> mCachedRawTexts = new java.util.HashMap<>();
     private final java.util.Set<Integer> mCollapsedIndices = new java.util.HashSet<>();
@@ -498,6 +507,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         mBtnSettingsClose = findViewById(R.id.btn_settings_close);
         mSettingsDimBackground = findViewById(R.id.settings_popup_dim_background);
         mBtnClearSessionCache = findViewById(R.id.btn_clear_session_cache);
+        mBtnKillAll = findViewById(R.id.btn_kill_all);
 
         mCbWakeLock = findViewById(R.id.cb_wake_lock);
         mArtifactsPopupRoot = findViewById(R.id.artifacts_popup_root);
@@ -540,6 +550,9 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                 closeSettings();
             });
         }
+        if (mBtnKillAll != null) {
+            mBtnKillAll.setOnClickListener(v -> killAllSessions());
+        }
         mBtnMic = findViewById(R.id.btn_mic);
         mPbThinking = findViewById(R.id.pb_thinking);
         mLayoutThinkingContainer = findViewById(R.id.layout_thinking_container);
@@ -555,14 +568,46 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
             });
         }
         
-        mBtnUpload = findViewById(R.id.btn_upload);
-        if (mBtnUpload != null) {
-            mBtnUpload.setOnClickListener(v -> openFilePicker());
-        }
+        mBtnAddOptions = findViewById(R.id.btn_add_options);
+        mAddOptionsDrawerRoot = findViewById(R.id.add_options_drawer_root);
+        mAddOptionsDimBackground = findViewById(R.id.add_options_dim_background);
+        mBtnAddOptionsClose = findViewById(R.id.btn_add_options_close);
+        mOptionFiles = findViewById(R.id.option_files);
+        mOptionCamera = findViewById(R.id.option_camera);
+        mOptionQuickPrompts = findViewById(R.id.option_quick_prompts);
 
-        View btnQuickPrompts = findViewById(R.id.btn_quick_prompts);
-        if (btnQuickPrompts != null) {
-            btnQuickPrompts.setOnClickListener(v -> {
+        if (mBtnAddOptions != null) {
+            mBtnAddOptions.setOnClickListener(v -> {
+                if (mAddOptionsDrawerRoot != null) {
+                    mAddOptionsDrawerRoot.setVisibility(View.VISIBLE);
+                }
+            });
+        }
+        if (mBtnAddOptionsClose != null) {
+            mBtnAddOptionsClose.setOnClickListener(v -> {
+                if (mAddOptionsDrawerRoot != null) mAddOptionsDrawerRoot.setVisibility(View.GONE);
+            });
+        }
+        if (mAddOptionsDimBackground != null) {
+            mAddOptionsDimBackground.setOnClickListener(v -> {
+                if (mAddOptionsDrawerRoot != null) mAddOptionsDrawerRoot.setVisibility(View.GONE);
+            });
+        }
+        if (mOptionFiles != null) {
+            mOptionFiles.setOnClickListener(v -> {
+                if (mAddOptionsDrawerRoot != null) mAddOptionsDrawerRoot.setVisibility(View.GONE);
+                openFilePicker();
+            });
+        }
+        if (mOptionCamera != null) {
+            mOptionCamera.setOnClickListener(v -> {
+                if (mAddOptionsDrawerRoot != null) mAddOptionsDrawerRoot.setVisibility(View.GONE);
+                openCameraPicker();
+            });
+        }
+        if (mOptionQuickPrompts != null) {
+            mOptionQuickPrompts.setOnClickListener(v -> {
+                if (mAddOptionsDrawerRoot != null) mAddOptionsDrawerRoot.setVisibility(View.GONE);
                 if (mQuickPromptsPopup != null) {
                     mQuickPromptsPopup.show();
                 }
@@ -3465,6 +3510,21 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         mTvEmptyDirs.setVisibility(View.VISIBLE);
     }
 
+    private void killAllSessions() {
+        new AlertDialog.Builder(this)
+            .setTitle("Kill All Sessions")
+            .setMessage("Are you sure you want to terminate all antigravity sessions and clear the TTS queue?")
+            .setPositiveButton("Yes", (dialog, which) -> {
+                Intent intent = new Intent(this, ToggleTalkService.class);
+                intent.setAction(ToggleTalkService.ACTION_KILL_ALL);
+                startService(intent);
+                addSystemMessage("⛔ All sessions killed by user.", "#FF416C");
+                closeSettings();
+            })
+            .setNegativeButton("No", null)
+            .show();
+    }
+
     // --- App States Visual Management ---
 
     private void onStateChanged(String state, String text) {
@@ -3801,6 +3861,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
     }
 
     private static final int PICK_FILE_REQUEST = 2002;
+    private static final int PICK_CAMERA_REQUEST = 2003;
 
     private void openFilePicker() {
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
@@ -3813,12 +3874,42 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         }
     }
 
+    private void openCameraPicker() {
+        Intent intent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+        try {
+            startActivityForResult(intent, PICK_CAMERA_REQUEST);
+        } catch (android.content.ActivityNotFoundException ex) {
+            Toast.makeText(this, "Camera app not found.", Toast.LENGTH_SHORT).show();
+        }
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == PICK_FILE_REQUEST && resultCode == RESULT_OK && data != null && data.getData() != null) {
             android.net.Uri uri = data.getData();
             handleSelectedFile(uri);
+        } else if (requestCode == PICK_CAMERA_REQUEST && resultCode == RESULT_OK && data != null) {
+            // For simple implementation, if data.getExtras().get("data") is present, it's a thumbnail bitmap
+            android.graphics.Bitmap bitmap = (android.graphics.Bitmap) data.getExtras().get("data");
+            if (bitmap != null) {
+                handleCapturedBitmap(bitmap);
+            }
+        }
+    }
+
+    private void handleCapturedBitmap(android.graphics.Bitmap bitmap) {
+        try {
+            java.io.File cacheFile = new java.io.File(getCacheDir(), "camera_capture_" + System.currentTimeMillis() + ".jpg");
+            java.io.FileOutputStream fos = new java.io.FileOutputStream(cacheFile);
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, fos);
+            fos.close();
+            
+            // Now handle it like a selected file
+            handleSelectedFile(android.net.Uri.fromFile(cacheFile));
+        } catch (Exception e) {
+            Log.e(TAG, "Error saving captured bitmap", e);
+            Toast.makeText(this, "Failed to save image", Toast.LENGTH_SHORT).show();
         }
     }
 

@@ -45,6 +45,7 @@ public class ToggleTalkService extends Service {
     public static final String ACTION_QUEUE_CHANGED = "com.toggletalk.android.ACTION_QUEUE_CHANGED";
     public static final String ACTION_UPDATE_PROMPT = "com.toggletalk.android.ACTION_UPDATE_PROMPT";
     public static final String ACTION_TERMINATE_SESSION = "com.toggletalk.android.ACTION_TERMINATE_SESSION";
+    public static final String ACTION_KILL_ALL = "com.toggletalk.android.ACTION_KILL_ALL";
 
     public static final String EXTRA_STATE = "state";
     public static final String EXTRA_TEXT = "text";
@@ -339,6 +340,8 @@ public class ToggleTalkService extends Service {
                     sessionId = mSelectedSessionId;
                 }
                 terminateSession(sessionId);
+            } else if (ACTION_KILL_ALL.equals(action)) {
+                killAllSessions();
             }
         }
         return START_STICKY;
@@ -1233,7 +1236,13 @@ public class ToggleTalkService extends Service {
         killIntent.setClassName("com.termux", "com.termux.app.RunCommandService");
         killIntent.setAction("com.termux.RUN_COMMAND");
         killIntent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash");
-        killIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{"-c", "if [ -f " + pidFilePath + " ]; then PID=$(cat " + pidFilePath + "); kill -9 $PID 2>/dev/null; pkill -9 -P $PID 2>/dev/null; rm -f " + pidFilePath + "; fi"});
+        
+        // Improved individual kill: try to kill by PID from file, AND by session_id pattern in process list
+        String killCmd = "if [ -f " + pidFilePath + " ]; then PID=$(cat " + pidFilePath + "); kill -9 $PID 2>/dev/null; pkill -9 -P $PID 2>/dev/null; rm -f " + pidFilePath + "; fi; " +
+                         "pkill -9 -f " + sessionId + "; " +
+                         "pkill -9 -f \"stream_session.py.*" + sessionId + "\"";
+                         
+        killIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{"-c", killCmd});
         killIntent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
         try {
             startService(killIntent);
@@ -1253,6 +1262,62 @@ public class ToggleTalkService extends Service {
 
         // 3. Move state to IDLE
         updateState(sessionId, "IDLE", "Terminated");
+    }
+
+    private void killAllSessions() {
+        Log.d(TAG, "killAllSessions called");
+
+        // 1. Force kill all antigravity-related processes in Termux
+        Intent killIntent = new Intent();
+        killIntent.setClassName("com.termux", "com.termux.app.RunCommandService");
+        killIntent.setAction("com.termux.RUN_COMMAND");
+        killIntent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash");
+        
+        // Comprehensive kill command: 
+        // - Kill known scripts and binaries by pattern
+        // - Kill any proot instance (broad but effective for "Kill All")
+        // - Kill any process containing 'agy' or 'antigravity'
+        // - Kill the stream watcher
+        // - Clear PID files
+        String killCmd = "pkill -9 -f run_antigravity.sh; " +
+                         "pkill -9 -f agy; " +
+                         "pkill -9 -f antigravity; " +
+                         "pkill -9 -f stream_session.py; " +
+                         "pkill -9 proot; " +
+                         "find /data/data/com.termux/files/home/.gemini/antigravity-cli/brain -name run.pid -delete";
+                         
+        killIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{"-c", killCmd});
+        killIntent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
+        try {
+            startService(killIntent);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to start global kill command", e);
+        }
+
+        // 2. Stop audio playback and flush TTS queue
+        stopAudioPlayback();
+        synchronized (mTtsQueue) {
+            mTtsQueue.clear();
+        }
+        mCurrentlyPlayingItem = null;
+        mCurrentPlayingChunk = null;
+        mIsTtsPaused = false;
+        mIsTtsPlaying = false;
+
+        // 3. Reset all session states to IDLE so UI transitions to unresolved if needed
+        for (String sessionId : new java.util.ArrayList<>(mSessionStates.keySet())) {
+            mSessionStates.put(sessionId, "IDLE");
+            mSessionTexts.put(sessionId, "Killed");
+            mSessionLastUpdateTimes.put(sessionId, System.currentTimeMillis());
+            broadcastQueueChanged(sessionId);
+        }
+
+        // 4. Reset main service state
+        mCurrentState = "IDLE";
+        mCurrentText = "All sessions killed";
+        broadcastStateToApp();
+        
+        Log.d(TAG, "All sessions and TTS queue cleared.");
     }
 
     private void checkThinkingSessions() {

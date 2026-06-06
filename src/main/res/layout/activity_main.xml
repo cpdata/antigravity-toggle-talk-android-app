@@ -341,85 +341,47 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:gravity="center_vertical"
+                android:gravity="bottom"
                 android:layout_marginBottom="6dp">
 
-                <!-- Button Column -->
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:layout_marginEnd="5dp"
-                    android:gravity="center">
-
-                    <!-- File Upload Button -->
-                    <ImageButton
-                        android:id="@+id/btn_upload"
-                        android:layout_width="42dp"
-                        android:layout_height="42dp"
-                        android:background="@drawable/card_glass"
-                        android:src="@drawable/ic_folder"
-                        android:tint="#00F2FE"
-                        android:padding="8dp"
-                        android:scaleType="fitCenter"
-                        android:contentDescription="Upload file or screenshot"
-                        android:layout_marginBottom="4dp"
-                        android:elevation="6dp"
-                        android:clickable="true"
-                        android:focusable="true" />
-
-                    <!-- Quick Prompts Button -->
-                    <ImageButton
-                        android:id="@+id/btn_quick_prompts"
-                        android:layout_width="42dp"
-                        android:layout_height="42dp"
-                        android:background="@drawable/card_glass"
-                        android:src="@drawable/ic_menu"
-                        android:tint="#00F2FE"
-                        android:padding="8dp"
-                        android:scaleType="fitCenter"
-                        android:contentDescription="Quick prompts"
-                        android:elevation="6dp"
-                        android:clickable="true"
-                        android:focusable="true" />
-                </LinearLayout>
-
-                <!-- Sleek glassmorphic text input box -->
-                <EditText
-                    android:id="@+id/et_message"
+                <!-- Sleek glassmorphic text input box container -->
+                <RelativeLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:minHeight="42dp"
-                    android:hint="Type or speak a message..."
-                    android:textColor="#FFFFFF"
-                    android:textColorHint="#80FFFFFF"
                     android:background="@drawable/card_glass"
-                    android:padding="10dp"
-                    android:textSize="13sp"
-                    android:layout_marginEnd="5dp"
-                    android:maxLines="4"
-                    android:scrollbars="vertical"
-                    android:textCursorDrawable="@drawable/cursor_color" />
-
-                <!-- Scaled Down Speak Button & Rings Container -->
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center_horizontal"
+                    android:padding="2dp"
                     android:layout_marginEnd="5dp">
 
+                    <!-- '+' Add Options Button -->
+                    <ImageButton
+                        android:id="@+id/btn_add_options"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true"
+                        android:background="?android:attr/selectableItemBackgroundBorderless"
+                        android:src="@android:drawable/ic_input_add"
+                        android:tint="#00F2FE"
+                        android:padding="8dp"
+                        android:scaleType="fitCenter"
+                        android:contentDescription="Add files, camera or quick prompts"
+                        android:clickable="true"
+                        android:focusable="true" />
+
+                    <!-- Mic Action Button Container -->
                     <FrameLayout
-                        android:id="@+id/button_container"
-                        android:layout_width="48dp"
-                        android:layout_height="48dp">
+                        android:id="@+id/mic_inside_container"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true">
 
                         <!-- Concentric Ring 3 (Outer Ring for Pulsing) -->
                         <View
                             android:id="@+id/ring_outer"
-                            android:layout_width="44dp"
-                            android:layout_height="44dp"
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
                             android:layout_gravity="center"
                             android:background="@drawable/bg_mic_btn"
                             android:alpha="0" />
@@ -427,8 +389,8 @@
                         <!-- Concentric Ring 2 (Middle Ring for Pulsing) -->
                         <View
                             android:id="@+id/ring_middle"
-                            android:layout_width="38dp"
-                            android:layout_height="38dp"
+                            android:layout_width="34dp"
+                            android:layout_height="34dp"
                             android:layout_gravity="center"
                             android:background="@drawable/bg_mic_btn"
                             android:alpha="0" />
@@ -436,8 +398,8 @@
                         <!-- Concentric Ring 1 (Inner Ring/Halo) -->
                         <View
                             android:id="@+id/ring_inner"
-                            android:layout_width="32dp"
-                            android:layout_height="32dp"
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
                             android:layout_gravity="center"
                             android:background="@drawable/bg_mic_btn"
                             android:alpha="0" />
@@ -445,31 +407,35 @@
                         <!-- Main Mic Action Button -->
                         <ImageButton
                             android:id="@+id/btn_mic"
-                            android:layout_width="32dp"
-                            android:layout_height="32dp"
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
                             android:layout_gravity="center"
                             android:background="@drawable/bg_mic_btn"
                             android:src="@drawable/ic_mic"
-                            android:padding="6dp"
+                            android:padding="5dp"
                             android:scaleType="fitCenter"
                             android:tint="#120E2E"
-                            android:contentDescription="Toggle voice record"
-                            android:elevation="6dp" />
+                            android:contentDescription="Toggle voice record" />
                     </FrameLayout>
 
-                    <!-- X Button below mic -->
-                    <ImageButton
-                        android:id="@+id/btn_flush"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
+                    <EditText
+                        android:id="@+id/et_message"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_toEndOf="@id/btn_add_options"
+                        android:layout_toStartOf="@id/mic_inside_container"
+                        android:layout_centerVertical="true"
+                        android:minHeight="40dp"
+                        android:hint="Type or speak..."
+                        android:textColor="#FFFFFF"
+                        android:textColorHint="#80FFFFFF"
                         android:background="@null"
-                        android:src="@android:drawable/ic_menu_close_clear_cancel"
-                        android:tint="#FF3B30"
-                        android:scaleType="fitCenter"
-                        android:padding="2dp"
-                        android:visibility="gone"
-                        android:contentDescription="Stop and flush audio queue" />
-                </LinearLayout>
+                        android:padding="8dp"
+                        android:textSize="13sp"
+                        android:maxLines="4"
+                        android:scrollbars="vertical"
+                        android:textCursorDrawable="@drawable/cursor_color" />
+                </RelativeLayout>
 
                 <!-- Send Button -->
                 <ImageButton
@@ -483,6 +449,21 @@
                     android:scaleType="fitCenter"
                     android:contentDescription="Send text message"
                     android:elevation="6dp" />
+
+                <!-- X Button for flushing (outside, or could be moved) -->
+                <ImageButton
+                    android:id="@+id/btn_flush"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:background="@null"
+                    android:src="@android:drawable/ic_menu_close_clear_cancel"
+                    android:tint="#FF3B30"
+                    android:scaleType="fitCenter"
+                    android:padding="2dp"
+                    android:visibility="gone"
+                    android:layout_marginStart="4dp"
+                    android:layout_gravity="center_vertical"
+                    android:contentDescription="Stop and flush audio queue" />
 
                 <!-- Unresolved Queue State Actions -->
                 <LinearLayout
@@ -954,6 +935,24 @@
                         android:clickable="true"
                         android:focusable="true"
                         android:contentDescription="Clear session history cache" />
+
+                    <!-- Kill All Sessions Button -->
+                    <TextView
+                        android:id="@+id/btn_kill_all"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="KILL ALL SESSIONS"
+                        android:textColor="#FF416C"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:gravity="center"
+                        android:padding="12dp"
+                        android:layout_marginTop="8dp"
+                        android:layout_marginBottom="12dp"
+                        android:background="@drawable/card_glass"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:contentDescription="Kill all sessions and clear TTS queue" />
                 </LinearLayout>
             </ScrollView>
         </LinearLayout>
@@ -1168,6 +1167,123 @@
                 android:divider="#20FFFFFF"
                 android:dividerHeight="1dp"
                 android:maxHeight="180dp" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- Add Options Drawer Overlay Container -->
+    <FrameLayout
+        android:id="@+id/add_options_drawer_root"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true">
+        
+        <!-- Dim clickable background -->
+        <View
+            android:id="@+id/add_options_dim_background"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#66000000" />
+            
+        <!-- Drawer content card at the bottom -->
+        <LinearLayout
+            android:id="@+id/add_options_drawer_content"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:orientation="vertical"
+            android:background="#F00B0518"
+            android:padding="16dp"
+            android:layout_margin="8dp"
+            android:elevation="16dp">
+            
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Add to conversation"
+                android:textColor="#E6E6FA"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="16dp" />
+                
+            <LinearLayout
+                android:id="@+id/option_files"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="12dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:clickable="true">
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_folder"
+                    android:tint="#00F2FE" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Files"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:layout_marginStart="16dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/option_camera"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="12dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:clickable="true">
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@android:drawable/ic_menu_camera"
+                    android:tint="#00F2FE" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Camera"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:layout_marginStart="16dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/option_quick_prompts"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="12dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:clickable="true">
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_menu"
+                    android:tint="#00F2FE" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Quick Prompts"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:layout_marginStart="16dp" />
+            </LinearLayout>
+            
+            <Button
+                android:id="@+id/btn_add_options_close"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Cancel"
+                android:textColor="#8A8A8F"
+                style="?android:attr/buttonBarButtonStyle"
+                android:layout_marginTop="8dp" />
         </LinearLayout>
     </FrameLayout>
 
