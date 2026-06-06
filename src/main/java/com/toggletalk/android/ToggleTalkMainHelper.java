@@ -144,7 +144,7 @@ public class ToggleTalkMainHelper {
                 "-not", "-name", ".*"
         });
         runCommandIntent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home");
+        runCommandIntent.putExtra("com.termux.RUN_COMMAND_WORKDIR", getAbsoluteTargetDir());
         runCommandIntent.putExtra("com.termux.RUN_COMMAND_PENDING_INTENT", pendingIntent);
 
         try {
@@ -212,7 +212,7 @@ public class ToggleTalkMainHelper {
         runCommandIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{"-c", command});
         
         runCommandIntent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home");
+        runCommandIntent.putExtra("com.termux.RUN_COMMAND_WORKDIR", getAbsoluteTargetDir());
         runCommandIntent.putExtra("com.termux.RUN_COMMAND_PENDING_INTENT", pendingIntent);
 
         try {
