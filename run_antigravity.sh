@@ -7,6 +7,7 @@ CONTINUE_SESSION="${3:-false}"
 SESSION_ID="$4"
 
 # PID Process Tracking for active session termination
+PID_FILE=""
 if [ -n "$SESSION_ID" ]; then
     PID_FILE="$HOME/.gemini/antigravity-cli/brain/$SESSION_ID/.system_generated/logs/run.pid"
     mkdir -p "$(dirname "$PID_FILE")"
@@ -27,7 +28,7 @@ else
             done
             if [ -n "$NEW_DIR" ]; then
                 SESS_ID=$(basename "$NEW_DIR")
-                PID_FILE="$HOME/.gemini/antigravity-cli/brain/$SESS_ID/.system_generated/logs/run.pid"
+                export PID_FILE="$HOME/.gemini/antigravity-cli/brain/$SESS_ID/.system_generated/logs/run.pid"
                 mkdir -p "$(dirname "$PID_FILE")"
                 echo "$PPID" > "$PID_FILE"
                 break
@@ -37,7 +38,7 @@ else
     ) &
 fi
 
-trap 'kill "$STREAM_PID" 2>/dev/null; rm -f "$HOME/.gemini/antigravity-cli/brain/$SESSION_ID/.system_generated/logs/run.pid"' EXIT
+trap 'kill "$STREAM_PID" 2>/dev/null; [ -z "$SESSION_ID" ] && SESSION_ID=$(ls -td "$HOME/.gemini/antigravity-cli/brain"/*/ 2>/dev/null | head -n 1 | xargs basename); [ -n "$SESSION_ID" ] && rm -f "$HOME/.gemini/antigravity-cli/brain/$SESSION_ID/.system_generated/logs/run.pid"' EXIT
 
 LOG_FILE="$HOME/.toggle_talk_antigravity.log"
 ERR_FILE="$HOME/.toggle_talk_antigravity.err"
@@ -83,6 +84,7 @@ RESPONSE=$(env -u LD_PRELOAD -u LD_LIBRARY_PATH PWD="$TARGET_DIR" AGENT_ENV_TYPE
       /bin/sh -c 'cd "$1" 2>/dev/null || true; shift; exec "$@"' sh "$TARGET_DIR" "${AGY_ARGS[@]}" < /dev/null 2>>"$ERR_FILE")
 
 # Stop streaming updates
+sleep 0.5
 kill $STREAM_PID 2>/dev/null
 wait $STREAM_PID 2>/dev/null
 
