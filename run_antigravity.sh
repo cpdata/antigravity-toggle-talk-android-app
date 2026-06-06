@@ -57,7 +57,7 @@ TARGET_DIR="$(pwd)"
 PROMPT="${TRANSCRIPT}"
 
 # Start streaming updates in the background
-python3 "/data/data/com.termux/files/home/ToggleTalkAndroid/stream_session.py" "$SESSION_ID" "$TRANSCRIPT" &
+python3 "/data/data/com.termux/files/home/ToggleTalkAndroid/stream_session.py" "$SESSION_ID" "$TRANSCRIPT" >/dev/null 2>&1 &
 STREAM_PID=$!
 
 # Build agy argument list
