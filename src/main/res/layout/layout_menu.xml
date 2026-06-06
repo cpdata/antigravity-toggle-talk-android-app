@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#0B0518"
+    android:padding="16dp">
+
+    <!-- Portrait: Top half for stats, Bottom half for grid -->
+    <!-- Landscape: Left half for stats, Right half for grid -->
+    
+    <LinearLayout
+        android:id="@+id/layout_menu_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:weightSum="2">
+
+        <!-- Stats/Notifications Section -->
+        <LinearLayout
+            android:id="@+id/layout_stats_section"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:background="@drawable/card_glass"
+            android:padding="16dp"
+            android:layout_marginBottom="8dp">
+            
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Usage Stats"
+                android:textColor="#E6E6FA"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="12dp"/>
+                
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="System Status: Operational"
+                android:textColor="#4CD964"
+                android:textSize="13sp"/>
+                
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Notifications: 0 new"
+                android:textColor="#8A8A8F"
+                android:textSize="13sp"
+                android:layout_marginTop="8dp"/>
+        </LinearLayout>
+
+        <!-- Tile Grid Section -->
+        <GridLayout
+            android:id="@+id/layout_grid_section"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:columnCount="2"
+            android:rowCount="2"
+            android:alignmentMode="alignMargins"
+            android:columnOrderPreserved="false"
+            android:padding="4dp">
+
+            <LinearLayout
+                android:id="@+id/btn_menu_chat"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_columnWeight="1"
+                android:layout_margin="8dp"
+                android:background="@drawable/card_glass"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:clickable="true"
+                android:focusable="true">
+                <ImageView
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:src="@android:drawable/stat_notify_chat"
+                    android:tint="#00F2FE"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Chat"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:layout_marginTop="8dp"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/btn_menu_commands"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_columnWeight="1"
+                android:layout_margin="8dp"
+                android:background="@drawable/card_glass"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:clickable="true"
+                android:focusable="true">
+                <ImageView
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:src="@android:drawable/ic_menu_agenda"
+                    android:tint="#A78BFA"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Commands"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:layout_marginTop="8dp"/>
+            </LinearLayout>
+        </GridLayout>
+    </LinearLayout>
+</LinearLayout>

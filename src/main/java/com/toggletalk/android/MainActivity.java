@@ -133,6 +133,23 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
     private View mBtnSearchClose;
     private List<SearchResult> mCurrentSearchResults = new ArrayList<>();
 
+    private ToggleTalkMainHelper mHelper;
+    private android.widget.ViewFlipper mViewFlipper;
+    private View mSharedFooter;
+    private View mBtnFooterMenu;
+    private View mBottomDrawerRoot;
+    private View mBottomDrawerDim;
+    private View mBtnDrawerHome;
+    private View mBtnDrawerChat;
+    private View mBtnDrawerCommands;
+    
+    // Commands view
+    private android.widget.EditText mEtNewCommand;
+    private ImageButton mBtnAddCommand;
+    private ListView mLvCommands;
+    private List<String> mCommandsList;
+    private ArrayAdapter<String> mCommandsAdapter;
+
     private static class SearchResult {
         String text;
         View view;
@@ -902,13 +919,150 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
             });
         }
 
+        // Initialize multi-view architecture
+        mHelper = new ToggleTalkMainHelper(this);
+        mViewFlipper = findViewById(R.id.view_flipper);
+        mSharedFooter = findViewById(R.id.layout_shared_footer);
+        mBtnFooterMenu = findViewById(R.id.btn_footer_menu);
+        mBottomDrawerRoot = findViewById(R.id.bottom_drawer_root);
+        mBottomDrawerDim = findViewById(R.id.bottom_drawer_dim_background);
+        mBtnDrawerHome = findViewById(R.id.btn_drawer_home);
+        mBtnDrawerChat = findViewById(R.id.btn_drawer_chat);
+        mBtnDrawerCommands = findViewById(R.id.btn_drawer_commands);
+
+        if (mBtnFooterMenu != null) {
+            mBtnFooterMenu.setOnClickListener(v -> openBottomDrawer());
+        }
+        if (mBottomDrawerDim != null) {
+            mBottomDrawerDim.setOnClickListener(v -> closeBottomDrawer());
+        }
+        if (mBtnDrawerHome != null) {
+            mBtnDrawerHome.setOnClickListener(v -> {
+                showView(0);
+                closeBottomDrawer();
+            });
+        }
+        if (mBtnDrawerChat != null) {
+            mBtnDrawerChat.setOnClickListener(v -> {
+                showView(1);
+                closeBottomDrawer();
+            });
+        }
+        if (mBtnDrawerCommands != null) {
+            mBtnDrawerCommands.setOnClickListener(v -> {
+                showView(2);
+                closeBottomDrawer();
+            });
+        }
+
+        initMenuView();
+        initCommandsView();
+        
         // Initialize state visually
         onStateChanged("IDLE", "");
+        
+        // Default to Menu view
+        showView(0);
 
         // Load previously selected session history on startup
         if (mSelectedSessionId != null && !mSelectedSessionId.isEmpty()) {
             loadSessionHistory(mSelectedSessionId);
         }
+    }
+
+    private void showView(int index) {
+        if (mViewFlipper != null) {
+            mViewFlipper.setDisplayedChild(index);
+        }
+        if (mSharedFooter != null) {
+            mSharedFooter.setVisibility(index == 0 ? View.GONE : View.VISIBLE);
+        }
+    }
+
+    private void openBottomDrawer() {
+        if (mBottomDrawerRoot != null) {
+            mBottomDrawerRoot.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void closeBottomDrawer() {
+        if (mBottomDrawerRoot != null) {
+            mBottomDrawerRoot.setVisibility(View.GONE);
+        }
+    }
+
+    private void initMenuView() {
+        View btnChat = findViewById(R.id.btn_menu_chat);
+        View btnCmds = findViewById(R.id.btn_menu_commands);
+        if (btnChat != null) btnChat.setOnClickListener(v -> showView(1));
+        if (btnCmds != null) btnCmds.setOnClickListener(v -> showView(2));
+        updateMenuLayout();
+    }
+
+    private void updateMenuLayout() {
+        android.widget.LinearLayout container = findViewById(R.id.layout_menu_container);
+        if (container == null) return;
+        boolean isLandscape = getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+        container.setOrientation(isLandscape ? android.widget.LinearLayout.HORIZONTAL : android.widget.LinearLayout.VERTICAL);
+        
+        // Adjust child weights for landscape
+        View stats = findViewById(R.id.layout_stats_section);
+        View grid = findViewById(R.id.layout_grid_section);
+        if (stats != null && grid != null) {
+            android.widget.LinearLayout.LayoutParams statsLp = (android.widget.LinearLayout.LayoutParams) stats.getLayoutParams();
+            android.widget.LinearLayout.LayoutParams gridLp = (android.widget.LinearLayout.LayoutParams) grid.getLayoutParams();
+            if (isLandscape) {
+                statsLp.width = 0;
+                statsLp.height = android.view.ViewGroup.LayoutParams.MATCH_PARENT;
+                statsLp.setMargins(0, 0, 8, 0);
+                gridLp.width = 0;
+                gridLp.height = android.view.ViewGroup.LayoutParams.MATCH_PARENT;
+            } else {
+                statsLp.width = android.view.ViewGroup.LayoutParams.MATCH_PARENT;
+                statsLp.height = 0;
+                statsLp.setMargins(0, 0, 0, 8);
+                gridLp.width = android.view.ViewGroup.LayoutParams.MATCH_PARENT;
+                gridLp.height = 0;
+            }
+            stats.setLayoutParams(statsLp);
+            grid.setLayoutParams(gridLp);
+        }
+    }
+
+    private void initCommandsView() {
+        mEtNewCommand = findViewById(R.id.et_new_command);
+        mBtnAddCommand = findViewById(R.id.btn_add_command);
+        mLvCommands = findViewById(R.id.lv_commands);
+        if (mLvCommands != null) {
+            mCommandsList = mHelper.getSavedCommands();
+            mCommandsAdapter = new android.widget.ArrayAdapter<String>(this, R.layout.item_command, R.id.tv_command_text, mCommandsList);
+            mLvCommands.setAdapter(mCommandsAdapter);
+            
+            mLvCommands.setOnItemClickListener((parent, view, position, id) -> {
+                String cmd = mCommandsList.get(position);
+                mHelper.runTermuxCommand(cmd, false);
+                Toast.makeText(this, "Running: " + cmd, Toast.LENGTH_SHORT).show();
+            });
+        }
+        if (mBtnAddCommand != null && mEtNewCommand != null) {
+            mBtnAddCommand.setOnClickListener(v -> {
+                String cmd = mEtNewCommand.getText().toString().trim();
+                if (!cmd.isEmpty()) {
+                    mHelper.saveCommand(cmd);
+                    mCommandsList.clear();
+                    mCommandsList.addAll(mHelper.getSavedCommands());
+                    mCommandsAdapter.notifyDataSetChanged();
+                    mEtNewCommand.setText("");
+                    Toast.makeText(this, "Command saved", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+    }
+
+    @Override
+    public void onConfigurationChanged(android.content.res.Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        updateMenuLayout();
     }
 
     @Override
@@ -1472,43 +1626,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         }
 
         addSystemMessage("Loading session history...", "#80FFFFFF");
-
-        // The transcript files live in Termux's private data dir which this app
-        // cannot read directly (different UIDs). Delegate to Termux via RUN_COMMAND.
-        Intent callbackIntent = new Intent(ACTION_SESSION_HISTORY);
-        callbackIntent.putExtra("session_id", sessionId);
-        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            flags |= PendingIntent.FLAG_MUTABLE;
-        }
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 999, callbackIntent, flags);
-
-        Intent runCommandIntent = new Intent();
-        runCommandIntent.setClassName("com.termux", "com.termux.app.RunCommandService");
-        runCommandIntent.setAction("com.termux.RUN_COMMAND");
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_PATH",
-                "/data/data/com.termux/files/usr/bin/python");
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{
-                "/data/data/com.termux/files/home/ToggleTalkAndroid/load_session_history.py",
-                sessionId
-        });
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_WORKDIR",
-                "/data/data/com.termux/files/home");
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_PENDING_INTENT", pendingIntent);
-
-        Log.d(TAG, "Requesting session history for: " + sessionId);
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(runCommandIntent);
-            } else {
-                startService(runCommandIntent);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to launch session history command", e);
-            if (mChatContainer != null) mChatContainer.removeAllViews();
-            addSystemMessage("Failed to load session history.", "#FF6B6B");
-        }
+        mHelper.querySessionHistory(sessionId);
     }
 
     private void receiveSessionHistory(String sessionId, String stdout, String errmsg) {
@@ -3298,47 +3416,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
     private void queryTermuxSessions() {
         mPbRightDrawerLoading.setVisibility(View.VISIBLE);
         mTvEmptySessions.setVisibility(View.GONE);
-
-        // Create PendingIntent for command result callback
-        Intent callbackIntent = new Intent(ACTION_SESSIONS_LIST);
-        
-        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            flags |= PendingIntent.FLAG_MUTABLE;
-        }
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 888, callbackIntent, flags);
-
-        // Build the command Intent targeting Termux's RunCommandService
-        Intent runCommandIntent = new Intent();
-        runCommandIntent.setClassName("com.termux", "com.termux.app.RunCommandService");
-        runCommandIntent.setAction("com.termux.RUN_COMMAND");
-
-        // Executable path: python utility
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/python");
-
-        // Arguments: run the list_sessions.py script
-        String[] arguments = new String[]{
-                "/data/data/com.termux/files/home/ToggleTalkAndroid/list_sessions.py"
-        };
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arguments);
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home");
-        
-        // Set PendingIntent extra
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_PENDING_INTENT", pendingIntent);
-
-        Log.d(TAG, "Querying Termux sessions...");
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(runCommandIntent);
-            } else {
-                startService(runCommandIntent);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to launch sessions query command", e);
-            mPbRightDrawerLoading.setVisibility(View.GONE);
-            Toast.makeText(this, "Failed to query Termux environment", Toast.LENGTH_LONG).show();
-        }
+        mHelper.queryTermuxSessions();
     }
 
     private void parseAndPopulateSessions(String stdout) {
@@ -3418,50 +3496,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
     private void queryTermuxDirectories() {
         mPbDrawerLoading.setVisibility(View.VISIBLE);
         mTvEmptyDirs.setVisibility(View.GONE);
-
-        // Create PendingIntent for command result callback
-        Intent callbackIntent = new Intent(ACTION_DIRECTORIES_LIST);
-        
-        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            flags |= PendingIntent.FLAG_MUTABLE;
-        }
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 999, callbackIntent, flags);
-
-        // Build the command Intent targeting Termux's RunCommandService
-        Intent runCommandIntent = new Intent();
-        runCommandIntent.setClassName("com.termux", "com.termux.app.RunCommandService");
-        runCommandIntent.setAction("com.termux.RUN_COMMAND");
-
-        // Executable path: find utility
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/find");
-
-        // Arguments: list directories in home
-        String[] arguments = new String[]{
-                "/data/data/com.termux/files/home",
-                "-maxdepth", "1",
-                "-type", "d",
-                "-not", "-name", ".*"
-        };
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arguments);
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home");
-        
-        // Set PendingIntent extra
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_PENDING_INTENT", pendingIntent);
-
-        Log.d(TAG, "Querying Termux directories...");
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(runCommandIntent);
-            } else {
-                startService(runCommandIntent);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to launch directory query command", e);
-            mPbDrawerLoading.setVisibility(View.GONE);
-            Toast.makeText(this, "Failed to query Termux environment", Toast.LENGTH_LONG).show();
-        }
+        mHelper.queryTermuxDirectories();
     }
 
     private void parseAndPopulateDirectories(String stdout) {

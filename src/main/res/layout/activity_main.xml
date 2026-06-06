@@ -1,547 +1,54 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/content_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Main Content Relative Layout -->
-    <RelativeLayout
-        android:id="@+id/main_content_layout"
+    <!-- View Flipper for switching between views -->
+    <ViewFlipper
+        android:id="@+id/view_flipper"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@drawable/bg_gradient"
-        android:padding="10dp">
+        android:layout_above="@+id/layout_shared_footer">
+        
+        <!-- Index 0: Menu View -->
+        <include layout="@layout/layout_menu" />
+        
+        <!-- Index 1: Chat View -->
+        <include layout="@layout/layout_chat" />
+        
+        <!-- Index 2: Commands View -->
+        <include layout="@layout/layout_commands" />
+    </ViewFlipper>
 
-        <!-- Top header with Hamburger, App name and Status -->
-        <RelativeLayout
-            android:id="@+id/header_layout"
-            android:layout_width="match_parent"
+    <!-- Shared Footer -->
+    <LinearLayout
+        android:id="@+id/layout_shared_footer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:padding="8dp"
+        android:background="#0B0518"
+        android:visibility="gone">
+
+        <Button
+            android:id="@+id/btn_footer_menu"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp">
-
-            <!-- Hamburger Menu Button -->
-            <ImageButton
-                android:id="@+id/btn_menu"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_alignParentStart="true"
-                android:layout_centerVertical="true"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
-                android:src="@drawable/ic_menu"
-                android:scaleType="centerInside"
-                android:contentDescription="Open directory menu" />
-
-            <!-- Title and Status centered -->
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:layout_centerInParent="true">
-
-                <TextView
-                    android:id="@+id/tv_active_dir_top"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Active: Home"
-                    android:textColor="#00F2FE"
-                    android:textSize="15sp"
-                    android:textStyle="bold"
-                    android:letterSpacing="0.05" />
-
-                <TextView
-                    android:id="@+id/tv_active_session_top"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text=""
-                    android:textColor="#80E6E6FA"
-                    android:textSize="10sp"
-                    android:singleLine="true"
-                    android:ellipsize="end"
-                    android:maxWidth="160dp" />
-
-                <TextView
-                    android:id="@+id/tv_status"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="IDLE"
-                    android:textColor="#8A8A8F"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:layout_marginTop="2dp"
-                    android:letterSpacing="0.1" />
-            </LinearLayout>
-
-            <!-- Right Drawer Menu Button -->
-            <ImageButton
-                android:id="@+id/btn_right_menu"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_alignParentEnd="true"
-                android:layout_centerVertical="true"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
-                android:src="@android:drawable/ic_menu_recent_history"
-                android:scaleType="centerInside"
-                android:tint="#E6E6FA"
-                android:contentDescription="Open sessions menu" />
-        </RelativeLayout>
-
-        <!-- Glassmorphic Text Transcript Log Card -->
-        <LinearLayout
-            android:id="@+id/card_container"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_below="@+id/header_layout"
-            android:layout_above="@+id/settings_layout"
-            android:layout_marginTop="6dp"
-            android:layout_marginBottom="6dp"
-            android:orientation="vertical"
+            android:text="Menu"
+            android:textColor="#FFFFFF"
             android:background="@drawable/card_glass"
-            android:padding="8dp">
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp"
+            android:layout_marginBottom="4dp" />
+    </LinearLayout>
 
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1">
+    <!-- Navigation Drawer (Shared) -->
+    <include layout="@layout/layout_bottom_navigation_drawer" />
 
-                <ScrollView
-                    android:id="@+id/scroll_log"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:fillViewport="true">
-
-                    <LinearLayout
-                        android:id="@+id/layout_chat_container"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="2dp" />
-                </ScrollView>
-
-                <!-- Scroll to Bottom Button -->
-                <ImageButton
-                    android:id="@+id/btn_scroll_bottom"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:layout_gravity="bottom|end"
-                    android:layout_margin="12dp"
-                    android:background="@drawable/card_glass"
-                    android:src="@android:drawable/ic_menu_revert"
-                    android:rotation="270"
-                    android:tint="#00F2FE"
-                    android:visibility="gone"
-                    android:padding="8dp"
-                    android:scaleType="fitCenter"
-                    android:elevation="4dp"
-                    android:contentDescription="Scroll to bottom" />
-            </FrameLayout>
-
-            <!-- Thinking spinner & Terminate button container (DIRECT CHILD) -->
-            <LinearLayout
-                android:id="@+id/layout_thinking_container"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_gravity="center_horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginTop="4dp"
-                android:layout_marginBottom="4dp"
-                android:background="@drawable/card_glass"
-                android:padding="6dp"
-                android:elevation="10dp"
-                android:visibility="gone"
-                android:clickable="true"
-                android:focusable="true">
-
-                <ProgressBar
-                    android:id="@+id/pb_thinking"
-                    android:layout_width="wrap_content"
-                    android:layout_height="20dp"
-                    android:indeterminate="true"
-                    android:indeterminateTintMode="src_atop"
-                    android:indeterminateTint="#00F2FE" />
-
-                <!-- Red X Terminate Button -->
-                <ImageButton
-                    android:id="@+id/btn_terminate"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:layout_marginStart="8dp"
-                    android:background="@drawable/card_glass"
-                    android:src="@android:drawable/ic_menu_close_clear_cancel"
-                    android:tint="#FF3B30"
-                    android:padding="6dp"
-                    android:scaleType="fitCenter"
-                    android:contentDescription="Terminate session execution"
-                    android:clickable="true"
-                    android:focusable="true" />
-            </LinearLayout>
-
-            <!-- Prompt Queue Container Layout (DIRECT CHILD) -->
-            <LinearLayout
-                android:id="@+id/layout_queue_container"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="4dp"
-                android:layout_marginTop="2dp"
-                android:layout_marginBottom="2dp"
-                android:visibility="gone"
-                android:background="@drawable/card_glass"
-                android:elevation="4dp">
-
-                <!-- Collapsed Layout -->
-                <LinearLayout
-                    android:id="@+id/layout_queue_collapsed"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-                    <TextView
-                        android:id="@+id/tv_queue_badge"
-                        android:layout_width="16dp"
-                        android:layout_height="16dp"
-                        android:gravity="center"
-                        android:textColor="#FFFFFF"
-                        android:textSize="9sp"
-                        android:textStyle="bold"
-                        android:background="@drawable/bg_badge" />
-                    <TextView
-                        android:id="@+id/tv_queue_collapsed_text"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:layout_marginStart="6dp"
-                        android:textColor="#E6E6FA"
-                        android:textSize="10sp"
-                        android:ellipsize="end"
-                        android:singleLine="true" />
-                </LinearLayout>
-
-                <!-- Expanded Scrollable Layout -->
-                <ScrollView
-                    android:id="@+id/scroll_queue_expanded"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:visibility="gone">
-                    <LinearLayout
-                        android:id="@+id/layout_queue_expanded_list"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical" />
-                </ScrollView>
-            </LinearLayout>
-        </LinearLayout>
-
-        <!-- Bottom Settings (Continue session & Setup info) -->
-        <LinearLayout
-            android:id="@+id/settings_layout"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_alignParentBottom="true"
-            android:orientation="vertical"
-            android:gravity="center_horizontal"
-            android:layout_marginBottom="4dp">
-
-            <!-- Top Controls Row: New Chat + Search + Mock Mode -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginStart="2dp"
-                android:layout_marginEnd="2dp"
-                android:layout_marginBottom="4dp">
-
-                <!-- New Chat Button -->
-                <TextView
-                    android:id="@+id/btn_new_chat"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="✦ New"
-                    android:textColor="#00F2FE"
-                    android:textSize="11sp"
-                    android:textStyle="bold"
-                    android:background="@drawable/card_glass"
-                    android:padding="6dp"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp"
-                    android:layout_marginEnd="4dp"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:contentDescription="Start a new chat session" />
-
-                <!-- Search Button -->
-                <ImageButton
-                    android:id="@+id/btn_search"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:background="@drawable/card_glass"
-                    android:src="@android:drawable/ic_menu_search"
-                    android:tint="#00F2FE"
-                    android:padding="6dp"
-                    android:scaleType="fitCenter"
-                    android:layout_marginEnd="4dp"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:contentDescription="Search conversation" />
-
-                <!-- Artifacts Button (Icon Only) -->
-                <ImageButton
-                    android:id="@+id/btn_artifacts"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:background="@drawable/card_glass"
-                    android:src="@drawable/ic_folder"
-                    android:tint="#00F2FE"
-                    android:padding="6dp"
-                    android:scaleType="fitCenter"
-                    android:layout_marginEnd="4dp"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:contentDescription="Show agent artifacts" />
-
-                <!-- Expand All Button -->
-                <TextView
-                    android:id="@+id/btn_expand_all"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="▶ Expand"
-                    android:textColor="#00F2FE"
-                    android:textSize="11sp"
-                    android:textStyle="bold"
-                    android:background="@drawable/card_glass"
-                    android:padding="6dp"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp"
-                    android:layout_marginEnd="4dp"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:contentDescription="Expand all thoughts and tool calls" />
-
-                <!-- Settings Button -->
-                <TextView
-                    android:id="@+id/btn_settings"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:text="⚙"
-                    android:textColor="#00F2FE"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    android:background="@drawable/card_glass"
-                    android:gravity="center"
-                    android:padding="0dp"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:contentDescription="Open settings" />
-            </LinearLayout>
-
-            <!-- Input Bar Layout -->
-            <LinearLayout
-                android:id="@+id/input_bar_layout"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="bottom"
-                android:layout_marginBottom="6dp">
-
-                <!-- Sleek glassmorphic text input box container -->
-                <RelativeLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:background="@drawable/card_glass"
-                    android:padding="2dp"
-                    android:layout_marginEnd="5dp">
-
-                    <!-- '+' Add Options Button -->
-                    <ImageButton
-                        android:id="@+id/btn_add_options"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:layout_alignParentStart="true"
-                        android:layout_centerVertical="true"
-                        android:background="?android:attr/selectableItemBackgroundBorderless"
-                        android:src="@android:drawable/ic_input_add"
-                        android:tint="#00F2FE"
-                        android:padding="8dp"
-                        android:scaleType="fitCenter"
-                        android:contentDescription="Add files, camera or quick prompts"
-                        android:clickable="true"
-                        android:focusable="true" />
-
-                    <!-- Mic Action Button Container -->
-                    <FrameLayout
-                        android:id="@+id/mic_inside_container"
-                        android:layout_width="44dp"
-                        android:layout_height="44dp"
-                        android:layout_alignParentEnd="true"
-                        android:layout_centerVertical="true">
-
-                        <!-- Concentric Ring 3 (Outer Ring for Pulsing) -->
-                        <View
-                            android:id="@+id/ring_outer"
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:layout_gravity="center"
-                            android:background="@drawable/bg_mic_btn"
-                            android:alpha="0" />
-
-                        <!-- Concentric Ring 2 (Middle Ring for Pulsing) -->
-                        <View
-                            android:id="@+id/ring_middle"
-                            android:layout_width="34dp"
-                            android:layout_height="34dp"
-                            android:layout_gravity="center"
-                            android:background="@drawable/bg_mic_btn"
-                            android:alpha="0" />
-
-                        <!-- Concentric Ring 1 (Inner Ring/Halo) -->
-                        <View
-                            android:id="@+id/ring_inner"
-                            android:layout_width="28dp"
-                            android:layout_height="28dp"
-                            android:layout_gravity="center"
-                            android:background="@drawable/bg_mic_btn"
-                            android:alpha="0" />
-
-                        <!-- Main Mic Action Button -->
-                        <ImageButton
-                            android:id="@+id/btn_mic"
-                            android:layout_width="28dp"
-                            android:layout_height="28dp"
-                            android:layout_gravity="center"
-                            android:background="@drawable/bg_mic_btn"
-                            android:src="@drawable/ic_mic"
-                            android:padding="5dp"
-                            android:scaleType="fitCenter"
-                            android:tint="#120E2E"
-                            android:contentDescription="Toggle voice record" />
-                    </FrameLayout>
-
-                    <EditText
-                        android:id="@+id/et_message"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_toEndOf="@id/btn_add_options"
-                        android:layout_toStartOf="@id/mic_inside_container"
-                        android:layout_centerVertical="true"
-                        android:minHeight="40dp"
-                        android:hint="Type or speak..."
-                        android:textColor="#FFFFFF"
-                        android:textColorHint="#80FFFFFF"
-                        android:background="@null"
-                        android:padding="8dp"
-                        android:textSize="13sp"
-                        android:maxLines="4"
-                        android:scrollbars="vertical"
-                        android:textCursorDrawable="@drawable/cursor_color" />
-                </RelativeLayout>
-
-                <!-- Send Button -->
-                <ImageButton
-                    android:id="@+id/btn_send"
-                    android:layout_width="42dp"
-                    android:layout_height="42dp"
-                    android:background="@drawable/card_glass"
-                    android:src="@android:drawable/ic_menu_send"
-                    android:tint="#00F2FE"
-                    android:padding="8dp"
-                    android:scaleType="fitCenter"
-                    android:contentDescription="Send text message"
-                    android:elevation="6dp" />
-
-                <!-- X Button for flushing (outside, or could be moved) -->
-                <ImageButton
-                    android:id="@+id/btn_flush"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:background="@null"
-                    android:src="@android:drawable/ic_menu_close_clear_cancel"
-                    android:tint="#FF3B30"
-                    android:scaleType="fitCenter"
-                    android:padding="2dp"
-                    android:visibility="gone"
-                    android:layout_marginStart="4dp"
-                    android:layout_gravity="center_vertical"
-                    android:contentDescription="Stop and flush audio queue" />
-
-                <!-- Unresolved Queue State Actions -->
-                <LinearLayout
-                    android:id="@+id/layout_unresolved_actions"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:visibility="gone"
-                    android:layout_marginStart="5dp">
-                    
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Prompt Queue?"
-                        android:textColor="#FF3B30"
-                        android:textSize="9sp"
-                        android:textStyle="bold"
-                        android:layout_marginBottom="2dp" />
-                        
-                    <Button
-                        android:id="@+id/btn_queue_resume"
-                        android:layout_width="75dp"
-                        android:layout_height="28dp"
-                        android:text="Resume"
-                        android:textSize="10sp"
-                        android:padding="0dp"
-                        android:background="@drawable/card_glass"
-                        android:textColor="#4CD964" />
-                        
-                    <Button
-                        android:id="@+id/btn_queue_delete"
-                        android:layout_width="75dp"
-                        android:layout_height="28dp"
-                        android:text="Delete"
-                        android:textSize="10sp"
-                        android:padding="0dp"
-                        android:background="@drawable/card_glass"
-                        android:textColor="#FF3B30"
-                        android:layout_marginTop="2dp" />
-                        
-                    <Button
-                        android:id="@+id/btn_queue_combine"
-                        android:layout_width="75dp"
-                        android:layout_height="28dp"
-                        android:text="Combine"
-                        android:textSize="10sp"
-                        android:padding="0dp"
-                        android:background="@drawable/card_glass"
-                        android:textColor="#00F2FE"
-                        android:layout_marginTop="2dp" />
-                        
-                    <Button
-                        android:id="@+id/btn_queue_add"
-                        android:layout_width="75dp"
-                        android:layout_height="28dp"
-                        android:text="Add"
-                        android:textSize="10sp"
-                        android:padding="0dp"
-                        android:background="@drawable/card_glass"
-                        android:textColor="#E6E6FA"
-                        android:layout_marginTop="2dp" />
-                </LinearLayout>
-
-            </LinearLayout>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Powered by Antigravity in Termux"
-                android:textColor="#40FFFFFF"
-                android:textSize="9sp"
-                android:layout_gravity="center_horizontal"
-                android:letterSpacing="0.05" />
-        </LinearLayout>
-    </RelativeLayout>
-
-    <!-- Slide-out Drawer Overlay Container -->
+    <!-- Slide-out Left Drawer Overlay Container (Shared) -->
     <FrameLayout
         android:id="@+id/drawer_root"
         android:layout_width="match_parent"
@@ -549,16 +56,12 @@
         android:visibility="gone"
         android:clickable="true"
         android:focusable="true">
-
-        <!-- Translucent dim background panel -->
         <View
             android:id="@+id/drawer_dim_background"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="#A6000000"
             android:alpha="0" />
-
-        <!-- Drawer Content Card (Glassmorphic) -->
         <LinearLayout
             android:id="@+id/drawer_content"
             android:layout_width="260dp"
@@ -570,14 +73,11 @@
             android:clickable="true"
             android:focusable="true"
             android:elevation="16dp">
-
-            <!-- Title Header -->
             <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:layout_marginBottom="10dp">
-
                 <TextView
                     android:id="@+id/tv_drawer_title"
                     android:layout_width="wrap_content"
@@ -587,8 +87,6 @@
                     android:textSize="13sp"
                     android:textStyle="bold"
                     android:letterSpacing="0.05" />
-
-                <!-- Refresh Button -->
                 <ImageButton
                     android:id="@+id/btn_refresh_dirs"
                     android:layout_width="32dp"
@@ -600,7 +98,6 @@
                     android:tint="#E6E6FA"
                     android:contentDescription="Refresh directories list" />
             </RelativeLayout>
-
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -609,22 +106,16 @@
                 android:textSize="11sp"
                 android:layout_marginBottom="12dp"
                 android:lineSpacingMultiplier="1.2" />
-
-            <!-- Loading Spinner container -->
             <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_weight="1">
-
-                <!-- List View of Directories -->
                 <ListView
                     android:id="@+id/lv_directories"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:divider="@null"
                     android:dividerHeight="0dp" />
-
-                <!-- Progress Bar during query -->
                 <ProgressBar
                     android:id="@+id/pb_drawer_loading"
                     android:layout_width="48dp"
@@ -632,8 +123,6 @@
                     android:layout_gravity="center"
                     android:visibility="gone"
                     android:indeterminateTint="#00F2FE" />
-
-                <!-- Empty state message -->
                 <TextView
                     android:id="@+id/tv_empty_dirs"
                     android:layout_width="wrap_content"
@@ -644,8 +133,6 @@
                     android:textSize="12sp"
                     android:visibility="gone" />
             </FrameLayout>
-
-            <!-- Bottom Selected Status -->
             <TextView
                 android:id="@+id/tv_active_dir"
                 android:layout_width="match_parent"
@@ -661,7 +148,7 @@
         </LinearLayout>
     </FrameLayout>
 
-    <!-- Slide-out Right Drawer Overlay Container -->
+    <!-- Slide-out Right Drawer Overlay Container (Shared) -->
     <FrameLayout
         android:id="@+id/right_drawer_root"
         android:layout_width="match_parent"
@@ -669,16 +156,12 @@
         android:visibility="gone"
         android:clickable="true"
         android:focusable="true">
-
-        <!-- Translucent dim background panel -->
         <View
             android:id="@+id/right_drawer_dim_background"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="#A6000000"
             android:alpha="0" />
-
-        <!-- Drawer Content Card (Glassmorphic) -->
         <LinearLayout
             android:id="@+id/right_drawer_content"
             android:layout_width="260dp"
@@ -690,14 +173,11 @@
             android:clickable="true"
             android:focusable="true"
             android:elevation="16dp">
-
-            <!-- Title Header -->
             <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:layout_marginBottom="10dp">
-
                 <TextView
                     android:id="@+id/tv_right_drawer_title"
                     android:layout_width="wrap_content"
@@ -707,8 +187,6 @@
                     android:textSize="13sp"
                     android:textStyle="bold"
                     android:letterSpacing="0.05" />
-
-                <!-- Refresh Button -->
                 <ImageButton
                     android:id="@+id/btn_refresh_sessions"
                     android:layout_width="32dp"
@@ -720,8 +198,6 @@
                     android:tint="#E6E6FA"
                     android:contentDescription="Refresh sessions list" />
             </RelativeLayout>
-
-            <!-- New Chat Button (same height as a session item) -->
             <TextView
                 android:id="@+id/btn_new_chat_drawer"
                 android:layout_width="match_parent"
@@ -739,30 +215,22 @@
                 android:clickable="true"
                 android:focusable="true"
                 android:contentDescription="Start a new chat session" />
-
-            <!-- Divider -->
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
                 android:background="#20FFFFFF"
                 android:layout_marginTop="6dp"
                 android:layout_marginBottom="2dp" />
-
-            <!-- Loading Spinner container -->
             <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_weight="1">
-
-                <!-- List View of Sessions -->
                 <ListView
                     android:id="@+id/lv_sessions"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:divider="@null"
                     android:dividerHeight="0dp" />
-
-                <!-- Progress Bar during query -->
                 <ProgressBar
                     android:id="@+id/pb_right_drawer_loading"
                     android:layout_width="48dp"
@@ -770,8 +238,6 @@
                     android:layout_gravity="center"
                     android:visibility="gone"
                     android:indeterminateTint="#00F2FE" />
-
-                <!-- Empty state message -->
                 <TextView
                     android:id="@+id/tv_empty_sessions"
                     android:layout_width="wrap_content"
@@ -782,8 +248,6 @@
                     android:textSize="12sp"
                     android:visibility="gone" />
             </FrameLayout>
-
-            <!-- Bottom Selected Status -->
             <TextView
                 android:id="@+id/tv_active_session"
                 android:layout_width="match_parent"
@@ -799,7 +263,7 @@
         </LinearLayout>
     </FrameLayout>
 
-    <!-- Settings Popup Overlay Container -->
+    <!-- Settings Popup Overlay Container (Shared) -->
     <FrameLayout
         android:id="@+id/settings_popup_root"
         android:layout_width="match_parent"
@@ -807,15 +271,11 @@
         android:visibility="gone"
         android:clickable="true"
         android:focusable="true">
-
-        <!-- Translucent dim background panel -->
         <View
             android:id="@+id/settings_popup_dim_background"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="#A6000000" />
-
-        <!-- Settings Card Container (Glassmorphic) centered -->
         <LinearLayout
             android:layout_width="280dp"
             android:layout_height="wrap_content"
@@ -826,13 +286,10 @@
             android:clickable="true"
             android:focusable="true"
             android:elevation="24dp">
-
-            <!-- Title Header -->
             <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp">
-
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -841,8 +298,6 @@
                     android:textSize="14sp"
                     android:textStyle="bold"
                     android:letterSpacing="0.05" />
-
-                <!-- Close Button -->
                 <ImageButton
                     android:id="@+id/btn_settings_close"
                     android:layout_width="28dp"
@@ -854,19 +309,14 @@
                     android:tint="#E6E6FA"
                     android:contentDescription="Close settings" />
             </RelativeLayout>
-
-            <!-- Scrollable Settings Content -->
             <ScrollView
                 android:layout_width="match_parent"
                 android:layout_height="220dp"
                 android:fillViewport="true">
-
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
-
-                    <!-- Mock Mode Checkbox -->
                     <CheckBox
                         android:id="@+id/cb_mock_mode"
                         android:layout_width="match_parent"
@@ -878,8 +328,6 @@
                         android:paddingStart="8dp"
                         android:layout_marginBottom="12dp"
                         android:checked="false" />
-
-                    <!-- WakeLock Checkbox -->
                     <CheckBox
                         android:id="@+id/cb_wake_lock"
                         android:layout_width="match_parent"
@@ -891,8 +339,6 @@
                         android:paddingStart="8dp"
                         android:layout_marginBottom="12dp"
                         android:checked="false" />
-
-                    <!-- Collapse Tool Messages Checkbox -->
                     <CheckBox
                         android:id="@+id/cb_collapse_tools"
                         android:layout_width="match_parent"
@@ -904,8 +350,6 @@
                         android:paddingStart="8dp"
                         android:layout_marginBottom="12dp"
                         android:checked="false" />
-
-                    <!-- Collapse Thoughts Checkbox -->
                     <CheckBox
                         android:id="@+id/cb_collapse_thoughts"
                         android:layout_width="match_parent"
@@ -917,8 +361,6 @@
                         android:paddingStart="8dp"
                         android:layout_marginBottom="12dp"
                         android:checked="false" />
-
-                    <!-- Clear Session History Cache Button -->
                     <TextView
                         android:id="@+id/btn_clear_session_cache"
                         android:layout_width="match_parent"
@@ -935,8 +377,6 @@
                         android:clickable="true"
                         android:focusable="true"
                         android:contentDescription="Clear session history cache" />
-
-                    <!-- Kill All Sessions Button -->
                     <TextView
                         android:id="@+id/btn_kill_all"
                         android:layout_width="match_parent"
@@ -958,7 +398,7 @@
         </LinearLayout>
     </FrameLayout>
 
-    <!-- Artifacts Popup Overlay Container -->
+    <!-- Artifacts Popup (Shared) -->
     <FrameLayout
         android:id="@+id/artifacts_popup_root"
         android:layout_width="match_parent"
@@ -966,15 +406,11 @@
         android:visibility="gone"
         android:clickable="true"
         android:focusable="true">
-
-        <!-- Translucent dim background panel -->
         <View
             android:id="@+id/artifacts_popup_dim_background"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="#A6000000" />
-
-        <!-- Artifacts Card Container (Glassmorphic) centered -->
         <LinearLayout
             android:layout_width="300dp"
             android:layout_height="400dp"
@@ -985,13 +421,10 @@
             android:clickable="true"
             android:focusable="true"
             android:elevation="24dp">
-
-            <!-- Title Header -->
             <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp">
-
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -1000,8 +433,6 @@
                     android:textSize="14sp"
                     android:textStyle="bold"
                     android:letterSpacing="0.05" />
-
-                <!-- Close Button -->
                 <ImageButton
                     android:id="@+id/btn_artifacts_close"
                     android:layout_width="28dp"
@@ -1013,14 +444,11 @@
                     android:tint="#E6E6FA"
                     android:contentDescription="Close artifacts" />
             </RelativeLayout>
-
-            <!-- Scrollable Artifacts List -->
             <ScrollView
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_weight="1"
                 android:fillViewport="true">
-
                 <LinearLayout
                     android:id="@+id/layout_artifacts_list"
                     android:layout_width="match_parent"
@@ -1030,7 +458,7 @@
         </LinearLayout>
     </FrameLayout>
 
-    <!-- Prompt Edit Popup Overlay Container -->
+    <!-- Prompt Edit Popup (Shared) -->
     <FrameLayout
         android:id="@+id/prompt_edit_popup_root"
         android:layout_width="match_parent"
@@ -1038,15 +466,11 @@
         android:visibility="gone"
         android:clickable="true"
         android:focusable="true">
-        
-        <!-- Dim clickable background -->
         <View
             android:id="@+id/prompt_edit_popup_dim_background"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="#66000000" />
-            
-        <!-- Popup panel at the bottom -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -1056,7 +480,6 @@
             android:padding="8dp"
             android:layout_margin="8dp"
             android:elevation="16dp">
-            
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -1065,7 +488,6 @@
                 android:textSize="12sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="4dp" />
-                
             <EditText
                 android:id="@+id/et_edit_prompt"
                 android:layout_width="match_parent"
@@ -1078,7 +500,6 @@
                 android:textSize="13sp"
                 android:background="@drawable/card_glass"
                 android:padding="8dp" />
-                
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -1093,7 +514,7 @@
         </LinearLayout>
     </FrameLayout>
 
-    <!-- Search Popup Overlay Container -->
+    <!-- Search Popup (Shared) -->
     <FrameLayout
         android:id="@+id/search_popup_root"
         android:layout_width="match_parent"
@@ -1101,15 +522,11 @@
         android:visibility="gone"
         android:clickable="true"
         android:focusable="true">
-        
-        <!-- Dim clickable background -->
         <View
             android:id="@+id/search_popup_dim_background"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="#66000000" />
-            
-        <!-- Popup panel at the bottom -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -1119,7 +536,6 @@
             android:padding="8dp"
             android:layout_margin="8dp"
             android:elevation="16dp">
-            
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -1143,7 +559,6 @@
                     android:tint="#E6E6FA"
                     android:scaleType="fitCenter" />
             </LinearLayout>
-                
             <EditText
                 android:id="@+id/et_search_popup"
                 android:layout_width="match_parent"
@@ -1157,8 +572,6 @@
                 android:textSize="12sp"
                 android:singleLine="true"
                 android:imeOptions="actionSearch" />
-                
-            <!-- Search Results List -->
             <ListView
                 android:id="@+id/lv_search_results"
                 android:layout_width="match_parent"
@@ -1170,7 +583,7 @@
         </LinearLayout>
     </FrameLayout>
 
-    <!-- Add Options Drawer Overlay Container -->
+    <!-- Add Options Drawer (Shared) -->
     <FrameLayout
         android:id="@+id/add_options_drawer_root"
         android:layout_width="match_parent"
@@ -1178,15 +591,11 @@
         android:visibility="gone"
         android:clickable="true"
         android:focusable="true">
-        
-        <!-- Dim clickable background -->
         <View
             android:id="@+id/add_options_dim_background"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="#66000000" />
-            
-        <!-- Drawer content card at the bottom -->
         <LinearLayout
             android:id="@+id/add_options_drawer_content"
             android:layout_width="match_parent"
@@ -1197,7 +606,6 @@
             android:padding="16dp"
             android:layout_margin="8dp"
             android:elevation="16dp">
-            
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -1206,7 +614,6 @@
                 android:textSize="14sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="16dp" />
-                
             <LinearLayout
                 android:id="@+id/option_files"
                 android:layout_width="match_parent"
@@ -1229,7 +636,6 @@
                     android:textSize="16sp"
                     android:layout_marginStart="16dp" />
             </LinearLayout>
-
             <LinearLayout
                 android:id="@+id/option_camera"
                 android:layout_width="match_parent"
@@ -1252,7 +658,6 @@
                     android:textSize="16sp"
                     android:layout_marginStart="16dp" />
             </LinearLayout>
-
             <LinearLayout
                 android:id="@+id/option_quick_prompts"
                 android:layout_width="match_parent"
@@ -1275,7 +680,6 @@
                     android:textSize="16sp"
                     android:layout_marginStart="16dp" />
             </LinearLayout>
-            
             <Button
                 android:id="@+id/btn_add_options_close"
                 android:layout_width="match_parent"
@@ -1287,7 +691,7 @@
         </LinearLayout>
     </FrameLayout>
 
-    <!-- Quick Prompts Popup Overlay Container -->
+    <!-- Quick Prompts Popup (Shared) -->
     <FrameLayout
         android:id="@+id/quick_prompts_popup_root"
         android:layout_width="match_parent"
@@ -1295,15 +699,11 @@
         android:visibility="gone"
         android:clickable="true"
         android:focusable="true">
-        
-        <!-- Dim clickable background -->
         <View
             android:id="@+id/quick_prompts_popup_dim_background"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="#66000000" />
-            
-        <!-- Popup panel at the bottom -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -1313,7 +713,6 @@
             android:padding="8dp"
             android:layout_margin="8dp"
             android:elevation="16dp">
-            
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -1322,14 +721,12 @@
                 android:textSize="12sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="4dp" />
-                
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
                 android:layout_marginBottom="8dp">
-                
                 <EditText
                     android:id="@+id/et_new_quick_prompt"
                     android:layout_width="0dp"
@@ -1342,7 +739,6 @@
                     android:background="@drawable/card_glass"
                     android:padding="8dp"
                     android:textSize="13sp" />
-                    
                 <Button
                     android:id="@+id/btn_add_quick_prompt"
                     android:layout_width="wrap_content"
@@ -1351,15 +747,12 @@
                     android:textColor="#00F2FE"
                     style="?android:attr/buttonBarButtonStyle" />
             </LinearLayout>
-                
-            <!-- Quick Prompts List -->
             <ListView
                 android:id="@+id/lv_quick_prompts"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:divider="#20FFFFFF"
                 android:dividerHeight="1dp" />
-                
             <Button
                 android:id="@+id/btn_quick_prompts_close"
                 android:layout_width="match_parent"
@@ -1370,4 +763,4 @@
                 android:layout_marginTop="4dp" />
         </LinearLayout>
     </FrameLayout>
-</FrameLayout>
+</RelativeLayout>

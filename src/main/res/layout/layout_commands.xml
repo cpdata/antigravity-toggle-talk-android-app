@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0B0518"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/tv_commands_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Commands"
+        android:textColor="#E6E6FA"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="16dp"
+        android:layout_alignParentTop="true"/>
+
+    <!-- Add Command field at the bottom -->
+    <LinearLayout
+        android:id="@+id/layout_add_command"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_alignParentBottom="true"
+        android:paddingTop="8dp">
+        
+        <EditText
+            android:id="@+id/et_new_command"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="Enter new command..."
+            android:textColor="#FFFFFF"
+            android:textColorHint="#80FFFFFF"
+            android:background="@drawable/card_glass"
+            android:padding="12dp"
+            android:textSize="13sp"
+            android:singleLine="true"/>
+            
+        <ImageButton
+            android:id="@+id/btn_add_command"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="8dp"
+            android:src="@android:drawable/ic_input_add"
+            android:background="@drawable/card_glass"
+            android:tint="#00F2FE"
+            android:contentDescription="Add Command"/>
+    </LinearLayout>
+
+    <ListView
+        android:id="@+id/lv_commands"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/tv_commands_title"
+        android:layout_above="@id/layout_add_command"
+        android:divider="#1AFFFFFF"
+        android:dividerHeight="1dp"
+        android:stackFromBottom="true"
+        android:transcriptMode="alwaysScroll"/>
+</RelativeLayout>
