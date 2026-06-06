@@ -10,7 +10,22 @@ def parse_transcript_steps(raw_steps):
 
 def parse_gemini_cli_format(raw_steps):
     messages = []
+    steps_dict = {}
+    ordered_ids = []
+    
     for obj in raw_steps:
+        if "id" in obj:
+            step_id = obj["id"]
+            if step_id not in steps_dict:
+                ordered_ids.append(step_id)
+            steps_dict[step_id] = obj
+        elif "$set" in obj:
+            # $set updates are not directly useful without knowing which ID they apply to
+            # Gemini CLI usually repeats the whole object with updated content anyway
+            pass
+
+    for step_id in ordered_ids:
+        obj = steps_dict[step_id]
         msg_type = obj.get("type")
         content = obj.get("content")
         

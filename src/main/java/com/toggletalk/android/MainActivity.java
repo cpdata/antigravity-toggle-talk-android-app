@@ -1474,6 +1474,9 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         
         // Close drawer smoothly
         mDrawerContent.postDelayed(this::closeDrawer, 150);
+        
+        // Re-query sessions for the new directory
+        queryTermuxSessions();
     }
 
     private void sendMessage() {

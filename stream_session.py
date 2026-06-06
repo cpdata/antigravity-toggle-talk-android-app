@@ -56,14 +56,22 @@ def find_gemini_transcript(session_id):
         start_time = time.time()
         initial_files = set(os.listdir(chats_dir))
         while time.time() - start_time < 30:
-            if os.path.exists(chats_dir):
-                current_files = set(os.listdir(chats_dir))
-                new_files = current_files - initial_files
-                if new_files:
-                    new_paths = [os.path.join(chats_dir, f) for f in new_files]
-                    res = max(new_paths, key=os.path.getmtime)
-                    print(f"Found new transcript file: {res}")
-                    return res
+            current_files = set(os.listdir(chats_dir))
+            new_files = current_files - initial_files
+            if new_files:
+                new_paths = [os.path.join(chats_dir, f) for f in new_files]
+                res = max(new_paths, key=os.path.getmtime)
+                print(f"Found new transcript file: {res}")
+                return res
+            
+            # Fallback: if there are ANY files, and the latest one is very recent, adopt it
+            all_files = [os.path.join(chats_dir, f) for f in current_files if f.endswith(".jsonl")]
+            if all_files:
+                latest = max(all_files, key=os.path.getmtime)
+                if os.path.getmtime(latest) > start_time - 5:
+                    print(f"Adopting recent transcript file: {latest}")
+                    return latest
+            
             time.sleep(0.5)
         
     print("Transcript not found.")

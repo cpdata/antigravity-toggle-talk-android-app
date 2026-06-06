@@ -706,8 +706,9 @@ public class ToggleTalkService extends Service {
                 sessionId = callbackSessionId;
             }
             
-            if (mSelectedSessionId == null || mSelectedSessionId.isEmpty()) {
-                if (sessionId != null && !sessionId.isEmpty()) {
+            boolean currentIsPlaceholder = (mSelectedSessionId == null || mSelectedSessionId.isEmpty() || mSelectedSessionId.equals("unknown") || mSelectedSessionId.startsWith("new_"));
+            if (currentIsPlaceholder) {
+                if (sessionId != null && !sessionId.isEmpty() && !sessionId.equals("unknown") && !sessionId.startsWith("new_")) {
                     mSelectedSessionId = sessionId;
                     mContinueSession = true;
                     getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putString("selected_session_id", sessionId).apply();
@@ -826,8 +827,12 @@ public class ToggleTalkService extends Service {
 
     private void handleStreamedUpdate(String sessionId, String messagesJson, String filePath, String ttsText) {
         Log.d(TAG, "handleStreamedUpdate: received sessionId=" + sessionId + ", mSelectedSessionId=" + mSelectedSessionId);
-        
-        if ((mSelectedSessionId == null || mSelectedSessionId.isEmpty() || mSelectedSessionId.startsWith("new_") || mSelectedSessionId.equals("unknown")) && sessionId != null && !sessionId.isEmpty() && !sessionId.startsWith("new_")) {
+
+        // Adopt real session ID if current is empty or a placeholder
+        boolean currentIsPlaceholder = (mSelectedSessionId == null || mSelectedSessionId.isEmpty() || mSelectedSessionId.startsWith("new_") || mSelectedSessionId.equals("unknown"));
+        boolean newIsReal = (sessionId != null && !sessionId.isEmpty() && !sessionId.startsWith("new_") && !sessionId.equals("unknown"));
+
+        if (currentIsPlaceholder && newIsReal) {
             mSelectedSessionId = sessionId;
             mContinueSession = true;
             getSharedPreferences("ToggleTalkPrefs", MODE_PRIVATE).edit().putString("selected_session_id", sessionId).apply();
@@ -838,7 +843,11 @@ public class ToggleTalkService extends Service {
             sendBroadcast(sessionIntent);
         }
 
-        if (mSelectedSessionId != null && !mSelectedSessionId.equals(sessionId) && sessionId != null && !sessionId.isEmpty()) {
+        // Allow update if session matches, OR if we don't have a real session ID yet
+        boolean isMatch = (mSelectedSessionId != null && mSelectedSessionId.equals(sessionId));
+        boolean isInitialUpdate = currentIsPlaceholder;
+
+        if (!isMatch && !isInitialUpdate) {
             Log.d(TAG, "Ignoring streamed update: sessionId mismatch. expected=" + mSelectedSessionId + ", got=" + sessionId);
             return;
         }
@@ -853,11 +862,10 @@ public class ToggleTalkService extends Service {
         if (ttsText != null && !ttsText.trim().isEmpty()) {
             String textToSpeak = sanitizeInApp(ttsText.trim());
             if (!textToSpeak.isEmpty()) {
-                queueTtsText(sessionId, textToSpeak);
+                queueTtsText(mSelectedSessionId, textToSpeak);
             }
         }
     }
-
     private synchronized void queueTtsText(String sessionId, String text) {
         if (text == null || text.trim().isEmpty()) return;
         

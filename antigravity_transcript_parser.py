@@ -11,7 +11,7 @@ def parse_transcript_steps(raw_steps):
     if not raw_steps:
         return []
 
-    # Detect format based on the first few entries
+    # Detect format
     is_gemini_cli = False
     for step in raw_steps:
         if step.get("type") in ["user", "gemini", "warning"]:
@@ -21,8 +21,8 @@ def parse_transcript_steps(raw_steps):
             break
 
     if is_gemini_cli:
-        # This should not happen, but as a fallback:
-        return []
+        from gemini_transcript_parser import parse_gemini_cli_format
+        return parse_gemini_cli_format(raw_steps)
     else:
         return parse_antigravity_format(raw_steps)
 

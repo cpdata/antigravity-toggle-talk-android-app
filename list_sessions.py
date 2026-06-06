@@ -10,16 +10,21 @@ AGY_BRAIN_DIR = "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain"
 # Gemini CLI paths
 GEMINI_TMP_DIR = "/data/data/com.termux/files/home/.gemini/tmp"
 
-def get_gemini_sessions():
-    # Use current directory to find the project name for Gemini CLI
-    cwd = os.getcwd()
+def get_gemini_sessions(target_dir=None):
+    # Use target_dir to find the project name for Gemini CLI
+    cwd = target_dir or os.getcwd()
     project_name = os.path.basename(cwd).lower()
     chats_dir = os.path.join(GEMINI_TMP_DIR, project_name, "chats")
     
     # If not found by exact project name, don't just pick any random one.
-    # We want sessions relative to the active directory.
     if not os.path.exists(chats_dir):
-        return []
+        # Fallback to home if toggletalkandroid doesn't exist
+        if project_name == "toggletalkandroid":
+            chats_dir = os.path.join(GEMINI_TMP_DIR, "home", "chats")
+            if not os.path.exists(chats_dir):
+                return []
+        else:
+            return []
 
     sessions = []
     for filename in os.listdir(chats_dir):
@@ -127,9 +132,10 @@ def get_antigravity_sessions():
 
 def main():
     agent = os.environ.get("AGENT", "antigravity")
+    target_dir = sys.argv[1] if len(sys.argv) > 1 else None
     
     if agent == "gemini":
-        print(json.dumps(get_gemini_sessions()))
+        print(json.dumps(get_gemini_sessions(target_dir)))
     else:
         print(json.dumps(get_antigravity_sessions()))
 
