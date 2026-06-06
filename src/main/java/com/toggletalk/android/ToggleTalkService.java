@@ -706,7 +706,7 @@ public class ToggleTalkService extends Service {
                 sessionId = callbackSessionId;
             }
             
-            boolean currentIsPlaceholder = (mSelectedSessionId == null || mSelectedSessionId.isEmpty() || mSelectedSessionId.equals("unknown") || mSelectedSessionId.startsWith("new_"));
+            boolean currentIsPlaceholder = (mSelectedSessionId == null || mSelectedSessionId.isEmpty() || mSelectedSessionId.startsWith("new_") || mSelectedSessionId.equals("unknown") || mSelectedSessionId.equals("test_session"));
             if (currentIsPlaceholder) {
                 if (sessionId != null && !sessionId.isEmpty() && !sessionId.equals("unknown") && !sessionId.startsWith("new_")) {
                     mSelectedSessionId = sessionId;
@@ -829,7 +829,7 @@ public class ToggleTalkService extends Service {
         Log.d(TAG, "handleStreamedUpdate: received sessionId=" + sessionId + ", mSelectedSessionId=" + mSelectedSessionId);
 
         // Adopt real session ID if current is empty or a placeholder
-        boolean currentIsPlaceholder = (mSelectedSessionId == null || mSelectedSessionId.isEmpty() || mSelectedSessionId.startsWith("new_") || mSelectedSessionId.equals("unknown"));
+        boolean currentIsPlaceholder = (mSelectedSessionId == null || mSelectedSessionId.isEmpty() || mSelectedSessionId.startsWith("new_") || mSelectedSessionId.equals("unknown") || mSelectedSessionId.equals("test_session"));
         boolean newIsReal = (sessionId != null && !sessionId.isEmpty() && !sessionId.startsWith("new_") && !sessionId.equals("unknown"));
 
         if (currentIsPlaceholder && newIsReal) {
