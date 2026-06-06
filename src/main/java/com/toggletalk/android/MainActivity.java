@@ -32,6 +32,10 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import android.widget.RadioGroup;
+import android.widget.RadioButton;
+import com.toggletalk.android.agent.AgentCLI;
+import com.toggletalk.android.agent.AgentManager;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -52,6 +56,9 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
     private CheckBox mCbWakeLock;
     private CheckBox mCbCollapseTools;
     private CheckBox mCbCollapseThoughts;
+    private RadioGroup mRgAgentSelection;
+    private RadioButton mRbAgentAntigravity;
+    private RadioButton mRbAgentGemini;
     private boolean mWakeLockEnabled = false;
     private boolean mCollapseTools = false;
     private boolean mCollapseThoughts = false;
@@ -919,6 +926,11 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
             });
         }
 
+        mRgAgentSelection = findViewById(R.id.rg_agent_selection);
+        mRbAgentAntigravity = findViewById(R.id.rb_agent_antigravity);
+        mRbAgentGemini = findViewById(R.id.rb_agent_gemini);
+        setupAgentSelection();
+
         // Initialize multi-view architecture
         mHelper = new ToggleTalkMainHelper(this);
         mViewFlipper = findViewById(R.id.view_flipper);
@@ -968,6 +980,34 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         if (mSelectedSessionId != null && !mSelectedSessionId.isEmpty()) {
             loadSessionHistory(mSelectedSessionId);
         }
+    }
+
+    private void setupAgentSelection() {
+        if (mRgAgentSelection == null) return;
+
+        AgentManager agentManager = AgentManager.getInstance(this);
+        String activeAgentId = agentManager.getActiveAgent().getId();
+        
+        if ("gemini".equals(activeAgentId)) {
+            mRbAgentGemini.setChecked(true);
+        } else {
+            mRbAgentAntigravity.setChecked(true);
+        }
+
+        mRgAgentSelection.setOnCheckedChangeListener((group, checkedId) -> {
+            String newAgentId = (checkedId == R.id.rb_agent_gemini) ? "gemini" : "antigravity";
+            agentManager.setActiveAgent(this, newAgentId);
+            Log.d(TAG, "Switched active agent to: " + newAgentId);
+            
+            // Broadcast to service that agent changed
+            Intent intent = new Intent(this, ToggleTalkService.class);
+            intent.setAction("com.toggletalk.android.ACTION_AGENT_CHANGED");
+            intent.putExtra("active_agent_id", newAgentId);
+            startService(intent);
+            
+            // Refresh sessions list for the new agent
+            queryTermuxSessions();
+        });
     }
 
     private void showView(int index) {

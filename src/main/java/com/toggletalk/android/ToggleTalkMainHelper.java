@@ -10,6 +10,7 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.util.Log;
 import android.widget.Toast;
+import com.toggletalk.android.agent.AgentManager;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -152,13 +153,16 @@ public class ToggleTalkMainHelper {
         }
         PendingIntent pendingIntent = PendingIntent.getBroadcast(mActivity, 888, callbackIntent, flags);
 
+        String activeAgentId = AgentManager.getInstance(mActivity).getActiveAgent().getId();
+
         Intent runCommandIntent = new Intent();
         runCommandIntent.setClassName("com.termux", "com.termux.app.RunCommandService");
         runCommandIntent.setAction("com.termux.RUN_COMMAND");
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/python");
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{
-                "/data/data/com.termux/files/home/ToggleTalkAndroid/list_sessions.py"
-        });
+        runCommandIntent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash");
+        
+        String command = "AGENT=" + activeAgentId + " python3 /data/data/com.termux/files/home/ToggleTalkAndroid/list_sessions.py";
+        runCommandIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{"-c", command});
+        
         runCommandIntent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
         runCommandIntent.putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home");
         runCommandIntent.putExtra("com.termux.RUN_COMMAND_PENDING_INTENT", pendingIntent);

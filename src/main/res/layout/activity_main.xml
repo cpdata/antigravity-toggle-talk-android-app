@@ -317,6 +317,38 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Active Agent CLI:"
+                        android:textColor="#B0B0C0"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="4dp"
+                        android:layout_marginTop="8dp" />
+                    <RadioGroup
+                        android:id="@+id/rg_agent_selection"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_marginBottom="12dp">
+                        <RadioButton
+                            android:id="@+id/rb_agent_antigravity"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Antigravity CLI"
+                            android:textColor="#E6E6FA"
+                            android:textSize="13sp"
+                            android:buttonTint="#9D50BB" />
+                        <RadioButton
+                            android:id="@+id/rb_agent_gemini"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Gemini CLI"
+                            android:textColor="#E6E6FA"
+                            android:textSize="13sp"
+                            android:buttonTint="#9D50BB" />
+                    </RadioGroup>
                     <CheckBox
                         android:id="@+id/cb_mock_mode"
                         android:layout_width="match_parent"

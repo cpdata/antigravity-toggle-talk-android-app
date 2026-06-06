@@ -18,6 +18,8 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Vibrator;
 import android.util.Log;
+import com.toggletalk.android.agent.AgentCLI;
+import com.toggletalk.android.agent.AgentManager;
 import java.util.ArrayList;
 
 import com.k2fsa.sherpa.onnx.OfflineRecognizer;
@@ -666,20 +668,6 @@ public class ToggleTalkService extends Service {
 
     private void runAntigravityReasoning(String sessionId, String transcript) {
         mIsStreamingActive = true;
-        // Construct the RUN_COMMAND Intent to invoke run_antigravity.sh in Termux
-        Intent runCommandIntent = new Intent();
-        runCommandIntent.setClassName("com.termux", "com.termux.app.RunCommandService");
-        runCommandIntent.setAction("com.termux.RUN_COMMAND");
-
-        // Set command: bash
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash");
-
-        // Script path
-        String scriptPath = "/data/data/com.termux/files/home/ToggleTalkAndroid/run_antigravity.sh";
-        
-        java.util.List<String> argList = new java.util.ArrayList<>();
-        argList.add(scriptPath);
-        argList.add(transcript);
         
         String absoluteTargetDir = "/data/data/com.termux/files/home";
         if (mTargetDirectory != null && !mTargetDirectory.isEmpty() && !"Home".equals(mTargetDirectory)) {
@@ -689,47 +677,11 @@ public class ToggleTalkService extends Service {
                 absoluteTargetDir = "/data/data/com.termux/files/home/" + mTargetDirectory;
             }
         }
-        argList.add(absoluteTargetDir);
         
         boolean continueSess = (sessionId != null && !sessionId.isEmpty());
-        argList.add(String.valueOf(continueSess));
-        if (continueSess) {
-            argList.add(sessionId);
-        } else {
-            argList.add("");
-        }
         
-        String[] arguments = argList.toArray(new String[0]);
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arguments);
-
-        // Run in background (don't pop up Termux console)
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home");
-
-        // Create PendingIntent for command result callback
-        Intent callbackIntent = new Intent(ACTION_ANTIGRAVITY_RESPONSE);
-        callbackIntent.putExtra("session_id", sessionId);
-        callbackIntent.setData(android.net.Uri.parse("session://" + (sessionId != null ? sessionId : "new")));
-        
-        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            flags |= PendingIntent.FLAG_MUTABLE;
-        }
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 1001, callbackIntent, flags);
-        runCommandIntent.putExtra("com.termux.RUN_COMMAND_PENDING_INTENT", pendingIntent);
-
-        Log.d(TAG, "Sending RUN_COMMAND to Termux for session " + sessionId + ": transcript=" + transcript);
-
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(runCommandIntent);
-            } else {
-                startService(runCommandIntent);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to send RUN_COMMAND intent", e);
-            updateState(sessionId, "IDLE", "Termux invocation failed");
-        }
+        Log.d(TAG, "Executing active agent for session " + sessionId + ": transcript=" + transcript);
+        AgentManager.getInstance(this).getActiveAgent().run(sessionId, transcript, absoluteTargetDir, continueSess);
     }
 
     private void handleAntigravityResponse(String callbackSessionId, String jsonString) {
@@ -1237,27 +1189,8 @@ public class ToggleTalkService extends Service {
         
         mStopRequested = true;
         
-        // 1. Force kill process using standard RunCommandService if session ID is not empty
-        if (!sessionId.isEmpty()) {
-            String pidFilePath = "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain/" + sessionId + "/.system_generated/logs/run.pid";
-            Intent killIntent = new Intent();
-            killIntent.setClassName("com.termux", "com.termux.app.RunCommandService");
-            killIntent.setAction("com.termux.RUN_COMMAND");
-            killIntent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash");
-            
-            // Improved individual kill: try to kill by PID from file, AND by session_id pattern in process list
-            String killCmd = "if [ -f " + pidFilePath + " ]; then PID=$(cat " + pidFilePath + "); kill -9 $PID 2>/dev/null; pkill -9 -P $PID 2>/dev/null; rm -f " + pidFilePath + "; fi; " +
-                             "pkill -9 -f " + sessionId + "; " +
-                             "pkill -9 -f \"stream_session.py.*" + sessionId + "\"";
-                             
-            killIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{"-c", killCmd});
-            killIntent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
-            try {
-                startService(killIntent);
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to start kill command", e);
-            }
-        }
+        // 1. Force kill the specific session via AgentCLI
+        AgentManager.getInstance(this).getActiveAgent().terminate(sessionId);
 
         // 2. Stop audio playback and flush TTS queue
         stopAudioPlayback();
@@ -1276,32 +1209,21 @@ public class ToggleTalkService extends Service {
     private void killAllSessions() {
         Log.d(TAG, "killAllSessions called");
 
-        // 1. Force kill all antigravity-related processes in Termux
+        // 1. Force kill all agent processes via AgentManager
+        for (AgentCLI agent : AgentManager.getInstance(this).getAgents()) {
+            agent.terminate(null); // Passing null implies global kill for that agent
+        }
+        
+        // Also kill stream watcher and general proot
         Intent killIntent = new Intent();
         killIntent.setClassName("com.termux", "com.termux.app.RunCommandService");
         killIntent.setAction("com.termux.RUN_COMMAND");
         killIntent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash");
-        
-        // Comprehensive kill command: 
-        // - Kill known scripts and binaries by pattern
-        // - Kill any proot instance (broad but effective for "Kill All")
-        // - Kill any process containing 'agy' or 'antigravity'
-        // - Kill the stream watcher
-        // - Clear PID files
-        String killCmd = "pkill -9 -f run_antigravity.sh; " +
-                         "pkill -9 -f agy; " +
-                         "pkill -9 -f antigravity; " +
-                         "pkill -9 -f stream_session.py; " +
-                         "pkill -9 proot; " +
-                         "find /data/data/com.termux/files/home/.gemini/antigravity-cli/brain -name run.pid -delete";
-                         
-        killIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{"-c", killCmd});
+        killIntent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{"-c", "pkill -9 -f stream_session.py; pkill -9 proot"});
         killIntent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
         try {
             startService(killIntent);
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to start global kill command", e);
-        }
+        } catch (Exception ignored) {}
 
         // 2. Stop audio playback and flush TTS queue
         stopAudioPlayback();

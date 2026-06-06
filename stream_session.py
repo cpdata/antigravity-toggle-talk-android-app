@@ -7,7 +7,7 @@ import re
 import subprocess
 import signal
 
-BRAIN_DIR = "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain"
+BRAIN_DIR = os.environ.get("AGENT_BRAIN_DIR", "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain")
 stop_requested = False
 
 def handle_signal(signum, frame):
