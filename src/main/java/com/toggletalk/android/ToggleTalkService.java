@@ -825,6 +825,8 @@ public class ToggleTalkService extends Service {
     }
 
     private void handleStreamedUpdate(String sessionId, String messagesJson, String filePath, String ttsText) {
+        Log.d(TAG, "handleStreamedUpdate: received sessionId=" + sessionId + ", mSelectedSessionId=" + mSelectedSessionId);
+        
         if ((mSelectedSessionId == null || mSelectedSessionId.isEmpty() || mSelectedSessionId.startsWith("new_") || mSelectedSessionId.equals("unknown")) && sessionId != null && !sessionId.isEmpty() && !sessionId.startsWith("new_")) {
             mSelectedSessionId = sessionId;
             mContinueSession = true;
