@@ -35,7 +35,7 @@ def get_gemini_sessions():
                     if not sess_id: continue
                     
                     # Find first user message for title
-                    title = sess_id
+                    title = None
                     f.seek(0)
                     for line in f:
                         try:
@@ -43,11 +43,15 @@ def get_gemini_sessions():
                             if entry.get("type") == "user":
                                 content = entry.get("content")
                                 if isinstance(content, list) and len(content) > 0:
-                                    title = content[0].get("text", title)
+                                    title = content[0].get("text", sess_id)
                                 elif isinstance(content, str):
                                     title = content
                                 break
                         except: continue
+                    
+                    # Only include session if it has a user message (title is not None)
+                    if title is None:
+                        continue
                     
                     # Clean title
                     title = re.sub(r"\s+", " ", title).strip()

@@ -97,8 +97,9 @@ try:
                     latest_text = msg.get('content', '')
                     break
         if not latest_text: latest_text = data.get('content', '')
+        if not latest_text: latest_text = data.get('response', '')
         
-        sess_id = data.get('sessionId', '$SESSION_ID')
+        sess_id = data.get('sessionId') or data.get('session_id') or '$SESSION_ID'
         
         # Sanitize
         sanitized_tts = re.sub(r'#+\s+', '', latest_text)

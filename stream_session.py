@@ -26,35 +26,42 @@ def find_gemini_transcript(session_id):
     project_name = os.path.basename(os.getcwd()).lower()
     chats_dir = os.path.join(GEMINI_TMP_DIR, project_name, "chats")
     
-    if not os.path.exists(chats_dir):
-        return None
-
     if session_id and not session_id.startswith("new_"):
-        pattern = os.path.join(chats_dir, f"session-*-{session_id[:8]}*.jsonl")
-        files = glob.glob(pattern)
-        if files: return files[0]
-        
-        # Fallback: scan files for session_id in first line
-        for f in glob.glob(os.path.join(chats_dir, "*.jsonl")):
+        if os.path.exists(chats_dir):
+            pattern = os.path.join(chats_dir, f"session-*-{session_id[:8]}*.jsonl")
+            files = glob.glob(pattern)
+            if files: return files[0]
+            
+            # Fallback: scan files for session_id in first line
+            for f in glob.glob(os.path.join(chats_dir, "*.jsonl")):
+                try:
+                    with open(f, "r") as fh:
+                        if session_id in fh.readline(): return f
+                except: continue
+
+        # Global fallback: search all projects
+        pattern = os.path.join(GEMINI_TMP_DIR, "*", "chats", "*.jsonl")
+        for f in glob.glob(pattern):
             try:
                 with open(f, "r") as fh:
                     if session_id in fh.readline(): return f
             except: continue
     
-    # If new session, wait for a new file
-    start_time = time.time()
-    initial_files = set(os.listdir(chats_dir)) if os.path.exists(chats_dir) else set()
-    while time.time() - start_time < 30:
-        if os.path.exists(chats_dir):
-            current_files = set(os.listdir(chats_dir))
-            new_files = current_files - initial_files
-            if new_files:
-                # Pick the newest one
-                new_paths = [os.path.join(chats_dir, f) for f in new_files]
-                return max(new_paths, key=os.path.getmtime)
-        time.sleep(0.5)
+    # If new session, wait for a new file in current project
+    if os.path.exists(chats_dir):
+        start_time = time.time()
+        initial_files = set(os.listdir(chats_dir))
+        while time.time() - start_time < 30:
+            if os.path.exists(chats_dir):
+                current_files = set(os.listdir(chats_dir))
+                new_files = current_files - initial_files
+                if new_files:
+                    # Pick the newest one
+                    new_paths = [os.path.join(chats_dir, f) for f in new_files]
+                    return max(new_paths, key=os.path.getmtime)
+            time.sleep(0.5)
     
-    # Final fallback: latest file in chats_dir
+    # Final fallback: latest file in current project's chats_dir
     if os.path.exists(chats_dir):
         files = [os.path.join(chats_dir, f) for f in os.listdir(chats_dir) if f.endswith(".jsonl")]
         if files: return max(files, key=os.path.getmtime)
