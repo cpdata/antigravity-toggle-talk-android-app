@@ -202,14 +202,42 @@ def extract_tts_text(step_obj):
             return " ".join(seg.strip() for seg in tts_segments).strip()
     return None
 
-def find_start_index(lines, prompt):
+def find_start_index(lines, prompt, session_id):
     agent = os.environ.get("AGENT", "antigravity")
     
+    # If it's a new session, we want everything
+    if not session_id or session_id == "unknown" or session_id.startswith("new_"):
+        print("New session detected, starting from index 0")
+        return 0
+        
     if not prompt:
         # If no prompt, start from the beginning to show full history
         return 0
     
-    # Find the index of the last final response (the end of the last turn)
+    # Clean prompt for matching
+    clean_prompt = prompt.strip().lower()
+    
+    # Find the last USER_INPUT that matches the prompt
+    # We look backwards to find the most recent one
+    for idx in range(len(lines) - 1, -1, -1):
+        try:
+            obj = json.loads(lines[idx].strip())
+            content = obj.get("content", "").lower()
+            msg_type = obj.get("type", "")
+            
+            is_user = False
+            if agent == "gemini":
+                if msg_type == "user": is_user = True
+            else:
+                if msg_type == "USER_INPUT": is_user = True
+                
+            if is_user and clean_prompt in content:
+                print(f"Found matching prompt at index {idx}")
+                return idx
+        except Exception:
+            pass
+
+    # Fallback: Find the index of the last final response (the end of the last turn)
     last_final_resp_idx = -1
     for idx in range(len(lines) - 1, -1, -1):
         try:
@@ -242,9 +270,18 @@ def find_start_index(lines, prompt):
         except Exception:
             pass
             
-    # If no new user input found, start from after the last final response
-    # This ensures we pick up any partial responses or thoughts that might have started
-    return last_final_resp_idx + 1
+    # If we are here, it means we didn't find a new user input.
+    # If the file has lines but we are skipping them all, that's likely wrong for a streaming session
+    # unless we are sure they are old.
+    
+    # If the last line is a model response, maybe it's the one we are looking for?
+    # To be safe, if we have a prompt but couldn't find a matching USER_INPUT, 
+    # we start from after the last final response, but if that skips everything, 
+    # and the prompt was recent, we might want to be less aggressive.
+    
+    start_idx = last_final_resp_idx + 1
+    print(f"Fallback: streaming from index {start_idx} (last_final_resp_idx={last_final_resp_idx})")
+    return start_idx
 
 def tail_transcript(path, session_id, prompt):
     global stop_requested
@@ -289,11 +326,17 @@ def tail_transcript(path, session_id, prompt):
                 initial_lines = f.readlines()
         except: pass
 
-    current_line_idx = find_start_index(initial_lines, prompt)
-    print(f"Streaming from index {current_line_idx}")
+    current_line_idx = find_start_index(initial_lines, prompt, session_id)
+    
+    # If we have lines to process, process them immediately once
+    if current_line_idx < len(initial_lines):
+        print(f"Processing {len(initial_lines) - current_line_idx} initial lines")
+    else:
+        print(f"No initial lines to process (total lines: {len(initial_lines)})")
 
     while True:
         if stop_requested:
+            print("Stop requested, exiting tail loop")
             break
             
         if not os.path.exists(path):
@@ -305,6 +348,7 @@ def tail_transcript(path, session_id, prompt):
                 lines = f.readlines()
                 
             if len(lines) < current_line_idx:
+                print(f"File truncated? resetting index from {current_line_idx} to 0")
                 current_line_idx = 0
                 
             while current_line_idx < len(lines):
@@ -354,6 +398,7 @@ def tail_transcript(path, session_id, prompt):
             print(f"Error reading file: {e}")
             
         time.sleep(0.5)
+
 
 def main():
     session_id = sys.argv[1] if len(sys.argv) > 1 else ""

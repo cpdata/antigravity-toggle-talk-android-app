@@ -6,6 +6,9 @@ TARGET_DIR="${2:-$HOME}"
 CONTINUE_SESSION="${3:-false}"
 SESSION_ID="$4"
 
+# Find script directory to locate helper scripts
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # PID Process Tracking for active session termination
 PID_FILE=""
 if [ -n "$SESSION_ID" ]; then
@@ -56,7 +59,8 @@ TARGET_DIR="$(pwd)"
 PROMPT="${TRANSCRIPT}"
 
 # Start streaming updates in the background
-python3 "/data/data/com.termux/files/home/ToggleTalkAndroid/stream_session.py" "$SESSION_ID" "$TRANSCRIPT" &
+STREAM_LOG="$HOME/.gemini/stream_session.log"
+python3 "$SCRIPT_DIR/stream_session.py" "$SESSION_ID" "$TRANSCRIPT" > "$STREAM_LOG" 2>&1 &
 STREAM_PID=$!
 
 # Build agy argument list
@@ -94,8 +98,8 @@ if [ -z "$SESSION_ID" ]; then
 fi
 
 # Extract latest and sanitized versions
-LATEST_RESPONSE=$(printf "%s" "$RESPONSE" | python3 "$TARGET_DIR/tts_sanitize.py" --history-file "$LOG_FILE" --history-only)
-SANITIZED_TTS=$(printf "%s" "$RESPONSE" | python3 "$TARGET_DIR/tts_sanitize.py" --history-file "$LOG_FILE")
+LATEST_RESPONSE=$(printf "%s" "$RESPONSE" | python3 "$SCRIPT_DIR/tts_sanitize.py" --history-file "$LOG_FILE" --history-only)
+SANITIZED_TTS=$(printf "%s" "$RESPONSE" | python3 "$SCRIPT_DIR/tts_sanitize.py" --history-file "$LOG_FILE")
 
 # Save history
 echo "$RESPONSE" > "$LOG_FILE"

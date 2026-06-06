@@ -2394,6 +2394,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
     }
 
     private void handleStreamedDisplay(String sessionId, String messagesJson, String filePath) {
+        Log.d("MainActivity", "handleStreamedDisplay: sess=" + sessionId + ", hasJson=" + (messagesJson != null) + ", hasPath=" + (filePath != null));
         mBufferedSessionId = sessionId;
         mBufferedMessagesJson = messagesJson;
         mBufferedFilePath = filePath;
@@ -2412,20 +2413,23 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
     }
 
     private void performStreamedDisplay(String sessionId, String messagesJson, String filePath) {
+        Log.d("MainActivity", "performStreamedDisplay: sess=" + sessionId);
         try {
             String jsonContent = messagesJson;
             if ((jsonContent == null || jsonContent.isEmpty()) && filePath != null && !filePath.isEmpty()) {
                 jsonContent = readFileContent(filePath);
             }
             if (jsonContent == null || jsonContent.isEmpty()) {
+                Log.w("MainActivity", "performStreamedDisplay: empty content");
                 return;
             }
 
             org.json.JSONArray newHistory = new org.json.JSONArray(jsonContent);
-            if (newHistory.toString().equals(mCurrentSessionHistory.toString())) {
+            if (mCurrentSessionHistory != null && newHistory.toString().equals(mCurrentSessionHistory.toString())) {
                 return;
             }
 
+            Log.d("MainActivity", "Updating UI with " + newHistory.length() + " messages");
             mCurrentSessionHistory = newHistory;
 
             // Cache the streamed session history

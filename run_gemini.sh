@@ -6,9 +6,14 @@ TARGET_DIR="${2:-$HOME}"
 CONTINUE_SESSION="${3:-false}"
 SESSION_ID="$4"
 
+# Find script directory to locate helper scripts
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Set up environment
 export AGENT_ENV_TYPE="ToggleTalkApp"
 export AGENT="gemini"
+export SCRIPT_DIR="$SCRIPT_DIR"
+export PYTHONPATH="$SCRIPT_DIR:$PYTHONPATH"
 export PATH="/data/data/com.termux/files/usr/bin:$PATH"
 export CI=true
 
@@ -26,7 +31,7 @@ TARGET_DIR="$(pwd)"
 # Start streaming watcher in background
 # It will find the transcript file automatically
 STREAM_LOG="$HOME/.gemini/stream_session.log"
-python3 "/data/data/com.termux/files/home/ToggleTalkAndroid/stream_session.py" "$SESSION_ID" "$TRANSCRIPT" > "$STREAM_LOG" 2>&1 &
+python3 "$SCRIPT_DIR/stream_session.py" "$SESSION_ID" "$TRANSCRIPT" > "$STREAM_LOG" 2>&1 &
 STREAM_PID=$!
 
 # Prepare Gemini command
