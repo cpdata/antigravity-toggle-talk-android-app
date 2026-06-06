@@ -10,6 +10,7 @@ SESSION_ID="$4"
 export AGENT_ENV_TYPE="ToggleTalkApp"
 export AGENT="gemini"
 export PATH="/data/data/com.termux/files/usr/bin:$PATH"
+export CI=true
 
 # PID Tracking
 PID_DIR="$HOME/.gemini/agent-pids"
@@ -24,7 +25,7 @@ TARGET_DIR="$(pwd)"
 
 # Start streaming watcher in background
 # It will find the transcript file automatically
-python3 "/data/data/com.termux/files/home/ToggleTalkAndroid/stream_session.py" "$SESSION_ID" "$TRANSCRIPT" &
+python3 "/data/data/com.termux/files/home/ToggleTalkAndroid/stream_session.py" "$SESSION_ID" "$TRANSCRIPT" >/dev/null 2>&1 &
 STREAM_PID=$!
 
 # Prepare Gemini command

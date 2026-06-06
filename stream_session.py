@@ -164,12 +164,6 @@ def tail_transcript(path, session_id, prompt):
                 current_line_idx = find_start_index(lines, prompt)
         except: pass
 
-    if not session_id or session_id.startswith("new_"):
-        # Try to extract real session ID from path or file
-        pass
-
-    print(f"Streaming from {path} for session {session_id}, starting from index {current_line_idx}")
-
     while True:
         if not os.path.exists(path):
             if stop_requested: break
@@ -193,8 +187,8 @@ def tail_transcript(path, session_id, prompt):
                     obj = json.loads(line)
                     tts_text = extract_tts_text(obj)
                     
-                    # Update real session ID if we were using a placeholder
-                    if session_id.startswith("new_"):
+                    # Update real session ID if we were using a placeholder or it was empty
+                    if not session_id or session_id.startswith("new_"):
                         if "sessionId" in obj:
                             session_id = obj["sessionId"]
                         elif "id" in obj and obj.get("type") == "user":

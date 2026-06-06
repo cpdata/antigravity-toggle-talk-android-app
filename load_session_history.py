@@ -12,27 +12,23 @@ def find_gemini_transcript(session_id):
     project_name = os.path.basename(os.getcwd()).lower()
     chats_dir = os.path.join(GEMINI_TMP_DIR, project_name, "chats")
     
-    if not os.path.exists(chats_dir):
-        # Fallback to searching all projects
-        pattern = os.path.join(GEMINI_TMP_DIR, "*", "chats", "*.jsonl")
-        files = glob.glob(pattern)
-        for f in files:
-            try:
-                with open(f, "r") as fh:
-                    line = fh.readline()
-                    if session_id in line:
-                        return f
-            except: continue
-        return None
-
     if session_id:
-        # Try specific pattern first
-        pattern = os.path.join(chats_dir, f"session-*-{session_id[:8]}*.jsonl")
-        files = glob.glob(pattern)
-        if files: return files[0]
-        
-        # Fallback: scan files in this project's chats_dir
-        for f in glob.glob(os.path.join(chats_dir, "*.jsonl")):
+        if os.path.exists(chats_dir):
+            # Try specific pattern first
+            pattern = os.path.join(chats_dir, f"session-*-{session_id[:8]}*.jsonl")
+            files = glob.glob(pattern)
+            if files: return files[0]
+            
+            # Fallback: scan files in this project's chats_dir
+            for f in glob.glob(os.path.join(chats_dir, "*.jsonl")):
+                try:
+                    with open(f, "r") as fh:
+                        if session_id in fh.readline(): return f
+                except: continue
+
+        # Global fallback: search all projects
+        pattern = os.path.join(GEMINI_TMP_DIR, "*", "chats", "*.jsonl")
+        for f in glob.glob(pattern):
             try:
                 with open(f, "r") as fh:
                     if session_id in fh.readline(): return f
