@@ -100,8 +100,6 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
     private View mOptionCamera;
     private View mOptionQuickPrompts;
     private final java.util.Map<Integer, android.text.Spanned> mRenderedTextCache = new java.util.HashMap<>();
-
-    private final java.util.Map<Integer, android.text.Spanned> mRenderedCodeCache = new java.util.HashMap<>();
     private final java.util.Map<Integer, String> mCachedRawTexts = new java.util.HashMap<>();
     private final java.util.Set<Integer> mCollapsedIndices = new java.util.HashSet<>();
     private final java.util.Set<Integer> mExpandedSummaryIndices = new java.util.HashSet<>();
@@ -1642,7 +1640,6 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         mCollapsedIndices.clear();
         mExpandedSummaryIndices.clear();
         mRenderedTextCache.clear();
-        mRenderedCodeCache.clear();
         mCachedRawTexts.clear();
 
         // Check if cached session history exists on the app side
@@ -2219,7 +2216,6 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                 }
             }
         } else { // tool_result
-            contentTv.setTypeface(android.graphics.Typeface.MONOSPACE);
             if (!content.isEmpty()) {
                 if (header.startsWith("View File")) {
                     java.util.regex.Matcher m = java.util.regex.Pattern.compile("File Path:\\s*`?(file://[^`\\n]+)`?").matcher(content);
@@ -2234,22 +2230,16 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
                 }
 
                 String cachedRaw = mCachedRawTexts.get(index);
-                android.text.Spanned spanned = mRenderedCodeCache.get(index);
+                android.text.Spanned spanned = mRenderedTextCache.get(index);
                 if (spanned == null || !content.equals(cachedRaw)) {
-                    String lang = detectLanguage(content, header);
-                    String htmlContent;
-                    if (!lang.isEmpty() || looksLikeCode(content)) {
-                        htmlContent = renderAndHighlightCodeBlock(content, lang);
-                    } else {
-                        htmlContent = renderPlainMonospace(content);
+                    String processedContent = content;
+                    // Auto-wrap in backticks if it looks like code and has no backticks
+                    if (!content.contains("```") && looksLikeCode(content)) {
+                        String lang = detectLanguage(content, header);
+                        processedContent = "```" + lang + "\n" + content + "\n```";
                     }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                        spanned = android.text.Html.fromHtml(htmlContent, android.text.Html.FROM_HTML_MODE_LEGACY);
-                    } else {
-                        spanned = android.text.Html.fromHtml(htmlContent);
-                    }
-                    spanned = makeSpansInterceptable(spanned);
-                    mRenderedCodeCache.put(index, spanned);
+                    spanned = renderMarkdown(processedContent);
+                    mRenderedTextCache.put(index, spanned);
                     mCachedRawTexts.put(index, content);
                 }
                 fullSpanned = spanned;
@@ -3010,9 +3000,9 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
 
         // --- Step 4: Apply markdown formatting ---
         // Headers (process most specific first)
-        String html = text.replaceAll("(?m)^###\\s+(.*)$", "<br/><font color=\"#00F2FE\"><b>$1</b></font><br/>");
-        html = html.replaceAll("(?m)^##\\s+(.*)$", "<br/><font color=\"#00F2FE\"><b><big>$1</big></b></font><br/>");
-        html = html.replaceAll("(?m)^#\\s+(.*)$", "<br/><font color=\"#00F2FE\"><b><big><big>$1</big></big></b></font><br/>");
+        String html = text.replaceAll("(?m)^###\\s+(.*?)\\r?$", "<br/><font color=\"#00F2FE\"><b>$1</b></font><br/>");
+        html = html.replaceAll("(?m)^##\\s+(.*?)\\r?$", "<br/><font color=\"#00F2FE\"><b><big>$1</big></b></font><br/>");
+        html = html.replaceAll("(?m)^#\\s+(.*?)\\r?$", "<br/><font color=\"#00F2FE\"><b><big><big>$1</big></big></b></font><br/>");
 
         // Bold (**text** and __text__) - must process before italic
         html = html.replaceAll("\\*\\*(.+?)\\*\\*", "<b>$1</b>");
@@ -3026,11 +3016,11 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         html = html.replaceAll("(?<=^|\\s)_([^_]+)_(?=$|\\s|[.,;:!?)])", "<i>$1</i>");
 
         // Bullets (lines starting with - or * followed by space)
-        html = html.replaceAll("(?m)^\\-\\s+(.*)$", "&#8226; $1<br/>");
-        html = html.replaceAll("(?m)^\\*\\s+(.*)$", "&#8226; $1<br/>");
+        html = html.replaceAll("(?m)^\\-\\s+(.*?)\\r?$", "&#8226; $1<br/>");
+        html = html.replaceAll("(?m)^\\*\\s+(.*?)\\r?$", "&#8226; $1<br/>");
 
         // Numbered lists
-        html = html.replaceAll("(?m)^(\\d+)\\.\\s+(.*)$", "$1. $2<br/>");
+        html = html.replaceAll("(?m)^(\\d+)\\.\\s+(.*?)\\r?$", "$1. $2<br/>");
 
         // Links: [text](url) -> <a href="url">text</a>
         html = html.replaceAll("\\[([^\\]]+)\\]\\(([^)]+)\\)", "<a href=\"$2\">$1</a>");
@@ -3934,7 +3924,6 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
             mCollapsedIndices.clear();
             mExpandedSummaryIndices.clear();
             mRenderedTextCache.clear();
-            mRenderedCodeCache.clear();
             mCachedRawTexts.clear();
         }
     }
