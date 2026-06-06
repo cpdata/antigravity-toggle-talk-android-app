@@ -6,6 +6,8 @@ TARGET_DIR="${2:-$HOME}"
 CONTINUE_SESSION="${3:-false}"
 SESSION_ID="$4"
 
+export AGENT="antigravity"
+
 # PID Process Tracking for active session termination
 if [ -n "$SESSION_ID" ]; then
     PID_FILE="$HOME/.gemini/antigravity-cli/brain/$SESSION_ID/.system_generated/logs/run.pid"

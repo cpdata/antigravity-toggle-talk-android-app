@@ -6,8 +6,13 @@ import time
 import re
 import subprocess
 import signal
+import glob
 
-BRAIN_DIR = os.environ.get("AGENT_BRAIN_DIR", "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain")
+# Default brain dir (Antigravity)
+DEFAULT_BRAIN_DIR = "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain"
+BRAIN_DIR = os.environ.get("AGENT_BRAIN_DIR", DEFAULT_BRAIN_DIR)
+GEMINI_TMP_DIR = "/data/data/com.termux/files/home/.gemini/tmp"
+
 stop_requested = False
 
 def handle_signal(signum, frame):
@@ -17,20 +22,69 @@ def handle_signal(signum, frame):
 signal.signal(signal.SIGTERM, handle_signal)
 signal.signal(signal.SIGINT, handle_signal)
 
+def find_gemini_transcript(session_id):
+    project_name = os.path.basename(os.getcwd()).lower()
+    chats_dir = os.path.join(GEMINI_TMP_DIR, project_name, "chats")
+    
+    if not os.path.exists(chats_dir):
+        # Try finding any chats dir in tmp
+        chats_dir_pattern = os.path.join(GEMINI_TMP_DIR, "*", "chats")
+        chats_dirs = glob.glob(chats_dir_pattern)
+        if not chats_dirs: return None
+        chats_dir = chats_dirs[0]
+
+    if session_id and not session_id.startswith("new_"):
+        pattern = os.path.join(chats_dir, f"session-*-{session_id[:8]}*.jsonl")
+        files = glob.glob(pattern)
+        if files: return files[0]
+        
+        # Fallback: scan files for session_id in first line
+        for f in glob.glob(os.path.join(chats_dir, "*.jsonl")):
+            try:
+                with open(f, "r") as fh:
+                    if session_id in fh.readline(): return f
+            except: continue
+    
+    # If new session, wait for a new file
+    start_time = time.time()
+    initial_files = set(os.listdir(chats_dir)) if os.path.exists(chats_dir) else set()
+    while time.time() - start_time < 30:
+        if os.path.exists(chats_dir):
+            current_files = set(os.listdir(chats_dir))
+            new_files = current_files - initial_files
+            if new_files:
+                # Pick the newest one
+                new_paths = [os.path.join(chats_dir, f) for f in new_files]
+                return max(new_paths, key=os.path.getmtime)
+        time.sleep(0.5)
+    
+    # Final fallback: latest file in chats_dir
+    if os.path.exists(chats_dir):
+        files = [os.path.join(chats_dir, f) for f in os.listdir(chats_dir) if f.endswith(".jsonl")]
+        if files: return max(files, key=os.path.getmtime)
+        
+    return None
+
 def find_log_path(session_id):
+    explicit_path = os.environ.get("AGENT_TRANSCRIPT_PATH")
+    if explicit_path and os.path.exists(explicit_path):
+        return explicit_path
+
+    agent = os.environ.get("AGENT", "antigravity")
+    if agent == "gemini":
+        return find_gemini_transcript(session_id)
+
     if session_id:
         path = os.path.join(BRAIN_DIR, session_id, ".system_generated", "logs", "transcript_full.jsonl")
-        return path
+        if os.path.exists(path): return path
     
-    # Capture initial directories to exclude them (avoid latching onto the previous session)
+    # Antigravity new session wait logic
     initial_dirs = set()
     if os.path.exists(BRAIN_DIR):
         try:
             initial_dirs = {d for d in os.listdir(BRAIN_DIR) if os.path.isdir(os.path.join(BRAIN_DIR, d))}
-        except Exception:
-            pass
+        except: pass
             
-    # Wait for a new transcript file to appear
     start_time = time.time()
     while time.time() - start_time < 30:
         try:
@@ -41,23 +95,17 @@ def find_log_path(session_id):
                     new_paths = [os.path.join(BRAIN_DIR, d) for d in new_dirs]
                     latest_dir = max(new_paths, key=os.path.getmtime)
                     path = os.path.join(latest_dir, ".system_generated", "logs", "transcript_full.jsonl")
-                    if os.path.exists(path):
-                        return path
-        except Exception:
-            pass
+                    if os.path.exists(path): return path
+        except: pass
         time.sleep(0.2)
         
-    # Fallback to the latest directory overall if no new directory was created after timeout
     try:
         subdirs = [os.path.join(BRAIN_DIR, d) for d in os.listdir(BRAIN_DIR) if os.path.isdir(os.path.join(BRAIN_DIR, d))]
         if subdirs:
             latest_dir = max(subdirs, key=os.path.getmtime)
             path = os.path.join(latest_dir, ".system_generated", "logs", "transcript_full.jsonl")
-            if os.path.exists(path):
-                return path
-    except Exception:
-        pass
-        
+            if os.path.exists(path): return path
+    except: pass
     return None
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -70,86 +118,58 @@ def send_broadcast(session_id, json_str=None, file_path=None, tts_text=None):
         "-a", "com.toggletalk.android.ACTION_STREAM_UPDATE",
         "--es", "session_id", session_id
     ]
-    if json_str:
-        cmd += ["--es", "messages_json", json_str]
-    if file_path:
-        cmd += ["--es", "file_path", file_path]
-    if tts_text:
-        cmd += ["--es", "tts_text", tts_text]
+    if json_str: cmd += ["--es", "messages_json", json_str]
+    if file_path: cmd += ["--es", "file_path", file_path]
+    if tts_text: cmd += ["--es", "tts_text", tts_text]
     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def extract_tts_text(step_obj):
     msg_type = step_obj.get("type", "")
-    source = step_obj.get("source", "")
-    if msg_type == "PLANNER_RESPONSE" and source == "MODEL":
+    # Handle Antigravity format
+    if msg_type == "PLANNER_RESPONSE":
         content = step_obj.get("content") or step_obj.get("thinking") or ""
-        # Find all occurrences of <tts>...</tts>
         tts_segments = re.findall(r"<tts>(.*?)</tts>", content, re.DOTALL)
-        if tts_segments:
-            return " ".join(seg.strip() for seg in tts_segments).strip()
+        if tts_segments: return " ".join(seg.strip() for seg in tts_segments).strip()
+    # Handle Gemini format
+    elif msg_type == "gemini":
+        content = step_obj.get("content", "")
+        tts_segments = re.findall(r"<tts>(.*?)</tts>", content, re.DOTALL)
+        if tts_segments: return " ".join(seg.strip() for seg in tts_segments).strip()
     return None
 
 def find_start_index(lines, prompt):
-    if not prompt:
-        return len(lines)
-    
-    # Find the index of the last final PLANNER_RESPONSE (the end of the last turn)
-    last_final_resp_idx = -1
+    if not prompt: return len(lines)
+    # Search backwards for the start of the current turn
     for idx in range(len(lines) - 1, -1, -1):
         try:
             obj = json.loads(lines[idx].strip())
-            if obj.get("type") == "PLANNER_RESPONSE" and obj.get("source") == "MODEL":
-                tool_calls = obj.get("tool_calls") or []
-                if not tool_calls: # Final response has no tool calls
-                    last_final_resp_idx = idx
-                    break
-        except Exception:
-            pass
-            
-    # Look for the USER_INPUT step after the last final response
-    for idx in range(last_final_resp_idx + 1, len(lines)):
-        try:
-            obj = json.loads(lines[idx].strip())
-            if obj.get("type") == "USER_INPUT":
-                # Found the new user input! Start streaming from here.
-                return idx
-        except Exception:
-            pass
-            
-    # If no USER_INPUT was found after the last final response, it hasn't been written yet.
-    # Start streaming from the end of the file.
+            # Antigravity start
+            if obj.get("type") == "USER_INPUT": return idx
+            # Gemini start
+            if obj.get("type") == "user": return idx
+        except: pass
     return len(lines)
 
 def tail_transcript(path, session_id, prompt):
     global stop_requested
     
-    # Read initial lines if file exists
-    initial_lines = []
+    current_line_idx = 0
     if os.path.exists(path):
         try:
             with open(path, "r", encoding="utf-8") as f:
-                initial_lines = f.readlines()
-        except Exception:
-            pass
+                lines = f.readlines()
+                current_line_idx = find_start_index(lines, prompt)
+        except: pass
 
-    # Find the starting index for streaming
-    start_idx = find_start_index(initial_lines, prompt)
+    if not session_id or session_id.startswith("new_"):
+        # Try to extract real session ID from path or file
+        pass
 
-    # Extract session ID from path if not provided
-    if not session_id:
-        parts = path.split(os.sep)
-        if len(parts) >= 6:
-            session_id = parts[-4]
-        else:
-            session_id = "unknown"
+    print(f"Streaming from {path} for session {session_id}, starting from index {current_line_idx}")
 
-    print(f"Streaming from {path} for session {session_id}, starting from index {start_idx}")
-
-    current_line_idx = start_idx
     while True:
         if not os.path.exists(path):
-            if stop_requested:
-                break
+            if stop_requested: break
             time.sleep(0.5)
             continue
             
@@ -157,33 +177,33 @@ def tail_transcript(path, session_id, prompt):
             with open(path, "r", encoding="utf-8") as f:
                 lines = f.readlines()
                 
-            # If the file was truncated/recreated
             if len(lines) < current_line_idx:
                 current_line_idx = 0
                 
             while current_line_idx < len(lines):
-                if stop_requested:
-                    break
+                if stop_requested: break
                 line = lines[current_line_idx].strip()
                 current_line_idx += 1
-                
-                if not line:
-                    continue
+                if not line: continue
                     
                 try:
                     obj = json.loads(line)
-                    # Extract any TTS text to speak from this new step
                     tts_text = extract_tts_text(obj)
                     
-                    # Parse all steps up to the current line
+                    # Update real session ID if we were using a placeholder
+                    if session_id.startswith("new_"):
+                        if "sessionId" in obj:
+                            session_id = obj["sessionId"]
+                        elif "id" in obj and obj.get("type") == "user":
+                            # Use file metadata or something
+                            pass
+
                     parsed_steps = []
                     for l in lines[:current_line_idx]:
                         l = l.strip()
                         if l:
-                            try:
-                                parsed_steps.append(json.loads(l))
-                            except Exception:
-                                pass
+                            try: parsed_steps.append(json.loads(l))
+                            except: pass
                     
                     messages = parse_transcript_steps(parsed_steps)
                     json_str = json.dumps(messages)
@@ -194,25 +214,16 @@ def tail_transcript(path, session_id, prompt):
                         out_dir = "/sdcard/Android/media/com.toggletalk.android"
                         os.makedirs(out_dir, exist_ok=True)
                         out_path = os.path.join(out_dir, "stream_history.json")
-                        try:
-                            with open(out_path, "w", encoding="utf-8") as out_f:
-                                out_f.write(json_str)
-                            send_broadcast(session_id, file_path=out_path, tts_text=tts_text)
-                        except Exception:
-                            # Fallback if SD card write fails
-                            send_broadcast(session_id, json_str=json_str, tts_text=tts_text)
+                        with open(out_path, "w", encoding="utf-8") as out_f:
+                            out_f.write(json_str)
+                        send_broadcast(session_id, file_path=out_path, tts_text=tts_text)
                 except Exception as e:
-                    print(f"Error parsing line: {e}")
+                    print(f"Error: {e}")
             
-            # Break if stop was requested and we have read all lines
-            if stop_requested and current_line_idx >= len(lines):
-                break
-                
+            if stop_requested and current_line_idx >= len(lines): break
         except Exception as e:
-            print(f"Error reading file: {e}")
-            if stop_requested:
-                break
-            
+            print(f"Error: {e}")
+            if stop_requested: break
         time.sleep(0.5)
 
 def main():

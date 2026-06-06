@@ -6,16 +6,78 @@ def parse_transcript_steps(raw_steps):
     Parses a list of JSON transcript steps and returns a list of dictionaries
     representing messages to display, each with 'role' and 'text'.
     
-    Roles:
-      - 'user': User message
-      - 'agent': Final agent response of a turn
-      - 'thought': Intermediate planning/thoughts from the model
-      - 'tool_call': Tool calls, execution results, system messages, or errors
+    Supports both Antigravity (USER_INPUT/PLANNER_RESPONSE) and Gemini CLI (user/gemini/etc.) formats.
     """
+    if not raw_steps:
+        return []
+
+    # Detect format based on the first few entries
+    is_gemini_cli = False
+    for step in raw_steps:
+        if step.get("type") in ["user", "gemini", "warning"]:
+            is_gemini_cli = True
+            break
+        if step.get("type") in ["USER_INPUT", "PLANNER_RESPONSE"]:
+            break
+
+    if is_gemini_cli:
+        return parse_gemini_cli_format(raw_steps)
+    else:
+        return parse_antigravity_format(raw_steps)
+
+def parse_gemini_cli_format(raw_steps):
+    messages = []
+    for obj in raw_steps:
+        msg_type = obj.get("type")
+        content = obj.get("content")
+        
+        if msg_type == "user":
+            text = ""
+            if isinstance(content, list):
+                text = " ".join(part.get("text", "") for part in content if isinstance(part, dict))
+            elif isinstance(content, str):
+                text = content
+            
+            if text.strip():
+                messages.append({"role": "user", "text": text.strip()})
+        
+        elif msg_type == "gemini":
+            text = ""
+            if isinstance(content, str):
+                text = content
+            
+            # Extract thoughts as separate messages
+            thoughts = obj.get("thoughts", [])
+            for thought in thoughts:
+                thought_text = thought.get("description", "")
+                if thought_text.strip():
+                    messages.append({"role": "thought", "text": thought_text.strip()})
+            
+            # Handle tool calls
+            tool_calls = obj.get("toolCalls", [])
+            for tc in tool_calls:
+                tc_name = tc.get("name", "")
+                tc_args = tc.get("args", {})
+                args_str = ", ".join(f"{k}={v}" for k, v in tc_args.items())
+                messages.append({"role": "tool_call", "text": f"Calling tool {tc_name}({args_str})"})
+            
+            if text.strip():
+                messages.append({"role": "agent", "text": text.strip()})
+        
+        elif msg_type == "tool_result" or (msg_type == "gemini" and "toolCalls" in obj):
+            # Tool results are often embedded or separate in Gemini CLI
+            # If separate:
+            if msg_type == "tool_result":
+                text = content.strip() if isinstance(content, str) else ""
+                if text:
+                    messages.append({"role": "tool_result", "text": text})
+
+    return messages
+
+def parse_antigravity_format(raw_steps):
     messages = []
     num_steps = len(raw_steps)
 
-    # Segment the raw steps list into logical turn blocks.
     user_input_indices = [i for i, step in enumerate(raw_steps) if step.get("type") == "USER_INPUT"]
     blocks = []
     if not user_input_indices:
@@ -28,7 +90,6 @@ def parse_transcript_steps(raw_steps):
             end = user_input_indices[i+1] if i + 1 < len(user_input_indices) else num_steps
             blocks.append((start, end))
 
-    # Identify the last planner response of each block.
     final_planner_response_indices = set()
     for start, end in blocks:
         last_pr_idx = -1
@@ -46,22 +107,15 @@ def parse_transcript_steps(raw_steps):
         tool_calls = obj.get("tool_calls") or []
 
         if msg_type == "USER_INPUT" and content.strip():
-            # Strip wrapping tags, keep the user request text
-            m = re.search(
-                r"<USER_REQUEST>(.*?)(?:</USER_REQUEST>|$)",
-                content, re.DOTALL
-            )
+            m = re.search(r"<USER_REQUEST>(.*?)(?:</USER_REQUEST>|$)", content, re.DOTALL)
             text = m.group(1).strip() if m else content.strip()
-            # Remove remaining XML/metadata tags
             text = re.sub(r"<[^>]+>.*?</[^>]+>", "", text, flags=re.DOTALL).strip()
             text = re.sub(r"<[^>]+>", "", text).strip()
             if text:
                 messages.append({"role": "user", "text": text})
 
         elif msg_type == "PLANNER_RESPONSE" and source == "MODEL":
-            # Only set is_final = True for the last planner response of the turn block
             is_final = (idx in final_planner_response_indices)
-
             stripped_content = content.strip() if content else ""
             if stripped_content:
                 status = obj.get("status", "")
@@ -80,7 +134,6 @@ def parse_transcript_steps(raw_steps):
             text = content.strip() if content else ""
             if not text and "error" in obj:
                 text = f"Error: {obj['error']}"
-            
             if text:
                 friendly_type = msg_type.replace("_", " ").title()
                 status = obj.get("status", "")

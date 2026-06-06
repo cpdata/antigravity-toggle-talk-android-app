@@ -3,31 +3,77 @@ import os
 import json
 import re
 import subprocess
+import glob
 
-BRAIN_DIR = "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain"
+# Antigravity paths
+AGY_BRAIN_DIR = "/data/data/com.termux/files/home/.gemini/antigravity-cli/brain"
+# Gemini CLI paths
+GEMINI_TMP_DIR = "/data/data/com.termux/files/home/.gemini/tmp"
 
 def get_gemini_sessions():
-    try:
-        # Run gemini --list-sessions and parse output
-        result = subprocess.run(["gemini", "--list-sessions"], capture_output=True, text=True)
-        lines = result.stdout.splitlines()
-        sessions = []
-        for line in lines:
-            # Match: "  1. Complete task... [uuid]"
-            match = re.search(r"\d+\.\s+(.*?)\s+\[([a-f0-9-]+)\]", line)
-            if match:
-                title = match.group(1).strip()
-                sess_id = match.group(2).strip()
-                sessions.append({
-                    "id": sess_id,
-                    "title": title
-                })
-        return sessions
-    except Exception:
-        return []
+    project_name = os.path.basename(os.getcwd()).lower()
+    chats_dir = os.path.join(GEMINI_TMP_DIR, project_name, "chats")
+    
+    if not os.path.exists(chats_dir):
+        # Try finding any chats dir in tmp
+        chats_dir_pattern = os.path.join(GEMINI_TMP_DIR, "*", "chats")
+        chats_dirs = glob.glob(chats_dir_pattern)
+        if not chats_dirs:
+            return []
+        chats_dir = chats_dirs[0] # Take the first one if current project not found
+
+    sessions = []
+    if os.path.exists(chats_dir):
+        for filename in os.listdir(chats_dir):
+            if filename.endswith(".jsonl"):
+                path = os.path.join(chats_dir, filename)
+                try:
+                    with open(path, "r", encoding="utf-8") as f:
+                        # First line should be session metadata
+                        first_line = f.readline()
+                        if not first_line: continue
+                        meta = json.loads(first_line)
+                        sess_id = meta.get("sessionId")
+                        if not sess_id: continue
+                        
+                        # Find first user message for title
+                        title = sess_id
+                        f.seek(0)
+                        for line in f:
+                            try:
+                                entry = json.loads(line)
+                                if entry.get("type") == "user":
+                                    content = entry.get("content")
+                                    if isinstance(content, list) and len(content) > 0:
+                                        title = content[0].get("text", title)
+                                    elif isinstance(content, str):
+                                        title = content
+                                    break
+                            except: continue
+                        
+                        # Clean title
+                        title = re.sub(r"\s+", " ", title).strip()
+                        if len(title) > 60:
+                            title = title[:57] + "..."
+                            
+                        mtime = os.path.getmtime(path)
+                        sessions.append({
+                            "id": sess_id,
+                            "title": title,
+                            "mtime": mtime
+                        })
+                except Exception:
+                    continue
+                    
+    sessions.sort(key=lambda x: x["mtime"], reverse=True)
+    for s in sessions:
+        del s["mtime"]
+        # Keep path? The app doesn't need it, but load_history might.
+        # Actually, the app only passes the ID.
+    return sessions
 
 def get_antigravity_session_title(session_id):
-    transcript_path = os.path.join(BRAIN_DIR, session_id, ".system_generated", "logs", "transcript.jsonl")
+    transcript_path = os.path.join(AGY_BRAIN_DIR, session_id, ".system_generated", "logs", "transcript.jsonl")
     if not os.path.exists(transcript_path):
         return session_id
     try:
@@ -38,7 +84,6 @@ def get_antigravity_session_title(session_id):
             data = json.loads(first_line)
             content = data.get("content", "")
             
-            # Extract content from <USER_REQUEST>...</USER_REQUEST> if present
             user_req_match = re.search(r"<USER_REQUEST>(.*?)(?:</USER_REQUEST>|$)", content, re.DOTALL)
             if user_req_match:
                 title = user_req_match.group(1).strip()
@@ -57,11 +102,11 @@ def get_antigravity_session_title(session_id):
         return session_id
 
 def get_antigravity_sessions():
-    if not os.path.exists(BRAIN_DIR):
+    if not os.path.exists(AGY_BRAIN_DIR):
         return []
     sessions = []
-    for item in os.listdir(BRAIN_DIR):
-        item_path = os.path.join(BRAIN_DIR, item)
+    for item in os.listdir(AGY_BRAIN_DIR):
+        item_path = os.path.join(AGY_BRAIN_DIR, item)
         if os.path.isdir(item_path):
             if os.path.exists(os.path.join(item_path, ".system_generated")):
                 title = get_antigravity_session_title(item)
