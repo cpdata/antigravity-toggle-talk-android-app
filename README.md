@@ -11,8 +11,7 @@ ToggleTalk Android is a native GPU/NPU-accelerated speech-to-speech companion ap
   * **Text-to-Speech (TTS)**: Kokoro TTS Offline Generator (`kokoro-en-v0_19-int8.onnx`).
 * **Interactive Main Interface**:
   * **Breathing Visualizer Rings**: Animated state-specific concentric rings (Recording: Red, Thinking: Blue, Speaking: Green, Idle: Purple).
-  * **Session Continuity Toggle**: Opt-in check for continuous agent conversation sessions.
-  * **Log Console**: High-contrast, scrollable transcript and logger output.
+  * **Conversation**: High-contrast, scrollable conversation transcripts with markdown rendering and code syntax highlighting..
 * **Workspace / Directory Drawer**:
   * Slide out edge drawer showing available project directories. Allows users to switch the active context directory of the Antigravity agent CLI directly from the UI.
 * **Quick Access Points**:
@@ -20,6 +19,7 @@ ToggleTalk Android is a native GPU/NPU-accelerated speech-to-speech companion ap
   * **Home Screen Widget**: A visually synchronized home-screen widget to start and stop speech interactions instantly.
 * **Termux Bridge**: Asynchronously executes the reasoning script via `com.termux.RUN_COMMAND` intent.
 
+> Note: Features list above is outdated/incomplete
 ---
 
 ## 📐 Architecture and Data Flow
@@ -64,7 +64,7 @@ ToggleTalk Android is a native GPU/NPU-accelerated speech-to-speech companion ap
 1. **Idle ➔ Recording**: Triggered via UI button, widget, or tile. `AudioRecord` captures mono 16kHz raw PCM samples.
 2. **Recording ➔ Thinking**: Tapped again to stop recording. The raw PCM buffer is transcribed in-memory by Sherpa-ONNX (Whisper).
 3. **Agent Invocation**: App sends the transcript to Termux via `com.termux.RUN_COMMAND` invoking `run_antigravity.sh`.
-4. **Thinking ➔ Speaking**: Termux processes the transcript, returns a JSON object with the output. The app parses the response and feeds it to Sherpa-ONNX (Kokoro) to generate speech.
+4. (may be outdated) **Thinking ➔ Speaking**: Termux processes the transcript, returns a JSON object with the output. The app parses the response and feeds it to Sherpa-ONNX (Kokoro) to generate speech.
 5. **Speaking ➔ Idle**: The generated audio plays via `AudioTrack` at 24kHz. The app resets to the `IDLE` state once completed.
 
 ---
@@ -77,17 +77,13 @@ ToggleTalk Android is a native GPU/NPU-accelerated speech-to-speech companion ap
 * Enabled developer options and **Wireless Debugging** (ADB) for local deployment.
 
 ### 2. Dependency Libraries
-* Download the official `sherpa-onnx` Android archive (`sherpa-onnx-vX.Y.Z-android-*.tar.bz2`) from the [k2-fsa/sherpa-onnx Releases](https://github.com/k2-fsa/sherpa-onnx/releases) page.
-* Copy the `.aar` libraries and binary dependencies to `libs/` folder:
-  ```bash
-  mkdir -p libs/
-  # Place sherpa-onnx aar archives here
-  ```
+* Downloaded the official `sherpa-onnx` Android archive (`sherpa-onnx-vX.Y.Z-android-*.tar.bz2`) from the [k2-fsa/sherpa-onnx Releases](https://github.com/k2-fsa/sherpa-onnx/releases) page.
+* Copied the `.aar` libraries and binary dependencies into `libs/` folder.
 
 ### 3. Dynamic Model Assets
 To maintain a small build size, models are dynamically loaded from local device storage:
-* Create a dedicated storage folder on the device: `/sdcard/ToggleTalkModels/`
-* Place the following model assets within that directory:
+* Created a dedicated storage folder on the device: `/sdcard/ToggleTalkModels/`
+* Placed the following model assets within that directory:
   * **Whisper (STT)**:
     * `whisper-tiny.en-encoder.int8.onnx`
     * `whisper-tiny.en-decoder.int8.onnx`
@@ -106,15 +102,18 @@ The project is built using Gradle. Since compilation takes place on-device or lo
 
 ```bash
 # Build the Debug APK
-./gradlew assembleDebug
+gradle assembleDebug
 
 # Install on connected device/emulator
-./gradlew installDebug
+gradle installDebug
+
+# Or alternativley verify adb connection then build quietly + install quietly (Recommended)
+./deploy.sh
 ```
 
 ---
 
-## 📄 File Map
+## 📄 File Map - (outdated/incomplete)
 
 * `src/main/java/com/toggletalk/android/`
   * `MainActivity.java`: UI layout, breathing ring animations, edge drawer panel, and gesture handling.
