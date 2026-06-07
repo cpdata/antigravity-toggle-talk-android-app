@@ -3023,10 +3023,7 @@ public class MainActivity extends Activity implements PromptQueueView.OnPromptAc
         sbInline.append(text, lastEndInline, text.length());
         text = sbInline.toString();
 
-        // --- Step 3: Strip <tts> tags ---
-        text = text.replaceAll("<tts>", "").replaceAll("</tts>", "");
-
-        // --- Step 4: Apply markdown formatting ---
+        // --- Step 3: Apply markdown formatting ---
         // Headers (process most specific first)
         String html = text.replaceAll("(?m)^###\\s+(.*?)\\r?$", "<br/><font color=\"#00F2FE\"><b>$1</b></font><br/>");
         html = html.replaceAll("(?m)^##\\s+(.*?)\\r?$", "<br/><font color=\"#00F2FE\"><b><big>$1</big></b></font><br/>");

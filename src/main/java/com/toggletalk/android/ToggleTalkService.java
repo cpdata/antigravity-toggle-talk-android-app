@@ -739,11 +739,10 @@ public class ToggleTalkService extends Service {
             if (latestResponse.isEmpty()) {
                 latestResponse = jsonString;
             }
-            if (sanitizedTts.isEmpty()) {
-                sanitizedTts = latestResponse;
-            }
+            // Use sanitizedTts from JSON if available, otherwise fallback to latestResponse
+            String textToSanitize = (sanitizedTts != null && !sanitizedTts.isEmpty()) ? sanitizedTts : latestResponse;
             
-            processTTSOutput(sessionId, latestResponse, sanitizedTts);
+            processTTSOutput(sessionId, latestResponse, textToSanitize);
         } catch (Exception e) {
             Log.e(TAG, "Error parsing Antigravity JSON output", e);
             // Fallback: use raw stdout
@@ -768,31 +767,50 @@ public class ToggleTalkService extends Service {
 
     private String sanitizeInApp(String text) {
         if (text == null) return "";
-        text = text.replaceAll("(?m)^#+\\s+", "");
-        text = text.replaceAll("\\*\\*([^*]+)\\*\\*|__([^_]+)__", "$1$2");
-        text = text.replaceAll("\\*([^*]+)\\*", "$1");
-        text = text.replaceAll("_([^_]+)_", "$1");
-        text = text.replaceAll("\\[([^\\]]+)\\]\\([^)]+\\)", "$1");
-        text = text.replaceAll("`([^`]+)`", "$1");
-        text = text.replaceAll("```[a-zA-Z0-9_-]*\\s*", "");
-        text = text.replaceAll("/", " slash ");
-        text = text.replaceAll("\\\\", " backslash ");
-        text = text.replaceAll("(?<=\\w)\\.(?=\\w)", " dot ");
-        text = text.replaceAll("(^|\\s)\\.([a-zA-Z0-9_-]+)", "$1dot $2");
-        text = text.replaceAll("\\$(\\d+(?:\\.\\d+)?)", "$1 dollars");
-        text = text.replaceAll("\\$", " dollars ");
-        text = text.replaceAll("&", " and ");
-        text = text.replaceAll("@", " at ");
-        text = text.replaceAll("%", " percent");
-        text = text.replaceAll("\\+", " plus ");
-        text = text.replaceAll("=", " equals ");
-        text = text.replaceAll("#", " number ");
-        text = text.replaceAll("~", " tilde ");
-        text = text.replaceAll("_", " ");
-        text = text.replaceAll("[^\\w\\s.,!?;:\\-'\"()¿¡]", "");
-        text = text.replaceAll("[ \\t]+", " ");
-        text = text.replaceAll("\\n+", " ");
-        return text.trim();
+        // Extract content from <tts> tags if present, otherwise use the whole text
+        java.util.List<String> ttsSegments = new java.util.ArrayList<>();
+        java.util.regex.Pattern ttsPattern = java.util.regex.Pattern.compile("<tts>(.*?)</tts>", java.util.regex.Pattern.DOTALL);
+        java.util.regex.Matcher ttsMatcher = ttsPattern.matcher(text);
+        while (ttsMatcher.find()) {
+            ttsSegments.add(ttsMatcher.group(1));
+        }
+        
+        String cleanText;
+        if (!ttsSegments.isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            for (String seg : ttsSegments) {
+                sb.append(seg).append(" ");
+            }
+            cleanText = sb.toString().trim();
+        } else {
+            cleanText = text;
+        }
+
+        cleanText = cleanText.replaceAll("(?m)^#+\\s+", "");
+        cleanText = cleanText.replaceAll("\\*\\*([^*]+)\\*\\*|__([^_]+)__", "$1$2");
+        cleanText = cleanText.replaceAll("\\*([^*]+)\\*", "$1");
+        cleanText = cleanText.replaceAll("_([^_]+)_", "$1");
+        cleanText = cleanText.replaceAll("\\[([^\\]]+)\\]\\([^)]+\\)", "$1");
+        cleanText = cleanText.replaceAll("`([^`]+)`", "$1");
+        cleanText = cleanText.replaceAll("```[a-zA-Z0-9_-]*\\s*", "");
+        cleanText = cleanText.replaceAll("/", " slash ");
+        cleanText = cleanText.replaceAll("\\\\", " backslash ");
+        cleanText = cleanText.replaceAll("(?<=\\w)\\.(?=\\w)", " dot ");
+        cleanText = cleanText.replaceAll("(^|\\s)\\.([a-zA-Z0-9_-]+)", "$1dot $2");
+        cleanText = cleanText.replaceAll("\\$(\\d+(?:\\.\\d+)?)", "$1 dollars");
+        cleanText = cleanText.replaceAll("\\$", " dollars ");
+        cleanText = cleanText.replaceAll("&", " and ");
+        cleanText = cleanText.replaceAll("@", " at ");
+        cleanText = cleanText.replaceAll("%", " percent");
+        cleanText = cleanText.replaceAll("\\+", " plus ");
+        cleanText = cleanText.replaceAll("=", " equals ");
+        cleanText = cleanText.replaceAll("#", " number ");
+        cleanText = cleanText.replaceAll("~", " tilde ");
+        cleanText = cleanText.replaceAll("_", " ");
+        cleanText = cleanText.replaceAll("[^\\w\\s.,!?;:\\-'\"()¿¡]", "");
+        cleanText = cleanText.replaceAll("[ \\t]+", " ");
+        cleanText = cleanText.replaceAll("\\n+", " ");
+        return cleanText.trim();
     }
 
     private void processTTSOutput(final String sessionId, final String latestResponse, final String sanitizedTts) {
