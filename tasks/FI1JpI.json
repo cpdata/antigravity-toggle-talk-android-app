@@ -1,0 +1,22 @@
+{
+  "id": "FI1JpI",
+  "title": "Add Transcript Auto-Send Setting",
+  "description": "Add a toggle to the Settings pop up for a new setting to automatically send voice transcription prompts to the agent CLI directly instead of just populatong the prompt input text field woth the transcription.",
+  "status": "ready",
+  "priority": 0.3,
+  "assignedTo": "main-agent",
+  "dependencies": [],
+  "payload": {},
+  "metadata": {
+    "createdAt": "2026-06-09T20:55:33.052Z",
+    "updatedAt": "2026-06-09T20:55:33.052Z",
+    "createdBy": "main-agent",
+    "tags": [
+      "settings",
+      "feature"
+    ],
+    "requiredCapabilities": [],
+    "maxRetries": 3,
+    "retryCount": 0
+  }
+}
