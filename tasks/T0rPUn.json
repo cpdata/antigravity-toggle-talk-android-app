@@ -1,0 +1,22 @@
+{
+  "id": "T0rPUn",
+  "title": "Add hide TTS setting toggle",
+  "description": "Add a new toggle to settings for striping <tts> tags and their conteny from conversation view",
+  "status": "ready",
+  "priority": 0.3,
+  "assignedTo": "main-agent",
+  "dependencies": [],
+  "payload": {},
+  "metadata": {
+    "createdAt": "2026-06-09T21:07:56.384Z",
+    "updatedAt": "2026-06-09T21:07:56.384Z",
+    "createdBy": "main-agent",
+    "tags": [
+      "settings",
+      "feature"
+    ],
+    "requiredCapabilities": [],
+    "maxRetries": 3,
+    "retryCount": 0
+  }
+}
